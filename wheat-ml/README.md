@@ -62,7 +62,7 @@ python -m scripts.init_database     # CSV 成果导入 MySQL
 
 如本机已有 MySQL 8，可在 `data/mysql/mysql-8.0.24-winx64` 放置安装目录，并通过 `scripts/mysql_server.ps1` 启动；当前仓库不内置 MySQL 二进制。
 
-- 连接配置：[config.yaml](config/config.yaml) 的 `database` 段，默认 `127.0.0.1:3307`、库名 `wheat_ml`
+- 连接配置：[config.yaml](config/config.yaml) 的 `database` 段，默认 `127.0.0.1:3306`、库名 `wheat_ml`
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts\mysql_server.ps1 start   # 启动
@@ -70,16 +70,20 @@ powershell -ExecutionPolicy Bypass -File scripts\mysql_server.ps1 status  # 状�
 powershell -ExecutionPolicy Bypass -File scripts\mysql_server.ps1 stop    # 停止
 ```
 
-表结构：
+表结构（`src/db/schema.py` 定义，主键 / 唯一键 / 外键 / 索引齐全）：
 
 | 表 | 内容 | 行数 |
 |---|---|---|
-| counties | 151 个县（市、区）及所属市 | 151 |
-| weather_daily | 逐日气象（8 参数） | 827,329 |
-| feature_table | 年度 18 个生育期特征 | 2,265 |
-| yield_labels | 分县分年产量标签（`source=demo/real`） | 2,265 |
+| counties | 151 个县（市、区）及所属市、区域类型 | 151 |
+| weather_daily | 逐日气象（8 参数，按县 + 日期唯一） | 821,850 |
+| feature_table | 年度 18 个生育期特征（按县 + 年份唯一） | 2,250 |
+| yield_labels | 建模用分县分年产量标签（`source=real/demo`） | 1,635 |
 
-读取顺序：**上传数据 → MySQL → 内置 CSV**。数据库未启动时自动回退 CSV，页面功能不受影响。
+导入方式：`python -m scripts.init_database` 建库建表并全量写入；采用分批 `executemany` 批量插入，
+不依赖 `LOAD DATA LOCAL INFILE`，无需开启 `local_infile`，也不受 `secure_file_priv` 目录限制。
+
+读取顺序：**上传数据 → MySQL → 内置 CSV**。应用优先查询 MySQL（单县气象、产量标签、年度特征、库内统计），
+数据库未启动、查询失败或表为空时自动回退内置 CSV，页面功能不受影响。
 
 ## 数据要求
 

@@ -3,8 +3,8 @@
 FEATURE_COLS = [
     "spi_12", "precip_anom", "hot_days", "cold_days", "gdd",
     "season_tmax", "season_tmin", "season_precip", "season_wind", "season_sunshine",
-    "season_precip_norm", "season_tmax_34", "season_precip_34", "gdd_34", "cold_days_34",
-    "season_tmax_56", "season_precip_56", "gdd_56", "hot_days_56", "hot_dry_days",
+    "season_tmax_34", "season_precip_34", "gdd_34",
+    "season_tmax_56", "season_precip_56", "gdd_56", "hot_dry_days", "year_index",
 ]
 
 DDL = [

@@ -1,8 +1,9 @@
-"""应用层查询接口：县列表、单县逐日气象、库内统计"""
+"""应用层查询接口：县列表、单县逐日气象、年度特征、产量标签与库内统计"""
 
 import pandas as pd
 
-from src.db.conn import connect, available  # noqa: F401  (available 供 app 层调用)
+from src.db.conn import connect, available  # noqa: F401
+from src.db.schema import FEATURE_COLS  # noqa: F401
 
 WEATHER_SQL = """
 SELECT c.name AS county, c.city AS city, w.obs_date AS date,
@@ -43,12 +44,34 @@ def county_weather(county: str) -> pd.DataFrame:
     return df.sort_values("date").reset_index(drop=True)
 
 
+def yield_labels() -> pd.DataFrame:
+    """全部产量标签，JOIN 县表返回 county / year / wheat_yield / source。"""
+    return _query("""
+        SELECT c.name AS county, y.year AS year,
+               y.wheat_yield AS wheat_yield, y.source AS source
+        FROM yield_labels y
+        JOIN counties c ON c.id = y.county_id
+        ORDER BY c.name, y.year
+    """)
+
+
+def feature_rows() -> pd.DataFrame:
+    """年度特征表，JOIN 县表返回 county / year 及各生育期特征列。"""
+    cols = ", ".join(f"f.{c}" for c in FEATURE_COLS)
+    return _query(f"""
+        SELECT c.name AS county, f.year AS year, {cols}
+        FROM feature_table f
+        JOIN counties c ON c.id = f.county_id
+        ORDER BY c.name, f.year
+    """)
+
+
 def stats() -> dict:
     df = _query("""
         SELECT (SELECT COUNT(*) FROM weather_daily) AS weather_rows,
                (SELECT COUNT(*) FROM counties) AS counties,
-               (SELECT MIN(date) FROM weather_daily) AS dmin,
-               (SELECT MAX(date) FROM weather_daily) AS dmax,
+               (SELECT MIN(obs_date) FROM weather_daily) AS dmin,
+               (SELECT MAX(obs_date) FROM weather_daily) AS dmax,
                (SELECT COUNT(*) FROM feature_table) AS feature_rows,
                (SELECT COUNT(*) FROM yield_labels) AS yield_rows
     """)

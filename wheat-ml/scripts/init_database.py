@@ -1,13 +1,18 @@
 """
 MySQL 建库建表与全量导入
 ==========================
-将 CSV 链路的成果写入项目内 MySQL（默认 127.0.0.1:3307 / wheat_ml）：
-  counties      151 个县（市、区）
-  weather_daily 827,329 条逐日气象
-  feature_table 2,265 条年度特征
-  yield_labels  2,265 条产量标签（真实优先，其次演示）
+将 CSV 链路的成果写入项目内 MySQL（默认 127.0.0.1:3306 / wheat_ml）：
+  counties      县（市、区）及所属市
+  weather_daily 逐日气象（8 参数）
+  feature_table 年度生育期特征
+  yield_labels  分县分年产量标签（真实优先，其次演示）
 
-用法：python -m scripts.init_database
+导入采用分批 executemany 批量写入，不依赖 LOAD DATA LOCAL INFILE，
+因此无需开启 local_infile，也不受 secure_file_priv 目录限制。
+
+用法：
+  cd wheat-ml
+  python -m scripts.init_database
 """
 
 import sys
@@ -25,9 +30,8 @@ with open(PROJECT_ROOT / "config" / "config.yaml", "r", encoding="utf-8") as f:
     CONFIG = yaml.safe_load(f)
 
 PROCESSED = PROJECT_ROOT / CONFIG["paths"]["processed"]
-STAGING = Path(r"C:\wheat_mysql\staging")
-if not STAGING.parent.exists():
-    STAGING = PROCESSED / "_db_staging"
+WEATHER_COLS = ["t2m_max", "t2m_min", "t2m", "precip", "wind", "radiation", "dew", "rh"]
+BATCH = 2000
 
 
 def region_type(name: str) -> str:
@@ -40,7 +44,37 @@ def region_type(name: str) -> str:
     return "其他"
 
 
-def create_schema(conn) -> None:
+def _clean(v):
+    """NaN/NaT 转 None，便于写入 SQL NULL。"""
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
+def bulk_insert(conn, table: str, columns: list[str], rows: list) -> int:
+    """分批 executemany 写入；rows 为已对齐 columns 的序列。"""
+    if not rows:
+        return 0
+    cols = ", ".join(columns)
+    placeholders = ", ".join(["%s"] * len(columns))
+    sql = f"INSERT INTO {table} ({cols}) VALUES ({placeholders})"
+    total = 0
+    with conn.cursor() as cur:
+        for i in range(0, len(rows), BATCH):
+            chunk = rows[i:i + BATCH]
+            cur.executemany(sql, chunk)
+            total += len(chunk)
+    conn.commit()
+    return total
+
+
+def create_schema() -> None:
+    conn = connect(with_database=False)
     with conn.cursor() as cur:
         cur.execute(f"CREATE DATABASE IF NOT EXISTS `{DB['name']}` "
                     "DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci")
@@ -48,11 +82,12 @@ def create_schema(conn) -> None:
 
     conn = connect()
     with conn.cursor() as cur:
+        cur.execute("SET FOREIGN_KEY_CHECKS=0")
+        # 旧表结构可能与当前 schema 不一致，先删除再按 DDL 重建
+        for table in ["weather_daily", "feature_table", "yield_labels", "counties"]:
+            cur.execute(f"DROP TABLE IF EXISTS {table}")
         for ddl in DDL:
             cur.execute(ddl)
-        cur.execute("SET FOREIGN_KEY_CHECKS=0")
-        for table in ["weather_daily", "feature_table", "yield_labels", "counties"]:
-            cur.execute(f"TRUNCATE TABLE {table}")
         cur.execute("SET FOREIGN_KEY_CHECKS=1")
     conn.close()
 
@@ -63,9 +98,8 @@ def import_counties() -> dict[str, int]:
         for name in mapping.values():
             rows.append((name, city, region_type(name)))
     conn = connect()
+    bulk_insert(conn, "counties", ["name", "city", "region_type"], rows)
     with conn.cursor() as cur:
-        cur.executemany(
-            "INSERT INTO counties (name, city, region_type) VALUES (%s, %s, %s)", rows)
         cur.execute("SELECT name, id FROM counties")
         ids = dict(cur.fetchall())
     conn.close()
@@ -73,40 +107,31 @@ def import_counties() -> dict[str, int]:
     return ids
 
 
-def load_table(conn, table: str, path: Path, columns: list[str]) -> None:
-    col_sql = ", ".join(columns)
-    sql = (f"LOAD DATA LOCAL INFILE %s INTO TABLE {table} "
-           "CHARACTER SET utf8mb4 FIELDS TERMINATED BY ',' "
-           f"LINES TERMINATED BY '\\n' ({col_sql})")
-    with conn.cursor() as cur:
-        cur.execute(sql, (str(path),))
-
-
 def import_weather(ids: dict[str, int]) -> None:
     df = pd.read_csv(PROCESSED / "weather_clean.csv", parse_dates=["date"])
     df["county_id"] = df["county"].map(ids)
+    df = df.dropna(subset=["county_id"])
+    df["county_id"] = df["county_id"].astype(int)
     df["obs_date"] = df["date"].dt.strftime("%Y-%m-%d")
-    cols = ["county_id", "obs_date", "t2m_max", "t2m_min", "t2m",
-            "precip", "wind", "radiation", "dew", "rh"]
-    STAGING.mkdir(parents=True, exist_ok=True)
-    p = STAGING / "weather_daily.csv"
-    df[cols].to_csv(p, index=False, header=False, float_format="%.4f")
+    cols = ["county_id", "obs_date"] + WEATHER_COLS
+    rows = df[cols].where(pd.notna(df[cols]), None).values.tolist()
     conn = connect()
-    load_table(conn, "weather_daily", p, cols)
+    n = bulk_insert(conn, "weather_daily", cols, rows)
     conn.close()
-    print(f"weather_daily: {len(df)} 行")
+    print(f"weather_daily: {n} 行")
 
 
 def import_features(ids: dict[str, int]) -> None:
     df = pd.read_csv(PROCESSED / "feature_table.csv")
     df["county_id"] = df["county"].map(ids)
+    df = df.dropna(subset=["county_id"])
+    df["county_id"] = df["county_id"].astype(int)
     cols = ["county_id", "year"] + FEATURE_COLS
-    p = STAGING / "feature_table.csv"
-    df[cols].to_csv(p, index=False, header=False, float_format="%.4f")
+    rows = df[cols].where(pd.notna(df[cols]), None).values.tolist()
     conn = connect()
-    load_table(conn, "feature_table", p, cols)
+    n = bulk_insert(conn, "feature_table", cols, rows)
     conn.close()
-    print(f"feature_table: {len(df)} 行")
+    print(f"feature_table: {n} 行")
 
 
 def import_yields(ids: dict[str, int]) -> None:
@@ -126,27 +151,25 @@ def import_yields(ids: dict[str, int]) -> None:
         [c for c in y.columns if "yield" in c][0]
     y["county_id"] = y["county"].map(ids)
     y = y.dropna(subset=["county_id"])
+    y["county_id"] = y["county_id"].astype(int)
     y["source"] = "real" if is_real else "demo"
     out = y[["county_id", "year", ycol, "source"]].rename(columns={ycol: "wheat_yield"})
-    out["county_id"] = out["county_id"].astype(int)
-    p = STAGING / "yield_labels.csv"
-    out.to_csv(p, index=False, header=False, float_format="%.2f")
+    rows = out.where(pd.notna(out), None).values.tolist()
     conn = connect()
-    load_table(conn, "yield_labels", p, ["county_id", "year", "wheat_yield", "source"])
+    n = bulk_insert(conn, "yield_labels",
+                     ["county_id", "year", "wheat_yield", "source"], rows)
     conn.close()
-    print(f"yield_labels: {len(out)} 行（{'真实产量' if is_real else '演示标签'}）")
+    print(f"yield_labels: {n} 行（{'真实产量' if is_real else '演示标签'}）")
 
 
 def main() -> None:
-    conn = connect(with_database=False)
-    create_schema(conn)
+    create_schema()
     ids = import_counties()
-
-    conn = connect()
     import_weather(ids)
     import_features(ids)
     import_yields(ids)
 
+    conn = connect()
     with conn.cursor() as cur:
         for t in ["counties", "weather_daily", "feature_table", "yield_labels"]:
             cur.execute(f"SELECT COUNT(*) FROM {t}")

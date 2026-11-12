@@ -276,7 +276,15 @@ def predict_years(df: pd.DataFrame, county: str) -> pd.DataFrame:
 
 
 def load_yield_labels() -> tuple[pd.DataFrame | None, bool]:
-    """真实产量优先，其次演示标签"""
+    """MySQL 优先；库内无标签或连接异常时回退内置 CSV。返回 (DataFrame, 是否真实标签)。"""
+    if repo.available():
+        try:
+            y = repo.yield_labels()
+            if not y.empty:
+                is_real = bool((y["source"] == "real").any()) if "source" in y.columns else True
+                return y, is_real
+        except Exception:
+            pass                                    # 数据库异常时继续走 CSV
     for key, is_real in [("raw_yield", True), ("raw_yield_demo", False)]:
         p = PROJECT_ROOT / CONFIG["paths"][key]
         if p.exists() and (is_real or CONFIG["model"].get("allow_demo_labels")):
@@ -589,7 +597,14 @@ def export_report():
 
     county = request.args.get("county", "")
 
-    feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
+    feat = None
+    if repo.available():
+        try:
+            feat = repo.feature_rows()
+        except Exception:
+            feat = None
+    if feat is None or feat.empty:
+        feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
     labels, _ = load_yield_labels()
     bundle = load_models()
 
@@ -670,7 +685,14 @@ def export_report_pdf():
 
     county = request.args.get("county", "")
 
-    feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
+    feat = None
+    if repo.available():
+        try:
+            feat = repo.feature_rows()
+        except Exception:
+            feat = None
+    if feat is None or feat.empty:
+        feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
     labels, _ = load_yield_labels()
     bundle = load_models()
 
