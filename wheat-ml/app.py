@@ -195,6 +195,21 @@ def read_metrics(name: str = "rf") -> dict | None:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
+MODEL_LABELS = {"rf": "随机森林", "lgbm": "LightGBM", "lr": "线性回归"}
+
+
+def best_model_metrics() -> tuple[dict | None, str]:
+    """按测试集 R² 选效果最好的模型，返回 (指标 dict, 中文模型名)；报告缺失时回退随机森林。"""
+    best, best_name = None, "rf"
+    for name in ("lgbm", "rf", "lr"):
+        m = read_metrics(name)
+        if m and m.get("r2") is not None and (best is None or m["r2"] > best["r2"]):
+            best, best_name = m, name
+    if best is None:
+        best = read_metrics("rf")
+    return best, MODEL_LABELS.get(best_name, best_name)
+
+
 def _safe_load(path: Path):
     """模型文件存在但运行库缺失时，降级为 None，避免整页 500。"""
     if not path.exists():
@@ -310,6 +325,7 @@ def feature_importance_items() -> list[dict]:
 @app.route("/")
 def index():
     mm = model_meta()
+    best_m, best_label = best_model_metrics()
     label_text = "真实产量" if (mm and mm.get("reliable")) else ("演示标签" if mm else "缺失")
     if repo.available():
         try:
@@ -337,7 +353,8 @@ def index():
                     "yield_rows": st["yield_rows"],
                 }
             return render_template("index.html", title=CONFIG["web"]["title"],
-                                   active="index", stats=stats, model=mm, db_online=True)
+                                   active="index", stats=stats, model=mm, db_online=True,
+                                   best=best_m, best_label=best_label)
         except Exception:
             pass
     df, meta = current_dataset()
@@ -351,7 +368,8 @@ def index():
         "yield_rows": 0,
     }
     return render_template("index.html", title=CONFIG["web"]["title"], active="index",
-                           stats=stats, model=mm, db_online=False)
+                           stats=stats, model=mm, db_online=False,
+                           best=best_m, best_label=best_label)
 
 
 @app.route("/upload", methods=["GET", "POST"])

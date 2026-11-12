@@ -191,13 +191,14 @@
           <div><strong>演示标签</strong><p>当前模型使用演示产量标签训练，预测值与 R² 仅用于跑通系统链路，不代表真实产量，也不构成准确率结论。</p></div>
         </div>
         {% endif %}
+        {% set b = best if best else model.metrics_rf %}
         <dl class="model-metrics">
           <div><dt>训练年份</dt><dd>{{ model.train_years[0] }}—{{ model.train_years[-1] }}</dd></div>
           <div><dt>测试年份</dt><dd>{{ model.test_years|join('、') }}</dd></div>
-          <div><dt>训练 / 测试样本</dt><dd>{{ "{:,}".format(model.metrics_rf.n_train) }} / {{ "{:,}".format(model.metrics_rf.n_test) }}</dd></div>
-          <div><dt>随机森林 R²</dt><dd>{{ model.metrics_rf.r2 }}{% if not model.reliable %}<small>演示</small>{% endif %}</dd></div>
-          <div><dt>MAE</dt><dd>{{ model.metrics_rf.mae }}<small>kg/亩</small></dd></div>
-          <div><dt>RMSE</dt><dd>{{ model.metrics_rf.rmse }}<small>kg/亩</small></dd></div>
+          <div><dt>训练 / 测试样本</dt><dd>{{ "{:,}".format(b.n_train) }} / {{ "{:,}".format(b.n_test) }}</dd></div>
+          <div><dt>{{ best_label }} R²</dt><dd>{{ b.r2 }}{% if not model.reliable %}<small>演示</small>{% endif %}</dd></div>
+          <div><dt>MAE</dt><dd>{{ b.mae }}<small>kg/亩</small></dd></div>
+          <div><dt>RMSE</dt><dd>{{ b.rmse }}<small>kg/亩</small></dd></div>
         </dl>
         <p class="model-foot">最终单产由随机森林 50% + LightGBM 30% + 线性回归 20% 融合得到，共 {{ model.features|length }} 项生育期特征，覆盖温度、降水、辐射、风速、干热风与干旱指数。{% if model.reliable %}当前使用真实产量标签，指标可作为评估参考。{% else %}接入真实产量后重新训练，指标才具备参考价值。{% endif %}</p>
       {% else %}
