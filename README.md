@@ -68,6 +68,20 @@ python run.py              # 自动打开默认浏览器
 - 市级产量 CSV 与《河南省小麦产量标签_总表.csv》已迁入 `wheat-ml/data/raw/source_yield/`，用于追溯；运行项目实际读取的是 `wheat-ml/data/raw/county_yield.csv`。
 - `wheat-ml/data/processed/` 与 `wheat-ml/output/models/` 是运行必需的大文件，不要随代码清理误删。
 
+## Git 仓库说明
+
+为控制仓库体积，以下内容已在 `.gitignore` 中排除，不随代码入库：
+
+- `wheat-ml/data/processed/weather_clean.csv`（清洗后的逐日气象宽表，约 73MB）
+- `wheat-ml/output/models/*.joblib`、`wheat-ml/output/dashboard/model.json`（训练产出的模型与缓存）
+- 各类 `.zip` 压缩包、`archive/` 历史归档、`__pycache__/` 缓存
+
+复现方式：
+
+- 清洗宽表与特征表：运行 `wheat-ml/scripts/run_pipeline.py`，由 `data/raw/weather/` 原始 CSV 重建。
+- 模型文件：运行 `wheat-ml/src/models/train_model.py` 重新训练导出。
+- 若需随仓库分发大模型或大数据表，可使用 Git LFS，或在 GitHub Release 中作为附件上传。
+
 ## 工具与文档
 
 - 数据检查：`tools/checks/`（对齐、泄露、异常值、区县清单、映射）。
