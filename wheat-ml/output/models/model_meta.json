@@ -42,20 +42,20 @@
     2024
   ],
   "metrics_rf": {
-    "r2": 0.9265,
-    "rmse": 23.9504,
-    "mae": 18.4586,
+    "r2": 0.9283,
+    "rmse": 23.6583,
+    "mae": 18.3055,
     "model": "rf",
     "yield_file": "data\\raw\\county_yield_train.csv",
     "data_source": "real",
     "reliable": true,
-    "n_samples": 1632,
+    "n_samples": 1635,
     "n_counties": 110,
     "year_range": [
       2010,
       2024
     ],
-    "n_train": 1302,
+    "n_train": 1305,
     "n_test": 330,
     "split": "按年份划分",
     "train_years": [
