@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{% set badges = ['CSV / XLSX / XLS', '单文件 ≤ ' ~ max_size ~ ' MB'] %}
+{{ page_head('数据上传', '把田间数据，接进来', '支持 CSV 与 Excel，自动识别中英文字段、检查缺失与异常值，校验通过后立即用于分析、预测与农事建议。', badges) }}
+<div class="container page-content">
+  {% if error %}
+  <div class="alert error"><span class="tag">上传失败</span><p>{{ error }}</p></div>
+  {% endif %}
+
+  {% if report %}
+  <div class="upload-feedback {{ 'is-ok' if report.ok else 'is-error' }}" role="status">
+    <div>
+      <strong>{{ '校验通过，当前数据集已更新' if report.ok else '校验未通过，请核对问题' }}</strong>
+      {% if report.ok %}
+      <p>{{ report.summary.get('rows', '—') }} 行 · {{ report.summary.get('year_range', '—') }} · {{ report.summary.get('date_range', '—') }}</p>
+      {% else %}
+      <p>发现 {{ report.issues|length }} 个问题，下方校验结果里有逐条说明；当前数据不会被替换。</p>
+      {% endif %}
+    </div>
+    <div class="upload-feedback-actions">
+      {% if report.ok and dataset %}
+      <a class="btn btn-primary btn-sm" href="{{ analysis_url }}">去分析</a>
+      <a class="btn btn-ghost btn-sm" href="{{ predict_url }}">去预测</a>
+      {% else %}
+      <a class="btn btn-ghost btn-sm" href="#validation-report">查看校验详情</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not dataset %}
+  <div class="alert ok">
+    <span class="tag">内置数据集</span>
+    <p>当前未使用上传数据，分析、预测与建议读取项目内置的清洗后数据。上传并通过校验后，全站会自动切换到新数据。</p>
+  </div>
+  {% endif %}
+
+  <div class="upload-layout">
+    <aside class="upload-aside">
+      <figure class="upload-photo">
+        <picture>
+          <source srcset="{{ url_for('static', filename='assets/field/wheat-closeup.webp') }}" type="image/webp">
+          <img src="{{ url_for('static', filename='assets/field/wheat-closeup.jpg') }}" alt="晨光中带露珠的麦穗特写" loading="lazy">
+        </picture>
+        <figcaption class="upload-photo-caption">
+          <strong>从一份逐日气象开始</strong>
+          <span>校验通过后，数据立即进入分析、预测与生育期建议。</span>
+        </figcaption>
+      </figure>
+      <div class="upload-rules">
+        <div class="upload-rule">{{ icon('check') }}<span>字段口径：年份 + 日序（1—366）或完整日期（YYYY-MM-DD），两种不可混用。</span></div>
+        <div class="upload-rule">{{ icon('check') }}<span>缺失值请留空，不要填 0；短波辐射若为 W/m² 会自动换算为 MJ/m²/day。</span></div>
+        <div class="upload-rule">{{ icon('check') }}<span>自动识别中英文字段，检查缺失、重复与异常值，校验通过后才替换当前数据集。</span></div>
+      </div>
+    </aside>
+
+    <div class="upload-card">
+      <form id="upload-form" method="post" enctype="multipart/form-data">
+        <label class="dropzone" id="dropzone" for="file-input" data-max-size="{{ max_size }}">
+          <span class="drop-icon" aria-hidden="true">{{ icon('upload') }}</span>
+          <span class="drop-title">拖拽气象数据到这里</span>
+          <span class="drop-hint">或点击选择文件 · CSV / Excel · 不超过 {{ max_size }} MB</span>
+          <span class="drop-file" data-file-name aria-live="polite">尚未选择文件</span>
+          <input id="file-input" type="file" name="file" accept=".csv,.xlsx,.xls" required>
+        </label>
+
+        <div class="upload-row">
+          <div class="field">
+            <label for="county-input">地区名称（可选）</label>
+            <input id="county-input" type="text" name="county" placeholder="如：登封" list="county-list">
+            <datalist id="county-list">
+              {% for c in counties %}<option value="{{ c }}"></option>{% endfor %}
+            </datalist>
+          </div>
+          <button class="btn btn-primary" id="upload-submit" type="submit">上传并校验</button>
+        </div>
+        <p class="upload-note">上传新文件并通过校验后，会自动替换当前数据集；恢复内置数据可在下方操作。</p>
+      </form>
+    </div>
+  </div>
+
+  {% if report %}
+  <section class="block-lg" id="validation-report">
+    <div class="block-head">
+      <div>
+        <p class="eyebrow">VALIDATION</p>
+        <h2>校验结果</h2>
+      </div>
+      <p class="block-note">{{ report.filename }} · {{ '校验通过' if report.ok else '存在问题，请核对提示' }}</p>
+    </div>
+
+    {% if report.issues %}
+    {% for issue in report.issues %}
+    <div class="alert {{ issue.level }}">
+      <span class="tag">{{ '错误' if issue.level == 'error' else ('提示' if issue.level == 'warning' else '信息') }}</span>
+      <p><strong>{{ issue.title }}</strong>{% if issue.detail %} —— {{ issue.detail }}{% endif %}</p>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert ok"><span class="tag">通过</span><p>字段与记录未发现明显问题，可以直接用于分析。</p></div>
+    {% endif %}
+
+    <div class="stat-strip">
+      <div class="stat"><span>记录行数</span><strong>{{ report.summary.get('rows', '—') }}<small> 行</small></strong></div>
+      <div class="stat"><span>年份范围</span><strong class="is-text">{{ report.summary.get('year_range', '—') }}</strong></div>
+      <div class="stat"><span>日期范围</span><strong class="is-text">{{ report.summary.get('date_range', '—') }}</strong></div>
+      <div class="stat"><span>识别字段</span><strong>{{ report.columns|length }}<small> 个</small></strong></div>
+    </div>
+
+    {% if report.columns %}
+    <details class="more panel">
+      <summary>字段识别 · {{ report.columns|length }} 个</summary>
+      <div class="detail-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>原始列名</th><th>标准字段</th></tr></thead>
+            <tbody>
+              {% for raw, std in report.columns.items() %}
+              <tr><td>{{ raw }}</td><td>{{ std }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+      </div>
+    </details>
+    {% endif %}
+
+    {% if report.preview %}
+    {% set preview_labels = {'date': '日期', 'year': '年份', 't2m_max': '最高温', 't2m_min': '最低温',
+                             't2m': '平均温', 'precip': '降水', 'wind': '风速', 'radiation': '辐射',
+                             'dew': '露点', 'rh': '湿度'} %}
+    <details class="more panel">
+      <summary>数据预览 · 前 {{ report.preview|length }} 行</summary>
+      <div class="detail-body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>{% for k in report.preview[0].keys() %}<th>{{ preview_labels.get(k, k) }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+              {% for row in report.preview %}
+              <tr>{% for v in row.values() %}<td>{{ v if v is not none else '—' }}</td>{% endfor %}</tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+      </div>
+    </details>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if dataset %}
+  <section class="block-lg">
+    <div class="block-head">
+      <div>
+        <p class="eyebrow">ACTIVE DATASET</p>
+        <h2>当前数据集</h2>
+      </div>
+      <p class="block-note">分析、预测与建议页面优先使用该数据</p>
+    </div>
+    <div class="panel dataset-panel">
+      <p class="dataset-text"><strong>{{ dataset.filename }}</strong>{% if dataset.county %}（{{ dataset.county }}）{% endif %}，共 {{ dataset.summary.rows }} 行。上传新文件校验通过后会自动替换。</p>
+      <div class="dataset-actions">
+        <a class="btn btn-primary btn-sm" href="{{ analysis_url }}">去分析 {{ icon('arrow', 'btn-arrow') }}</a>
+        <a class="btn btn-ghost btn-sm" href="{{ predict_url }}">去预测</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('reset_dataset') }}"
+           data-confirm="恢复内置数据集后，当前上传的数据将不再参与分析。确定继续？">恢复内置数据集</a>
+      </div>
+      <p class="chart-note">恢复内置数据集不会删除原始上传文件，但该文件将不再参与分析与预测。</p>
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

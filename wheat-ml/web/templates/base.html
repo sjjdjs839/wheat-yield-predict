@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ '豫麦智测 · ' ~ title if title else '豫麦智测 · 河南省小麦气象分析与产量预测' }}</title>
+<meta name="description" content="河南省小麦气象数据分析与产量预测系统：交互式气象分析、产量地图、干热风预警、机器学习产量预测、产量预警与生育期农事建议。">
+<meta name="theme-color" content="#10271A">
+<link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+<script>document.documentElement.classList.add('js');</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% block preload %}
+{% if active != 'index' %}
+<link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/field-band.webp') }}" type="image/webp">
+{% endif %}
+{% endblock %}
+<noscript><style>[data-reveal]{opacity:1!important;transform:none!important}</style></noscript>
+</head>
+<body class="page-{{ active }}">
+
+<div class="nav-progress" id="nav-progress" aria-hidden="true"></div>
+
+<svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <symbol id="wheat-mark" viewBox="0 0 48 48">
+    <path d="M24 44V16" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M23.6 35.5c-5.8 0-9.4-3.7-10.4-8.8 6.1 0 9.4 3.4 10.4 8.8Z" fill="currentColor"/>
+    <path d="M24.4 35.5c5.8 0 9.4-3.7 10.4-8.8-6.1 0-9.4 3.4-10.4 8.8Z" fill="currentColor" opacity=".72"/>
+    <path d="M23.8 28.2c-4.7 0-7.7-3-8.5-7.2 5 0 7.7 2.8 8.5 7.2Z" fill="currentColor"/>
+    <path d="M24.2 28.2c4.7 0 7.7-3 8.5-7.2-5 0-7.7 2.8-8.5 7.2Z" fill="currentColor" opacity=".72"/>
+    <path d="M24 21.6c-3.4 0-5.6-2.1-6.2-5.2 3.6 0 5.6 2 6.2 5.2Z" fill="currentColor"/>
+    <path d="M24 21.6c3.4 0 5.6-2.1 6.2-5.2-3.6 0-5.6 2-6.2 5.2Z" fill="currentColor" opacity=".72"/>
+    <path d="M24 5.5c2.8 3 2.8 6.4 0 9.4-2.8-3-2.8-6.4 0-9.4Z" fill="#D2A24C"/>
+  </symbol>
+  <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M7 15l4-4 3 2 5-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-ruler" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+  <symbol id="icon-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 19c2-5 5-8 9-10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="icon-seed" viewBox="0 0 24 24"><path d="M12 20v-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 14c-4 0-6.3-2.5-6.8-6 4 0 6.3 2.5 6.8 6ZM12 14c4 0 6.3-2.5 6.8-6-4 0-6.3 2.5-6.8 6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-drop" viewBox="0 0 24 24"><path d="M12 3.5C9 7.2 6.5 10.2 6.5 13.6a5.5 5.5 0 0 0 11 0C17.5 10.2 15 7.2 12 3.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M4.7 4.7l1.4 1.4M17.9 17.9l1.4 1.4M19.3 4.7l-1.4 1.4M6.1 17.9l-1.4 1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="icon-wind" viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8a2.5 2.5 0 1 1-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="icon-thermo" viewBox="0 0 24 24"><path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 4 3 20h18L12 4Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4M12 17.2v.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 3.5v4M16 3.5v4M4 10h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="icon-soil" viewBox="0 0 24 24"><path d="M3 8h18M3 12h18M3 16h18M6 20h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="icon-grain" viewBox="0 0 24 24"><ellipse cx="8" cy="9" rx="2.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse cx="16" cy="9" rx="2.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse cx="12" cy="16" rx="2.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main">跳到主要内容</a>
+
+<header class="site-head" id="site-head">
+  <div class="container head-inner">
+    <a class="brand" href="{{ url_for('index') }}" aria-label="豫麦智测首页">
+      <svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
+      <span class="brand-text">
+        <span class="brand-name">豫麦智测</span>
+        <span class="brand-sub">HENAN WHEAT INTELLIGENCE</span>
+      </span>
+    </a>
+
+    <nav class="main-nav" aria-label="主导航">
+      <a href="{{ url_for('index') }}" class="{{ 'is-active' if active == 'index' }}" {% if active == 'index' %}aria-current="page"{% endif %}>概览</a>
+      <a href="{{ url_for('analysis') }}" class="{{ 'is-active' if active == 'analysis' }}" {% if active == 'analysis' %}aria-current="page"{% endif %}>气象分析</a>
+      <a href="{{ url_for('map_view') }}" class="{{ 'is-active' if active == 'map' }}" {% if active == 'map' %}aria-current="page"{% endif %}>产量地图</a>
+      <a href="{{ url_for('dry_hot') }}" class="{{ 'is-active' if active == 'dry_hot' }}" {% if active == 'dry_hot' %}aria-current="page"{% endif %}>干热风预警</a>
+      <a href="{{ url_for('predict') }}" class="{{ 'is-active' if active == 'predict' }}" {% if active == 'predict' %}aria-current="page"{% endif %}>产量预测</a>
+      <a href="{{ url_for('advice') }}" class="{{ 'is-active' if active == 'advice' }}" {% if active == 'advice' %}aria-current="page"{% endif %}>农事建议</a>
+    </nav>
+
+    <a class="btn btn-primary btn-upload{{ ' is-active' if active == 'upload' }}" href="{{ url_for('upload') }}" {% if active == 'upload' %}aria-current="page"{% endif %}>
+      <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-upload"></use></svg>
+      <span>上传数据</span>
+    </a>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="site-foot">
+  <div class="container foot-main">
+    <div class="foot-brand">
+      <svg class="foot-mark" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
+      <div>
+        <p class="foot-name">豫麦智测</p>
+        <p class="foot-desc">河南省小麦气象数据分析与产量预测系统</p>
+      </div>
+    </div>
+    <nav class="foot-nav" aria-label="页脚导航">
+      <a href="{{ url_for('analysis') }}">气象分析</a>
+      <a href="{{ url_for('map_view') }}">产量地图</a>
+      <a href="{{ url_for('dry_hot') }}">干热风预警</a>
+      <a href="{{ url_for('predict') }}">产量预测</a>
+      <a href="{{ url_for('advice') }}">农事建议</a>
+      <a href="{{ url_for('upload') }}">数据上传</a>
+    </nav>
+  </div>
+  <div class="container foot-meta">
+    <span>数据范围 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 个气象县区 · 按年份划分训练 / 测试集</span>
+    <span>真实产量标签 · 图表与地图全部本地渲染，断网可用</span>
+  </div>
+</footer>
+
+{% if active in ['analysis', 'predict'] %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+{% endif %}
+{% if active == 'map' %}
+<script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+{% endif %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

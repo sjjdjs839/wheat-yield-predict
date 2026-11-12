@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{{ page_head('产量地图', '把单产放回地图', '按年份查看县级小麦单产与生育期降水的空间分布。颜色越深，数值越高；没有产量标签或降水记录的区县保持浅色留白。', ['县级单元', year ~ ' 年', '可缩放地图']) }}
+<div class="container page-content map-page">
+  <div class="map-toolbar-panel">
+    <div class="filter-panel map-filter">
+      <div class="field">
+        <label for="yearSelect">年份</label>
+        <select id="yearSelect">
+          {% for y in years %}
+          <option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="metricSelect">显示指标</label>
+        <select id="metricSelect">
+          <option value="yield">小麦单产（kg/亩）</option>
+          <option value="rainfall">生育期降水（mm）</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="mapUpdate" type="button">更新地图</button>
+      <a class="filter-reset" href="{{ url_for('map_view') }}">重置</a>
+    </div>
+    <p class="filter-hint">地图支持滚轮缩放与拖拽平移；悬停区县查看具体数值。地图包含有产量标签的城区，气象分析覆盖 {{ footer.counties }} 个县区。</p>
+  </div>
+
+  <div class="map-layout">
+    <div class="map-canvas-card">
+      <div id="map" class="map-canvas" role="img" aria-label="河南省县级小麦产量空间分布地图"></div>
+      <p class="map-info" id="mapInfo" aria-live="polite">正在加载河南省县级地图数据…</p>
+    </div>
+
+    <aside class="map-side">
+      <div class="map-side-block">
+        <p class="eyebrow">TOP 5</p>
+        <h2>当前指标最高的 5 个县区</h2>
+        <ol class="map-rank" id="mapTop" aria-live="polite">
+          <li class="map-rank-empty">加载中…</li>
+        </ol>
+      </div>
+      <div class="map-side-block map-legend-note">
+        <p class="eyebrow">READING</p>
+        <h2>怎么看这张图</h2>
+        <ul class="map-notes">
+          <li>{{ icon('check') }}颜色深浅表示数值高低，不是产量增减幅度。</li>
+          <li>{{ icon('check') }}浅米色区县表示该年没有对应指标记录。</li>
+          <li>{{ icon('check') }}单产与降水使用不同的顺序色板，切换指标时图例会同步变化。</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  var chart = null;
+  var geoReady = false;
+
+  var PALETTES = {
+    yield: ['#F3EDDD', '#E7DEC8', '#C9D6B4', '#A9BE8C', '#5B7F3F', '#1D4A2C'],
+    rainfall: ['#FAF6EA', '#E3ECEC', '#C6DBDE', '#9FBFC4', '#5C7E86', '#2F5560']
+  };
+  var METRIC_LABEL = {
+    yield: '小麦单产（kg/亩）',
+    rainfall: '生育期降水（mm）'
+  };
+
+  function byId(id) { return document.getElementById(id); }
+
+  function showFallback(message) {
+    var map = byId('map');
+    if (map) map.innerHTML = '<div class="chart-fallback">' + message + '</div>';
+    var info = byId('mapInfo');
+    if (info) info.textContent = message;
+  }
+
+  function renderRank(items) {
+    var list = byId('mapTop');
+    if (!list) return;
+    var top = items.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
+    if (!top.length) {
+      list.innerHTML = '<li class="map-rank-empty">该年没有可用数据。</li>';
+      return;
+    }
+    list.innerHTML = top.map(function (item, index) {
+      return '<li><span class="rank-index">' + String(index + 1).padStart(2, '0') + '</span>' +
+        '<span class="rank-name">' + item.county + '</span>' +
+        '<strong>' + item.value.toFixed(1) + '</strong></li>';
+    }).join('');
+  }
+
+  function updateMap() {
+    if (!geoReady) return;
+    var year = byId('yearSelect').value;
+    var metric = byId('metricSelect').value;
+
+    fetch('/api/map_data?year=' + encodeURIComponent(year) + '&metric=' + encodeURIComponent(metric))
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        var items = data.items || [];
+        var values = items.map(function (item) { return ({ name: item.county, value: item.value }); });
+        var numbers = values.map(function (item) { return item.value; }).filter(function (value) { return typeof value === 'number'; });
+        var max = numbers.length ? Math.max.apply(null, numbers) : 1;
+        var min = numbers.length ? Math.min.apply(null, numbers) : 0;
+
+        if (!chart) {
+          chart = echarts.init(byId('map'));
+        }
+        chart.setOption({
+          backgroundColor: 'transparent',
+          title: {
+            text: year + ' 年河南省' + METRIC_LABEL[metric] + '分布',
+            left: 'center',
+            top: 14,
+            textStyle: { color: '#1B241A', fontSize: 15, fontWeight: 600, fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif' }
+          },
+          tooltip: {
+            trigger: 'item',
+            backgroundColor: '#FFFDF7',
+            borderColor: 'rgba(29,74,44,.18)',
+            borderWidth: 1,
+            padding: 10,
+            textStyle: { color: '#1B241A', fontSize: 12 },
+            formatter: function (params) {
+              var value = params.value;
+              var text = (typeof value === 'number') ? value.toFixed(1) : '无数据';
+              return params.name + '<br>' + METRIC_LABEL[metric] + '：' + text;
+            }
+          },
+          visualMap: {
+            min: min,
+            max: max,
+            left: 18,
+            bottom: 18,
+            text: ['高', '低'],
+            textStyle: { color: '#5A6657', fontSize: 11 },
+            inRange: { color: PALETTES[metric] },
+            calculable: true,
+            itemWidth: 12,
+            itemHeight: 90
+          },
+          series: [{
+            name: METRIC_LABEL[metric],
+            type: 'map',
+            map: 'henan',
+            roam: true,
+            scaleLimit: { min: 0.85, max: 6 },
+            label: { show: false },
+            emphasis: {
+              label: { show: true, color: '#10271A', fontSize: 11 },
+              itemStyle: { areaColor: '#D2A24C', borderColor: '#FFFDF7', borderWidth: 1 }
+            },
+            itemStyle: {
+              areaColor: '#E7DEC8',
+              borderColor: '#FFFDF7',
+              borderWidth: 0.8
+            },
+            data: values
+          }]
+        }, true);
+
+        var info = byId('mapInfo');
+        if (info) {
+          var countLabel = metric === 'yield'
+            ? ' 个有产量标签的区县'
+            : ' 个有生育期降水记录的区县';
+          info.textContent = year + ' 年共显示 ' + (data.count || 0) + countLabel +
+            '；指标：' + METRIC_LABEL[metric] + '。';
+        }
+        renderRank(items);
+      })
+      .catch(function () {
+        showFallback('地图数据加载失败，请刷新页面重试。');
+      });
+  }
+
+  function init() {
+    if (typeof echarts === 'undefined') {
+      showFallback('地图组件未加载，请检查静态资源。');
+      return;
+    }
+    var map = byId('map');
+    if (!map) return;
+    chart = echarts.init(map);
+
+    fetch('{{ url_for("static", filename="henan_county.json") }}')
+      .then(function (response) { return response.json(); })
+      .then(function (geo) {
+        echarts.registerMap('henan', geo);
+        geoReady = true;
+        updateMap();
+      })
+      .catch(function () {
+        showFallback('河南省地图数据加载失败，请刷新页面重试。');
+      });
+
+    byId('mapUpdate').addEventListener('click', updateMap);
+    byId('yearSelect').addEventListener('change', updateMap);
+    byId('metricSelect').addEventListener('change', updateMap);
+    window.addEventListener('resize', function () {
+      if (chart) chart.resize();
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+{% endblock %}

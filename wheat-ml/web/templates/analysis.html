@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{% set badges = [source] + ([county] if county else []) + (['全部年份'] if not year else [year|string ~ ' 年']) %}
+{{ page_head('气象数据分析', '看清热与水的年际变化', '选择县区、年份与月份区间，重算温度、降水、风速、辐射与湿度图表，并给出该年的气象条件综合评估。', badges) }}
+<div class="container page-content">
+  {% if error %}
+  <div class="alert error"><span class="tag">无法分析</span><p>{{ error }}</p></div>
+  {% endif %}
+
+  <form class="filter-panel" method="get" aria-label="分析筛选">
+    <div class="field">
+      <label for="f-county">县区</label>
+      <select id="f-county" name="county">
+        {% if city_groups %}
+          {% for city, city_counties in city_groups.items() %}
+          <optgroup label="{{ city }}">
+            {% for c in city_counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+          </optgroup>
+          {% endfor %}
+        {% else %}
+          {% for c in counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+        {% endif %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-year">年份</label>
+      <select id="f-year" name="year">
+        <option value="all" {{ 'selected' if not year }}>全部年份</option>
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-month-from">起始月</label>
+      <select id="f-month-from" name="month_from">
+        {% for m in range(1, 13) %}<option value="{{ m }}" {{ 'selected' if m == month_from }}>{{ m }} 月</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-month-to">结束月</label>
+      <select id="f-month-to" name="month_to">
+        {% for m in range(1, 13) %}<option value="{{ m }}" {{ 'selected' if m == month_to }}>{{ m }} 月</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">应用筛选</button>
+    <a class="filter-reset" href="{{ url_for('analysis') }}">重置</a>
+  </form>
+  <p class="filter-hint">全部年份按月聚合；单一年份按日绘制并叠加滑动平均。悬停图表可查看具体数值。</p>
+
+  {% if evaluation %}
+  {% set current = evaluation.rows|selectattr('year', 'equalto', evaluation.year)|list %}
+  <section class="insight-panel" data-reveal>
+    <span class="insight-ghost" aria-hidden="true">{{ evaluation.year }}</span>
+    <div class="insight-grid">
+      <div class="insight-main">
+        <p class="eyebrow eyebrow--light">YEAR DIAGNOSIS / {{ evaluation.year }}</p>
+        <p class="insight-text">{{ evaluation.text }}</p>
+        {% if evaluation.rows %}
+        <a class="insight-link" href="#year-detail">查看 {{ evaluation.rows|length }} 年指标明细 {{ icon('arrow') }}</a>
+        {% endif %}
+      </div>
+      {% if current %}
+      <dl class="insight-metrics">
+        <div class="insight-metric"><dt>平均气温</dt><dd><strong>{{ current[0]['平均气温'] }}</strong><span>℃</span></dd></div>
+        <div class="insight-metric"><dt>年降水量</dt><dd><strong>{{ current[0]['年降水量'] }}</strong><span>mm</span></dd></div>
+        <div class="insight-metric"><dt>高温日数</dt><dd><strong>{{ current[0]['高温日数'] }}</strong><span>天</span></dd></div>
+        <div class="insight-metric"><dt>霜冻日数</dt><dd><strong>{{ current[0]['霜冻日数'] }}</strong><span>天</span></dd></div>
+      </dl>
+      {% endif %}
+    </div>
+  </section>
+  {% if evaluation.rows %}
+  <details class="more panel block" id="year-detail">
+    <summary>年度指标明细 · {{ evaluation.rows|length }} 年</summary>
+    <div class="detail-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {% for k in evaluation.rows[0].keys() %}
+              <th>{{ {'year': '年份'}.get(k, k) }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in evaluation.rows %}
+            <tr>
+              {% for k, v in row.items() %}
+              <td>{{ v if v is not none else '—' }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+    </div>
+  </details>
+  {% endif %}
+  {% endif %}
+
+  <section class="block-lg">
+    <div class="block-head" data-reveal>
+      <div>
+        <p class="eyebrow">CHART EVIDENCE</p>
+        <h2>七组图表，看清过程</h2>
+      </div>
+      <p class="block-note">悬停读数 · 图例可开关 · 随筛选条件重算</p>
+    </div>
+
+    <div class="chart-grid">
+      {% for c in charts %}
+      <article class="chart-card{{ ' wide' if loop.first or c.kind in ['monthCompare', 'panelBars'] }}">
+        <div class="chart-head">
+          <span class="chart-index">{{ '%02d'|format(loop.index) }}</span>
+          <div>
+            <h3>{{ c.title }}</h3>
+            <p>{{ c.desc }}</p>
+          </div>
+        </div>
+
+        {% if c.kind == 'empty' %}
+        <div class="chart-empty">{{ c.desc }}</div>
+
+        {% elif c.kind == 'monthCompare' %}
+        <div class="chart-panels">
+          <div class="chart-panel">
+            <h4>逐月平均气温（℃）</h4>
+            <div class="chart-body"><canvas role="img" aria-label="逐月平均气温跨年对比"></canvas></div>
+          </div>
+          <div class="chart-panel">
+            <h4>逐月累计降水（mm）</h4>
+            <div class="chart-body"><canvas role="img" aria-label="逐月累计降水跨年对比"></canvas></div>
+          </div>
+        </div>
+
+        {% elif c.kind == 'panelBars' %}
+        <div class="chart-panels">
+          {% for p in c.payload.panels %}
+          <div class="chart-panel">
+            <h4>{{ p.title }}（{{ p.unit }}）</h4>
+            <div class="chart-body"><canvas role="img" aria-label="{{ p.title }}年度对比"></canvas></div>
+            <p class="chart-note">多年平均 {{ p.mean }} {{ p.unit }}</p>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="chart-body"><canvas role="img" aria-label="{{ c.title }}"></canvas></div>
+        {% endif %}
+
+        {% if c.kind != 'empty' %}
+        <script type="application/json" class="chart-spec">{{ c|tojson }}</script>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

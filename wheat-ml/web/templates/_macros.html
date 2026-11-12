@@ -1,0 +1,26 @@
+{% macro icon(name, cls='') -%}
+<svg class="icon {{ cls }}" aria-hidden="true" focusable="false"><use href="#icon-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{% macro mark(cls='') -%}
+<svg class="{{ cls }}" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
+{%- endmacro %}
+
+{% macro page_head(kicker, title, lead, badges=None) -%}
+<section class="page-head">
+  <div class="page-head-media" style="background-image:url('{{ url_for('static', filename='assets/field/field-band.webp') }}')" aria-hidden="true"></div>
+  <div class="page-head-shade" aria-hidden="true"></div>
+  <div class="container page-head-inner">
+    <div class="page-head-copy">
+      <p class="eyebrow eyebrow--light">{{ kicker }}</p>
+      <h1>{{ title }}</h1>
+      <p class="page-head-lead">{{ lead }}</p>
+    </div>
+    {% if badges %}
+    <div class="page-head-badges">
+      {% for badge in badges if badge %}<span class="ph-badge">{{ badge }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+{%- endmacro %}

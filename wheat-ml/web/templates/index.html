@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block preload %}
+<link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/hero-wheat.webp') }}" type="image/webp" media="(min-width: 761px)">
+<link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/hero-wheat-mobile.webp') }}" type="image/webp" media="(max-width: 760px)">
+{% endblock %}
+{% block content %}
+{% set label_class = 'is-real' if stats.label_text == '真实产量' else ('is-demo' if stats.label_text == '演示标签' else 'is-missing') %}
+<section class="hero">
+  <picture class="hero-media">
+    <source media="(max-width: 760px)" srcset="{{ url_for('static', filename='assets/field/hero-wheat-mobile.webp') }}" type="image/webp">
+    <source media="(max-width: 760px)" srcset="{{ url_for('static', filename='assets/field/hero-wheat-mobile.jpg') }}" type="image/jpeg">
+    <source srcset="{{ url_for('static', filename='assets/field/hero-wheat.webp') }}" type="image/webp">
+    <img src="{{ url_for('static', filename='assets/field/hero-wheat.jpg') }}" alt="晨光中的金色麦田，麦浪延伸至远方" fetchpriority="high">
+  </picture>
+  <div class="hero-shade" aria-hidden="true"></div>
+
+  <div class="container hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow eyebrow--light">HENAN WHEAT · CLIMATE &amp; YIELD</p>
+      <h1>读懂麦浪，<br>预见丰收</h1>
+      <p class="hero-lead">覆盖河南 {{ stats.counties }} 个县区、{{ "{:,}".format(stats.rows) }} 条逐日气象记录。从一场雨，到一季收成，用数据看清小麦的每一步生长。</p>
+      <div class="hero-status">
+        <span class="hero-chip"><i class="dot {{ 'is-online' if db_online else 'is-local' }}"></i>{{ stats.dataset_text }}</span>
+        <span class="hero-chip">数据范围 {{ stats.year_range }}</span>
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn-gold" href="{{ url_for('analysis') }}">开始气象分析 {{ icon('arrow', 'btn-arrow') }}</a>
+        <a class="btn btn-light" href="{{ url_for('predict') }}">产量预测</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-rail">
+    <dl class="container hero-rail-inner">
+      <div class="hero-stat">
+        <dt>WEATHER RECORDS</dt>
+        <dd><strong data-count="{{ stats.rows }}">{{ "{:,}".format(stats.rows) }}</strong><span>条</span></dd>
+      </div>
+      <div class="hero-stat">
+        <dt>COUNTIES</dt>
+        <dd><strong data-count="{{ stats.counties }}">{{ stats.counties }}</strong><span>个县区</span></dd>
+      </div>
+      <div class="hero-stat">
+        <dt>DATA RANGE</dt>
+        <dd><strong>{{ stats.year_range }}</strong><span>逐日气象</span></dd>
+      </div>
+      <div class="hero-stat">
+        <dt>LABEL SOURCE</dt>
+        <dd class="is-text"><strong class="status-text {{ label_class }}"><i class="dot"></i>{{ stats.label_text }}</strong><span>产量标签</span></dd>
+      </div>
+    </dl>
+  </div>
+  <span class="hero-scroll" aria-hidden="true">SCROLL TO EXPLORE</span>
+</section>
+
+<section class="section workflow">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">01 / WORKFLOW</p>
+      <h2>从一场雨，到一季收成</h2>
+      <p class="section-lead">气象分析负责看清过程，产量预测负责判断结果，农事建议负责落到地里。三个核心模块，共用一套数据与口径。</p>
+    </div>
+    <div class="workflow-grid">
+      <a class="workflow-card" href="{{ url_for('analysis') }}" data-reveal>
+        <div class="workflow-top"><span class="card-index">01</span>{{ icon('chart', 'card-icon') }}</div>
+        <h3>气象分析</h3>
+        <p>温度、降水、风速、辐射、湿度七类交互图表，可按年份、月份与县区筛选。</p>
+        <div class="workflow-visual">
+          <svg class="mini-spark" viewBox="0 0 260 56" role="img" aria-label="温度变化示意图">
+            <path d="M4 42C34 37 48 42 72 33S112 26 136 30s40-18 64-15 38-4 56 6" fill="none" stroke="#1D4A2C" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4 48C34 43 48 47 72 40S112 34 136 38s40-14 64-11 38-2 56 6" fill="none" stroke="#5C7E86" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M4 36C34 31 48 37 72 28S112 20 136 24s40-21 64-18 38-6 56 4" fill="none" stroke="#A65B3A" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="card-link">查看分析 {{ icon('arrow', 'link-arrow') }}</span>
+      </a>
+
+      <a class="workflow-card" href="{{ url_for('predict') }}" data-reveal>
+        <div class="workflow-top"><span class="card-index">02</span>{{ icon('ruler', 'card-icon') }}</div>
+        <h3>产量预测与预警</h3>
+        <p>随机森林、LightGBM 与线性回归融合预测单产，结合自定义预警线判断是否触发预警。</p>
+        <div class="workflow-visual">
+          <div class="mini-ruler" aria-hidden="true">
+            <span class="mini-ruler-track"></span>
+            <span class="mini-ruler-mean" style="left:62%"></span>
+            <span class="mini-ruler-alert" style="left:42%"></span>
+            <span class="mini-ruler-pred" style="left:46%"></span>
+          </div>
+          <div class="mini-scale"><span>396</span><span>413</span><span>453</span></div>
+        </div>
+        <span class="card-link">开始预测 {{ icon('arrow', 'link-arrow') }}</span>
+      </a>
+
+      <a class="workflow-card" href="{{ url_for('advice') }}" data-reveal>
+        <div class="workflow-top"><span class="card-index">03</span>{{ icon('leaf', 'card-icon') }}</div>
+        <h3>农事建议</h3>
+        <p>按返青、拔节、抽穗扬花、灌浆、成熟五个生育期生成针对性管理建议。</p>
+        <div class="workflow-visual">
+          <div class="mini-stages" aria-hidden="true">
+            <span class="is-done"></span><span class="is-done"></span><span></span><span></span><span></span>
+          </div>
+          <div class="mini-scale"><span>返青</span><span>拔节</span><span>抽穗</span><span>灌浆</span><span>成熟</span></div>
+        </div>
+        <span class="card-link">查看建议 {{ icon('arrow', 'link-arrow') }}</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section extension-section">
+  <div class="container">
+    <div class="section-head" data-reveal>
+      <p class="eyebrow">02 / FIELD TOOLS</p>
+      <h2>把产量放回地图，把风险提前看见</h2>
+      <p class="section-lead">空间分布回答“哪里高、哪里低”，干热风预警回答“今年哪一段最危险”。两个工具，补上时间序列之外的判断。</p>
+    </div>
+    <div class="extension-grid">
+      <a class="extension-card" href="{{ url_for('map_view') }}" data-reveal>
+        <div class="extension-top">
+          <span class="card-index">SPATIAL</span>
+          {{ icon('map', 'card-icon') }}
+        </div>
+        <h3>产量地图</h3>
+        <p>按年份查看县级小麦单产与生育期降水的空间分布，颜色越深，数值越高；无数据区县保持留白。</p>
+        <div class="map-mini" aria-hidden="true">
+          <span style="--tone:3"></span><span style="--tone:4"></span><span style="--tone:2"></span><span style="--tone:1"></span>
+          <span style="--tone:4"></span><span style="--tone:5"></span><span style="--tone:5"></span><span style="--tone:2"></span>
+          <span style="--tone:2"></span><span style="--tone:4"></span><span style="--tone:3"></span><span style="--tone:1"></span>
+        </div>
+        <span class="card-link">打开地图 {{ icon('arrow', 'link-arrow') }}</span>
+      </a>
+
+      <a class="extension-card" href="{{ url_for('dry_hot') }}" data-reveal>
+        <div class="extension-top">
+          <span class="card-index">RISK</span>
+          {{ icon('alert', 'card-icon') }}
+        </div>
+        <h3>干热风预警</h3>
+        <p>按城市展开干热风天数、等级与产量影响预估，重点盯住灌浆期的青枯逼熟风险。</p>
+        <div class="risk-mini" aria-hidden="true">
+          <span style="--h:34%"></span><span style="--h:52%"></span><span style="--h:41%"></span><span style="--h:76%"></span><span style="--h:58%"></span><span style="--h:92%"></span><span style="--h:64%"></span>
+        </div>
+        <span class="card-link">查看预警 {{ icon('arrow', 'link-arrow') }}</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section section--paper data-section">
+  <div class="container data-split">
+    <figure class="data-photo" data-reveal>
+      <picture>
+        <source srcset="{{ url_for('static', filename='assets/field/aerial-farmland.webp') }}" type="image/webp">
+        <img src="{{ url_for('static', filename='assets/field/aerial-farmland.jpg') }}" alt="航拍视角下的麦田、田埂与灌溉渠" loading="lazy">
+      </picture>
+      <figcaption class="photo-caption">
+        <span class="photo-chip">{{ stats.counties }} 个县区 · {{ "{:,}".format(stats.rows) }} 条逐日记录</span>
+      </figcaption>
+    </figure>
+    <div class="data-copy" data-reveal>
+      <p class="eyebrow">03 / DATA</p>
+      <h2>不是一块大屏，<br>而是一套可追溯的田间数据</h2>
+      <p class="data-lead">每一条建议都从真实的逐日气象开始：先清洗、再校验，然后进入图表、模型与生育期判断。数据链路清楚，结论才有依据。</p>
+      <dl class="data-facts">
+        <div><dt>数据来源</dt><dd>{{ stats.dataset_text }}{% if db_online %} · 年度特征 {{ "{:,}".format(stats.feature_rows) }} 行{% endif %}</dd></div>
+        <div><dt>更新方式</dt><dd>CSV / Excel 上传校验通过后，立即用于全站分析、预测与建议</dd></div>
+        <div><dt>模型口径</dt><dd>按年份划分训练 / 测试集，{{ model.features|length if model else 18 }} 项生育期特征</dd></div>
+      </dl>
+      <a class="btn btn-primary" href="{{ url_for('upload') }}">上传你的数据 {{ icon('arrow', 'btn-arrow') }}</a>
+    </div>
+  </div>
+</section>
+
+<section class="section section--dark model-section">
+  <svg class="model-contour" viewBox="0 0 900 500" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
+    <path d="M-40 120C120 40 240 170 400 110s260-70 500 30"/>
+    <path d="M-40 190C120 110 260 240 420 178s260-62 520 40"/>
+    <path d="M-40 260C120 180 280 310 440 248s260-54 520 50"/>
+    <path d="M-40 330C120 250 300 380 460 318s250-46 510 58"/>
+  </svg>
+  <div class="container model-layout">
+    <div class="model-copy" data-reveal>
+      <p class="eyebrow eyebrow--light">04 / MODEL</p>
+      <h2>模型状态，写在明处</h2>
+      <p class="dark-lead">按年份划分训练与测试集，不使用随机拆分。指标、样本量与标签来源都在这里说明，避免把演示结果误读成真实产量。</p>
+      {% if model %}
+        {% if not model.reliable %}
+        <div class="demo-note">
+          {{ icon('alert', 'demo-icon') }}
+          <div><strong>演示标签</strong><p>当前模型使用演示产量标签训练，预测值与 R² 仅用于跑通系统链路，不代表真实产量，也不构成准确率结论。</p></div>
+        </div>
+        {% endif %}
+        <dl class="model-metrics">
+          <div><dt>训练年份</dt><dd>{{ model.train_years[0] }}—{{ model.train_years[-1] }}</dd></div>
+          <div><dt>测试年份</dt><dd>{{ model.test_years|join('、') }}</dd></div>
+          <div><dt>训练 / 测试样本</dt><dd>{{ "{:,}".format(model.metrics_rf.n_train) }} / {{ "{:,}".format(model.metrics_rf.n_test) }}</dd></div>
+          <div><dt>随机森林 R²</dt><dd>{{ model.metrics_rf.r2 }}{% if not model.reliable %}<small>演示</small>{% endif %}</dd></div>
+          <div><dt>MAE</dt><dd>{{ model.metrics_rf.mae }}<small>kg/亩</small></dd></div>
+          <div><dt>RMSE</dt><dd>{{ model.metrics_rf.rmse }}<small>kg/亩</small></dd></div>
+        </dl>
+        <p class="model-foot">最终单产由随机森林 50% + LightGBM 30% + 线性回归 20% 融合得到，共 {{ model.features|length }} 项生育期特征，覆盖温度、降水、辐射、风速、干热风与干旱指数。{% if model.reliable %}当前使用真实产量标签，指标可作为评估参考。{% else %}接入真实产量后重新训练，指标才具备参考价值。{% endif %}</p>
+      {% else %}
+        <div class="model-empty">
+          <strong>尚未训练模型</strong>
+          <p>产量预测与农事建议暂不可用。在项目目录运行 <code>python -m src.models.train_model</code>，产量标签缺失时可先用演示标签跑通链路。</p>
+        </div>
+      {% endif %}
+    </div>
+    <div class="model-art" aria-hidden="true">
+      <svg class="model-wheat"><use href="#wheat-mark"></use></svg>
+      <span class="model-art-label">FIELD MODEL / RF+LGBM+LR</span>
+      <span class="model-art-meta">{{ model.features|length if model else 18 }} FEATURES · YEAR-BASED SPLIT</span>
+    </div>
+  </div>
+</section>
+
+<section class="section cta-section">
+  <div class="container cta-split">
+    <figure class="cta-photo" data-reveal>
+      <picture>
+        <source srcset="{{ url_for('static', filename='assets/field/wheat-closeup.webp') }}" type="image/webp">
+        <img src="{{ url_for('static', filename='assets/field/wheat-closeup.jpg') }}" alt="晨光中带露珠的麦穗特写" loading="lazy">
+      </picture>
+    </figure>
+    <div class="cta-copy" data-reveal>
+      <p class="eyebrow">05 / UPLOAD</p>
+      <h2>把今年的数据，<br>交给明年的丰收</h2>
+      <p>上传一份逐日气象 CSV / Excel，自动识别中英文字段，完成缺失、重复与异常校验。校验通过后，立即进入分析、预测与农事建议。</p>
+      <a class="btn btn-primary" href="{{ url_for('upload') }}">上传数据 {{ icon('arrow', 'btn-arrow') }}</a>
+      <span class="cta-note">{{ icon('check', 'note-icon') }} 支持 CSV / XLSX / XLS · 单文件 ≤ 50 MB</span>
+    </div>
+  </div>
+</section>
+{% endblock %}

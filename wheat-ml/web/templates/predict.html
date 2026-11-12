@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{% set badges = [source, '多模型融合', 'MAE 近似区间'] %}
+{{ page_head('产量预测与预警', '预测单产，盯住预警线', '按县区与年份融合随机森林、LightGBM 与线性回归输出预测单产，对比多年平均与实测值，并按自定义预警线判断是否触发产量预警。', badges) }}
+<div class="container page-content">
+  {% if error %}
+  <div class="alert error"><span class="tag">无法预测</span><p>{{ error }}</p></div>
+  {% endif %}
+
+  <div class="workbench">
+    <form class="control-card" method="get" aria-label="预测条件">
+      <h2>预测条件</h2>
+      <div class="field">
+        <label for="f-county">县区</label>
+        <select id="f-county" name="county">
+          {% if city_groups %}
+            {% for city, city_counties in city_groups.items() %}
+            <optgroup label="{{ city }}">
+              {% for c in city_counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+            </optgroup>
+            {% endfor %}
+          {% else %}
+            {% for c in counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+          {% endif %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-year">预测年份</label>
+        <select id="f-year" name="year">
+          {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-threshold">自定预警值（kg/亩）</label>
+        <input id="f-threshold" type="number" name="threshold" step="0.1" min="0"
+               {% if threshold_max %}max="{{ threshold_max }}"{% endif %} value="{{ threshold }}">
+      </div>
+      <button class="btn btn-primary" type="submit">计算预测</button>
+      <p class="control-hint">预警线默认取该县多年平均单产的 {{ ratio }}%，可修改后重新计算。</p>
+      {% if threshold_note %}
+      <p class="control-hint is-warning">{{ threshold_note }}</p>
+      {% endif %}
+    </form>
+
+    {% if result %}
+    <section class="result-card" data-reveal>
+      {% if not reliable %}
+      <div class="demo-banner">
+        {{ icon('alert') }}
+        <span>以下预测值由演示产量标签训练的模型给出，仅用于演示系统链路，不代表真实产量，也不构成准确率结论。</span>
+      </div>
+      {% endif %}
+      {% if result.feature_note %}
+      <div class="demo-banner">
+        {{ icon('alert') }}
+        <span>该年部分跨年气象特征缺失（如 SPI-12），已按中性值处理，预测结果仅供趋势参考。</span>
+      </div>
+      {% endif %}
+      <div class="result-head">
+        <div class="result-summary">
+          <p class="result-kicker">{{ result.county }} · {{ result.year }} 年 · ENSEMBLE FORECAST</p>
+          <div class="result-value">{{ result.pred }}<small>kg/亩</small></div>
+          <p class="result-sub">随机森林 {{ result.pred_rf }} · LightGBM {{ result.pred_lgbm }} · 线性回归 {{ result.pred_lr }} kg/亩<br>该县多年平均 {{ result.mean_yield }} kg/亩</p>
+          <p class="result-ci">MAE 近似区间 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩</p>
+          <span class="status-pill {{ 'is-alert' if result.alert else 'is-ok' }}">
+            {{ '产量预警：预测单产低于预警线' if result.alert else '产量正常：预测单产不低于预警线' }}
+          </span>
+        </div>
+
+        <div class="result-scale">
+          <div class="ruler">
+            <div class="ruler-head"><span>{{ result.scale.min }}</span><span>{{ result.scale.max }} kg/亩</span></div>
+            <div class="ruler-track">
+              <span class="ruler-band" style="left: {{ result.scale.low_pct }}%; width: {{ result.scale.high_pct - result.scale.low_pct }}%"></span>
+              <span class="ruler-mean" style="left: {{ result.scale.mean_pct }}%"></span>
+              <span class="ruler-threshold" style="left: {{ result.scale.threshold_pct }}%"></span>
+              <span class="ruler-pred{{ ' is-alert' if result.alert }}" style="left: {{ result.scale.pred_pct }}%"></span>
+            </div>
+            <div class="ruler-legend">
+              <span><i class="legend-dot"></i>预测值 {{ result.pred }}</span>
+              <span><i class="legend-line"></i>预警线 {{ result.threshold }}</span>
+              <span><i class="legend-mean"></i>多年平均 {{ result.mean_yield }}</span>
+              <span><i class="legend-band"></i>近似区间 {{ result.pred_low }}—{{ result.pred_high }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><span>预警值</span><strong>{{ result.threshold }}<small>kg/亩</small></strong></div>
+        <div class="metric"><span>相对预警线</span><strong>{{ '+' if result.vs_threshold > 0 }}{{ result.vs_threshold }}<small>%</small></strong></div>
+        <div class="metric"><span>相对常年</span><strong>{{ '+' if result.vs_mean > 0 }}{{ result.vs_mean }}<small>%</small></strong></div>
+        <div class="metric"><span>该年实测单产</span><strong>{{ result.actual if result.actual is not none else '—' }}{% if result.actual is not none %}<small>kg/亩</small>{% endif %}</strong></div>
+      </div>
+
+      {% if metrics %}
+      <p class="model-metrics-line">融合权重 0.5 / 0.3 / 0.2 · RF R² {{ metrics.r2 }} · LGBM R² {{ metrics_lgbm.r2 if metrics_lgbm else '—' }} · LR R² {{ metrics_lr.r2 if metrics_lr else '—' }} · 测试年份 {{ metrics.test_years|join('、') }}，{{ metrics.n_test }} 条样本{% if not metrics.reliable %}（演示标签，指标不作准确率结论）{% endif %}</p>
+      {% endif %}
+
+      <div class="result-actions">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('export_report', county=result.county) }}">{{ icon('download') }} 导出 Excel 报告</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('export_report_pdf', county=result.county) }}">{{ icon('download') }} 导出 PDF 报告</a>
+      </div>
+    </section>
+    {% else %}
+    <div class="result-empty">
+      <p>填写左侧县区、年份与预警值后点击「计算预测」，结果会显示在这里。</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="export-bar">
+    <div class="export-bar-title">
+      <span class="result-kicker">BATCH EXPORT</span>
+      <p>批量导出全省各县区逐年预测结果（Excel / PDF）</p>
+    </div>
+    <div class="result-actions export-actions">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('export_report') }}">{{ icon('download') }} 导出全省 Excel</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('export_report_pdf') }}">{{ icon('download') }} 导出全省 PDF</a>
+    </div>
+  </div>
+
+  <div class="pipeline" data-reveal>
+    <span class="pipeline-node">气象数据</span><span class="pipeline-arrow">→</span>
+    <span class="pipeline-node">{{ feature_count|default(18) }} 项生育期特征</span><span class="pipeline-arrow">→</span>
+    <span class="pipeline-node">多模型融合</span><span class="pipeline-arrow">→</span>
+    <span class="pipeline-node">预测单产</span>
+    <span class="pipeline-meta">RF 50% + LGBM 30% + LR 20%{% if metrics %} · TEST {{ metrics.test_years|join(' / ') }} · N {{ metrics.n_test }}{% endif %}</span>
+  </div>
+
+  {% if result and trend_chart %}
+  <section class="block-lg">
+    <div class="block-head" data-reveal>
+      <div>
+        <p class="eyebrow">YIELD TREND</p>
+        <h2>实测与预测，放在同一条线上</h2>
+      </div>
+      <p class="block-note">预警线 {{ trend_chart.payload.threshold }} kg/亩 · 选中年份已放大</p>
+    </div>
+    <article class="chart-card wide">
+      <div class="chart-head">
+        <span class="chart-index">趋势</span>
+        <div>
+          <h3>{{ trend_chart.title }}</h3>
+          <p>{{ trend_chart.desc }}</p>
+        </div>
+      </div>
+      <div class="chart-body tall"><canvas role="img" aria-label="历年实测与预测单产对比"></canvas></div>
+      <p class="chart-note">预警线 {{ trend_chart.payload.threshold }} kg/亩 · 选中年份 {{ trend_chart.payload.selected }} 年的数据点已放大显示。</p>
+      <script type="application/json" class="chart-spec">{{ trend_chart|tojson }}</script>
+    </article>
+  </section>
+  {% endif %}
+
+  {% if result and feature_chart %}
+  <section class="block-lg">
+    <div class="block-head" data-reveal>
+      <div>
+        <p class="eyebrow">MODEL EXPLAINER</p>
+        <h2>哪些气象因子在推动产量</h2>
+      </div>
+      <p class="block-note">随机森林特征重要性 · 百分比</p>
+    </div>
+    <article class="chart-card wide">
+      <div class="chart-head">
+        <span class="chart-index">IMP</span>
+        <div>
+          <h3>{{ feature_chart.title }}</h3>
+          <p>{{ feature_chart.desc }}</p>
+        </div>
+      </div>
+      <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
+      <p class="chart-note">数值为随机森林特征重要性占比。品种改良趋势与返青拔节期积温通常是影响最大的因子。</p>
+      <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
+    </article>
+    <details class="more panel">
+      <summary>特征重要性数据表 · {{ feature_chart.payload.labels|length }} 项</summary>
+      <div class="detail-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>特征</th><th>重要性占比</th></tr></thead>
+            <tbody>
+              {% for label in feature_chart.payload.labels %}
+              <tr><td>{{ label }}</td><td>{{ feature_chart.payload.values[loop.index0] }}%</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+
+  {% if result %}
+  <section class="block-lg" id="simulation">
+    <div class="block-head" data-reveal>
+      <div>
+        <p class="eyebrow">SCENARIO</p>
+        <h2>把气象条件，拨一拨</h2>
+      </div>
+      <p class="block-note">拖动滑块 · 300ms 防抖 · 实时重算</p>
+    </div>
+    <div class="sim-layout">
+      <div class="sim-controls control-card" data-reveal>
+        <h2>情景因子</h2>
+        <div class="sim-slider">
+          <label for="gdd">生育期积温（℃·d）<span id="gddVal">—</span></label>
+          <input type="range" id="gdd" min="1000" max="2500" step="10">
+        </div>
+        <div class="sim-slider">
+          <label for="season_precip">生育期降水（mm）<span id="season_precipVal">—</span></label>
+          <input type="range" id="season_precip" min="50" max="800" step="10">
+        </div>
+        <div class="sim-slider">
+          <label for="hot_days">极端高温天数（天）<span id="hot_daysVal">—</span></label>
+          <input type="range" id="hot_days" min="0" max="30" step="1">
+        </div>
+        <div class="sim-slider">
+          <label for="cold_days">极端低温天数（天）<span id="cold_daysVal">—</span></label>
+          <input type="range" id="cold_days" min="0" max="50" step="1">
+        </div>
+        <button class="btn btn-ghost btn-sm" id="sim-reset" type="button">重置为基准值</button>
+        <p class="control-hint">模拟基于当前县区与年份的生育期特征；极端输入会按各模型基准值 ±30% 截断，避免外推失真，结果仅用于趋势判断。</p>
+      </div>
+      <div class="sim-result" data-reveal>
+        <p class="result-kicker">SIMULATED YIELD</p>
+        <div class="sim-value"><span id="simResult" aria-live="polite">—</span><small>kg/亩</small></div>
+        <dl class="sim-meta">
+          <div><dt>基准值</dt><dd><span id="simBaseline">—</span> kg/亩</dd></div>
+          <div><dt>变化</dt><dd><span id="simChange" aria-live="polite">—</span></dd></div>
+          <div><dt>多年平均</dt><dd>{{ result.mean_yield }} kg/亩</dd></div>
+        </dl>
+        <p class="sim-advice" id="simAdvice" aria-live="polite">正在加载基准情景…</p>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if history %}
+  <details class="more panel block-lg">
+    <summary>逐年预测与实测对比 · {{ history|length }} 年</summary>
+    <div class="detail-body">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>年份</th><th>实测单产（kg/亩）</th><th>预测单产（kg/亩）</th><th>偏差</th><th>状态</th></tr>
+          </thead>
+          <tbody>
+            {% for r in history %}
+            <tr>
+              <td>{{ r.year }}</td>
+              <td>{{ r.actual if r.actual is not none else '—' }}</td>
+              <td>{{ r.pred }}</td>
+              <td>{% if r.diff is not none %}{{ '+' if r.diff > 0 }}{{ r.diff }}{% else %}—{% endif %}</td>
+              <td><span class="chip {{ 'chip--alert' if r.alert else 'chip--ok' }}"><i class="dot"></i>{{ '预警' if r.alert else '正常' }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+      <p class="chart-note">预测值由当期气象特征驱动融合模型得到；若某年缺少产量标签，实测列显示为「—」。</p>
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if result %}
+<script>
+(function () {
+  'use strict';
+  var SIM = { county: {{ result.county|tojson }}, year: {{ result.year|tojson }} };
+  var baselineData = null;
+  var timer = null;
+
+  function byId(id) { return document.getElementById(id); }
+
+  function setText(id, text) {
+    var el = byId(id);
+    if (el) el.textContent = text;
+  }
+
+  function setSlider(id, value) {
+    var slider = byId(id);
+    if (slider) slider.value = value;
+    setText(id + 'Val', value);
+  }
+
+  function applyBaseline(features) {
+    setSlider('gdd', features.gdd);
+    setSlider('season_precip', features.season_precip);
+    setSlider('hot_days', features.hot_days);
+    setSlider('cold_days', features.cold_days);
+  }
+
+  async function loadBaseline() {
+    try {
+      var response = await fetch('/api/simulate?county=' + encodeURIComponent(SIM.county) + '&year=' + SIM.year);
+      var data = await response.json();
+      if (!response.ok || data.error) {
+        setText('simAdvice', data.error || '情景模拟暂不可用。');
+        return;
+      }
+      baselineData = data;
+      setText('simBaseline', data.baseline);
+      setText('simResult', data.predicted);
+      setText('simChange', '基准');
+      applyBaseline(data.base_features || {});
+      setText('simAdvice', '拖动左侧滑块，查看关键气象因子变化对预测单产的影响。');
+    } catch (error) {
+      setText('simAdvice', '情景模拟加载失败，请刷新页面重试。');
+    }
+  }
+
+  async function runSim() {
+    if (!baselineData) return;
+    var params = new URLSearchParams({
+      county: SIM.county,
+      year: String(SIM.year),
+      gdd: byId('gdd').value,
+      season_precip: byId('season_precip').value,
+      hot_days: byId('hot_days').value,
+      cold_days: byId('cold_days').value
+    });
+    try {
+      var response = await fetch('/api/simulate?' + params.toString());
+      var data = await response.json();
+      if (!response.ok || data.error) {
+        setText('simAdvice', data.error || '情景模拟暂不可用。');
+        return;
+      }
+      setText('simResult', data.predicted);
+      var change = byId('simChange');
+      if (change) {
+        change.textContent = (data.change >= 0 ? '+' : '') + data.change + '%';
+        change.classList.toggle('is-up', data.change >= 0);
+        change.classList.toggle('is-down', data.change < 0);
+      }
+      var advice = '产量变化在正常波动范围内。';
+      if (data.change < -10) advice = '该情景下产量明显下降，需警惕减产风险。';
+      else if (data.change > 10) advice = '该情景下产量提升明显。';
+      setText('simAdvice', advice);
+    } catch (error) {
+      setText('simAdvice', '情景模拟请求失败，请稍后重试。');
+    }
+  }
+
+  function debouncedRunSim() {
+    if (timer) window.clearTimeout(timer);
+    timer = window.setTimeout(runSim, 300);
+  }
+
+  ['gdd', 'season_precip', 'hot_days', 'cold_days'].forEach(function (id) {
+    var slider = byId(id);
+    if (!slider) return;
+    slider.addEventListener('input', function () {
+      setText(id + 'Val', slider.value);
+      debouncedRunSim();
+    });
+  });
+
+  var reset = byId('sim-reset');
+  if (reset) {
+    reset.addEventListener('click', function () {
+      if (!baselineData) return;
+      applyBaseline(baselineData.base_features || {});
+      runSim();
+    });
+  }
+
+  loadBaseline();
+})();
+</script>
+{% endif %}
+{% endblock %}

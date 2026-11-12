@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{{ page_head('干热风预警', '盯住灌浆期的那阵热风', '干热风是小麦灌浆期的灾害性天气，高温低湿会导致青枯逼熟、粒重下降。按城市展开，查看各区县干热风天数、等级与产量影响预估。', ['近 15 年', year ~ ' 年', '县级干热风天数']) }}
+<div class="container page-content dh-page">
+  <div class="dh-summary">
+    <div class="dh-card" data-reveal>
+      <span class="dh-label">近 15 年干热风总天数</span>
+      <strong>{{ stats.total_days }}</strong>
+      <small>天 · 全部区县累计</small>
+    </div>
+    <div class="dh-card" data-reveal>
+      <span class="dh-label">最严重年份</span>
+      <strong class="is-text">{{ stats.max_year }}</strong>
+      <small>按当年总天数</small>
+    </div>
+    <div class="dh-card" data-reveal>
+      <span class="dh-label">干热风最多区县</span>
+      <strong class="is-text">{{ stats.max_county }}</strong>
+      <small>15 年累计</small>
+    </div>
+    <div class="dh-card is-alert" data-reveal>
+      <span class="dh-label">预警区县数</span>
+      <strong>{{ stats.alert_count }}</strong>
+      <small>{{ year }} 年天数 &gt; 0</small>
+    </div>
+  </div>
+
+  <form class="filter-panel dh-filter" method="get" aria-label="干热风年份筛选">
+    <div class="field">
+      <label for="yearSelect">年份</label>
+      <select id="yearSelect" name="year" onchange="this.form.submit()">
+        {% for y in years %}
+        <option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">查看该年</button>
+    <p class="filter-hint" id="yearNote" aria-live="polite">正在统计…</p>
+  </form>
+
+  <section class="panel dh-panel" data-reveal>
+    <div class="block-head">
+      <div>
+        <p class="eyebrow">CITY &amp; COUNTY</p>
+        <h2>{{ year }} 年干热风分布</h2>
+      </div>
+      <p class="block-note">点击城市行展开 / 收起区县明细；城市行等级取该市最高县。</p>
+    </div>
+    <div class="table-wrap">
+      <table class="dh-table">
+        <thead>
+          <tr>
+            <th style="width:30%">区域</th>
+            <th>干热风天数</th>
+            <th>等级</th>
+            <th>对产量影响预估</th>
+          </tr>
+        </thead>
+        <tbody id="dhTableBody">
+        </tbody>
+      </table>
+    </div>
+    <p class="chart-note">干热风天数按县区逐日气象统计；等级与产量影响为经验参考，不替代实地灾情评估。</p>
+  </section>
+
+  <section class="dh-levels">
+    <article class="dh-level">
+      <span class="chip chip--ok"><i class="dot"></i>无</span>
+      <strong>0 天</strong>
+      <p>未出现干热风日，正常关注灌浆期水分供应。</p>
+    </article>
+    <article class="dh-level">
+      <span class="chip chip--gold"><i class="dot"></i>轻度</span>
+      <strong>1—2 天</strong>
+      <p>可能造成轻度减产，建议关注土壤墒情与叶面补水。</p>
+    </article>
+    <article class="dh-level is-alert">
+      <span class="chip chip--alert"><i class="dot"></i>重度</span>
+      <strong>≥ 3 天</strong>
+      <p>青枯逼熟风险明显，需提前安排灌溉与防灾措施。</p>
+    </article>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  var DATA = {{ data|tojson }};
+  var COUNTY_TO_CITY = {{ city_map|tojson }};
+  var selectedYear = String({{ year|tojson }});
+  var yearSelect = document.getElementById('yearSelect');
+  var tbody = document.getElementById('dhTableBody');
+  var yearNote = document.getElementById('yearNote');
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function (char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+    });
+  }
+
+  function getLevel(days) {
+    if (days === 0) return { level: 0, text: '无', chip: 'chip--ok', effect: '无影响' };
+    if (days <= 2) return { level: 1, text: '轻度', chip: 'chip--gold', effect: '轻度减产约 3—5%' };
+    return { level: 2, text: '重度', chip: 'chip--alert', effect: '重度减产约 5—10%' };
+  }
+
+  function toggleCity(city) {
+    var rows = tbody.querySelectorAll('.dh-county-row[data-city="' + CSS.escape(city) + '"]');
+    var cityRow = tbody.querySelector('.dh-city-row[data-city="' + CSS.escape(city) + '"]');
+    var button = cityRow ? cityRow.querySelector('.dh-city-toggle') : null;
+    var expanded = button ? button.getAttribute('aria-expanded') === 'true' : false;
+    rows.forEach(function (row) {
+      row.classList.toggle('show', !expanded);
+    });
+    if (button) {
+      button.setAttribute('aria-expanded', String(!expanded));
+      var hint = button.querySelector('.dh-toggle');
+      if (hint) hint.textContent = expanded ? '展开 ▼' : '收起 ▲';
+    }
+  }
+
+  function renderTable() {
+    selectedYear = yearSelect.value;
+    var yearData = DATA.filter(function (item) { return String(item.year) === selectedYear; });
+    var groups = {};
+
+    yearData.forEach(function (item) {
+      var city = COUNTY_TO_CITY[item.county] || '其他';
+      if (!groups[city]) groups[city] = [];
+      groups[city].push(item);
+    });
+
+    var cities = Object.keys(groups).sort(function (a, b) {
+      var sumA = groups[a].reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
+      var sumB = groups[b].reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
+      return sumB - sumA;
+    });
+
+    if (!cities.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="dh-empty">该年没有干热风统计数据。</td></tr>';
+      yearNote.textContent = '该年没有可用数据。';
+      return;
+    }
+
+    var html = '';
+    cities.forEach(function (city) {
+      var counties = groups[city].slice().sort(function (a, b) { return b.hot_dry_days - a.hot_dry_days; });
+      var totalDays = counties.reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
+      var alertCount = counties.filter(function (item) { return item.hot_dry_days > 0; }).length;
+      var maxDays = counties.length ? counties[0].hot_dry_days : 0;
+      var level = getLevel(maxDays);
+
+      html += '<tr class="dh-city-row" data-city="' + escapeHtml(city) + '">' +
+        '<td><button class="dh-city-toggle" type="button" aria-expanded="false">' +
+        '<span>' + escapeHtml(city) + '</span> <span class="dh-toggle">展开 ▼</span></button></td>' +
+        '<td><b>' + totalDays + '</b> 天（' + alertCount + ' 个区县）</td>' +
+        '<td><span class="chip ' + level.chip + '"><i class="dot"></i>' + level.text + '</span>' +
+        '<span class="dh-impact-mobile">影响：' + level.effect + '</span></td>' +
+        '<td>' + level.effect + '</td></tr>';
+
+      counties.forEach(function (item) {
+        var countyLevel = getLevel(item.hot_dry_days);
+        html += '<tr class="dh-county-row" data-city="' + escapeHtml(city) + '">' +
+          '<td class="dh-county-name">└ ' + escapeHtml(item.county) + '</td>' +
+          '<td>' + item.hot_dry_days + ' 天</td>' +
+          '<td><span class="chip ' + countyLevel.chip + '"><i class="dot"></i>' + countyLevel.text + '</span>' +
+          '<span class="dh-impact-mobile">影响：' + countyLevel.effect + '</span></td>' +
+          '<td>' + countyLevel.effect + '</td></tr>';
+      });
+    });
+
+    tbody.innerHTML = html;
+    var maxTotal = groups[cities[0]].reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
+    yearNote.textContent = maxTotal > 20
+      ? selectedYear + ' 年干热风偏重，注意防范灌浆期青枯逼熟。'
+      : selectedYear + ' 年干热风总体正常。';
+  }
+
+  tbody.addEventListener('click', function (event) {
+    var row = event.target.closest('.dh-city-row');
+    if (row) toggleCity(row.getAttribute('data-city'));
+  });
+  renderTable();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+# ---- Python 缓存与虚拟环境 ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- 压缩包与历史归档 ----
+*.zip
+*.tar.gz
+*.7z
+archive/
+
+# ---- 可重建的大数据中间产物 ----
+# 清洗后的逐日气象宽表（由 data/raw/weather 原始 CSV 经流水线重建）
+wheat-ml/data/processed/weather_clean.csv
+
+# ---- 训练产出的模型与缓存（由 scripts 训练流水线重建）----
+wheat-ml/output/models/*.joblib
+wheat-ml/output/dashboard/model.json
+
+# ---- 本地上传临时文件 ----
+wheat-ml/web/uploads/*
+!wheat-ml/web/uploads/.gitkeep
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

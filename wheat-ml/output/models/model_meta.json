@@ -1,0 +1,82 @@
+{
+  "features": [
+    "spi_12",
+    "precip_anom",
+    "hot_days",
+    "cold_days",
+    "gdd",
+    "season_tmax",
+    "season_tmin",
+    "season_precip",
+    "season_wind",
+    "season_sunshine",
+    "season_tmax_34",
+    "season_precip_34",
+    "gdd_34",
+    "season_tmax_56",
+    "season_precip_56",
+    "gdd_56",
+    "hot_dry_days",
+    "year_index"
+  ],
+  "data_source": "real",
+  "reliable": true,
+  "yield_file": "data\\raw\\county_yield_train.csv",
+  "train_years": [
+    2010,
+    2011,
+    2012,
+    2013,
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "test_years": [
+    2022,
+    2023,
+    2024
+  ],
+  "metrics_rf": {
+    "r2": 0.9048,
+    "rmse": 27.2507,
+    "mae": 19.9716,
+    "model": "rf",
+    "yield_file": "data\\raw\\county_yield_train.csv",
+    "data_source": "real",
+    "reliable": true,
+    "n_samples": 1517,
+    "n_counties": 110,
+    "year_range": [
+      2010,
+      2024
+    ],
+    "n_train": 1191,
+    "n_test": 326,
+    "split": "按年份划分",
+    "train_years": [
+      2010,
+      2011,
+      2012,
+      2013,
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021
+    ],
+    "test_years": [
+      2022,
+      2023,
+      2024
+    ],
+    "target": "yield_norm -> 还原真实单产 (kg/亩)"
+  }
+}

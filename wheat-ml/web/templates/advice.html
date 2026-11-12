@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{{ page_head('农事建议', '按生育期，管好每一段生长', '以当期气象条件为主、产量预测为辅，按返青—成熟五个生育期梳理风险提示与管理重点，不直接给出施肥、灌溉剂量。', [source, '五个生育期']) }}
+<div class="container page-content">
+  {% if error %}
+  <div class="alert error"><span class="tag">无法生成</span><p>{{ error }}</p></div>
+  {% endif %}
+
+  <form class="filter-panel" method="get" aria-label="建议筛选">
+    <div class="field">
+      <label for="f-county">县区</label>
+      <select id="f-county" name="county">
+        {% if city_groups %}
+          {% for city, city_counties in city_groups.items() %}
+          <optgroup label="{{ city }}">
+            {% for c in city_counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+          </optgroup>
+          {% endfor %}
+        {% else %}
+          {% for c in counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+        {% endif %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-year">年份</label>
+      <select id="f-year" name="year">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-threshold">预警值（kg/亩）</label>
+      <input id="f-threshold" type="number" name="threshold" step="0.1" min="0" value="{{ threshold }}">
+    </div>
+    <button class="btn btn-primary" type="submit">生成建议</button>
+  </form>
+
+  {% if result %}
+  {% if result.yield_note %}
+  <div class="yield-banner{{ ' is-alert' if result.alert }}" data-reveal>
+    <div class="yield-icon">{{ icon('alert' if result.alert else 'check') }}</div>
+    <div>
+      <strong>{{ '产量预警' if result.alert else '产量正常' }}</strong>
+      <p>{{ result.yield_note }}</p>
+    </div>
+  </div>
+  {% endif %}
+  {% if result.feature_note %}
+  <div class="alert warning">
+    <span class="tag">提示</span>
+    <p>该年部分跨年气象特征缺失，产量预测已按中性值处理，预警与建议仅作趋势参考。</p>
+  </div>
+  {% endif %}
+
+  {% set label_map = {
+    '平均最高温': '平均最高温', '平均最低温': '平均最低温', '降水日数': '降水日数',
+    '平均相对湿度': '平均湿度', '干热风日数': '干热风日数', '平均辐射': '平均辐射',
+    '平均风速': '平均风速', '大风日数': '大风日数'
+  } %}
+  {% set unit_map = {
+    '平均最高温': '℃', '平均最低温': '℃', '降水日数': '天', '平均相对湿度': '%',
+    '干热风日数': '天', '平均辐射': 'MJ/m²/day', '平均风速': 'm/s', '大风日数': '天'
+  } %}
+  {% set extra_keys = ['平均最高温', '平均最低温', '降水日数', '平均相对湿度', '干热风日数', '平均辐射', '平均风速', '大风日数'] %}
+
+  <section class="block-lg">
+    <div class="block-head" data-reveal>
+      <div>
+        <p class="eyebrow">GROWTH TIMELINE</p>
+        <h2>五个生育期，逐段看</h2>
+      </div>
+      <p class="block-note">按当期气象条件与产量预测生成</p>
+    </div>
+
+    <div class="timeline">
+      {% for s in result.stages %}
+      <div class="stage">
+        <div class="stage-rail">
+          <span class="stage-node">{{ '%02d'|format(loop.index) }}</span>
+        </div>
+        <article class="stage-card">
+          <div class="stage-head">
+            <div>
+              <h2>{{ s.name }}</h2>
+              <p class="stage-period">{{ s.period }}</p>
+            </div>
+            <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
+          </div>
+
+          <div class="stage-body">
+            <div>
+              {% if s.stats %}
+              <div class="stage-kpis">
+                <div class="stage-kpi"><span>累计降水</span><strong>{{ s.stats['累计降水'] }}<small>mm</small></strong></div>
+                <div class="stage-kpi"><span>平均气温</span><strong>{{ s.stats['平均气温'] }}<small>℃</small></strong></div>
+                <div class="stage-kpi"><span>高温日数</span><strong>{{ s.stats['高温日数'] }}<small>天</small></strong></div>
+                <div class="stage-kpi"><span>霜冻日数</span><strong>{{ s.stats['霜冻日数'] }}<small>天</small></strong></div>
+              </div>
+              <details class="more">
+                <summary>更多气象指标</summary>
+                <div class="detail-body">
+                  <dl class="stat-list">
+                    {% for k in extra_keys %}
+                    {% if k in s.stats %}
+                    <div><dt>{{ label_map[k] }}</dt><dd>{{ s.stats[k] }} {{ unit_map[k] }}</dd></div>
+                    {% endif %}
+                    {% endfor %}
+                  </dl>
+                </div>
+              </details>
+              {% else %}
+              <p class="stage-empty">该生育期没有逐日气象记录。</p>
+              {% endif %}
+            </div>
+
+            <div class="advice-side">
+              <div class="chips">
+                {% if not s.stats %}
+                <span class="chip">气象记录缺失</span>
+                {% elif s.flags %}
+                {% for f in s.flags %}<span class="chip chip--alert"><i class="dot"></i>{{ f }}</span>{% endfor %}
+                {% else %}
+                <span class="chip chip--ok"><i class="dot"></i>气象条件平稳</span>
+                {% endif %}
+              </div>
+              <ul class="advice-list">
+                {% for a in s.advice %}<li>{{ a }}</li>{% endfor %}
+              </ul>
+            </div>
+          </div>
+        </article>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
