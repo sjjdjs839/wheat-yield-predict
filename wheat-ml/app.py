@@ -39,6 +39,7 @@ NASA_TO_CANON = {v: k for k, v in CANONICAL_TO_NASA.items()}
 UPLOAD_DIR = PROJECT_ROOT / CONFIG["paths"]["uploads"]
 LATEST = UPLOAD_DIR / "latest.json"
 PROCESSED = PROJECT_ROOT / CONFIG["paths"]["processed"] / "weather_clean.csv"
+FEATURE_CSV = PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv"
 MODELS_DIR = PROJECT_ROOT / CONFIG["paths"]["models"]
 REPORTS_DIR = PROJECT_ROOT / CONFIG["paths"]["reports"]
 
@@ -130,6 +131,15 @@ def scope_city_groups(scope: dict | None) -> dict | None:
 
 def builtin_dataset() -> pd.DataFrame:
     return _read_processed(str(PROCESSED), PROCESSED.stat().st_mtime)
+
+
+@lru_cache(maxsize=1)
+def feature_csv_rows() -> int:
+    """内置特征表行数；回退 CSV 链路时与天气表同口径统计。"""
+    try:
+        return int(pd.read_csv(FEATURE_CSV).shape[0])
+    except Exception:
+        return 0
 
 
 def dataset_for_county(county: str) -> tuple[pd.DataFrame, dict]:
@@ -323,7 +333,7 @@ def index():
                     "year_range": f"{int(cdf['year'].min())}—{int(cdf['year'].max())}" if "year" in cdf else "—",
                     "label_text": label_text,
                     "dataset_text": cmeta["source"],
-                    "feature_rows": st["feature_rows"],
+                    "feature_rows": feature_csv_rows(),
                     "yield_rows": st["yield_rows"],
                 }
             return render_template("index.html", title=CONFIG["web"]["title"],
@@ -337,7 +347,7 @@ def index():
         "year_range": f"{int(df['year'].min())}—{int(df['year'].max())}" if "year" in df else "—",
         "label_text": label_text,
         "dataset_text": meta["source"],
-        "feature_rows": 0,
+        "feature_rows": feature_csv_rows(),
         "yield_rows": 0,
     }
     return render_template("index.html", title=CONFIG["web"]["title"], active="index",

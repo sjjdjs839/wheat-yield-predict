@@ -13,7 +13,7 @@
       <h2>预测条件</h2>
       <div class="field">
         <label for="f-county">县区</label>
-        <select id="f-county" name="county">
+        <select id="f-county" name="county" onchange="var t=document.getElementById('f-threshold'); if(t){t.value='';}">
           {% if city_groups %}
             {% for city, city_counties in city_groups.items() %}
             <optgroup label="{{ city }}">
