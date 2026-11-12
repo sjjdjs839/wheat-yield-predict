@@ -1,19 +1,19 @@
 {
-  "r2": 0.9035,
-  "rmse": 27.4335,
-  "mae": 20.0273,
+  "r2": 0.9304,
+  "rmse": 23.2963,
+  "mae": 18.0843,
   "model": "lgbm",
   "yield_file": "data\\raw\\county_yield_train.csv",
   "data_source": "real",
   "reliable": true,
-  "n_samples": 1576,
+  "n_samples": 1608,
   "n_counties": 110,
   "year_range": [
     2010,
     2024
   ],
-  "n_train": 1250,
-  "n_test": 326,
+  "n_train": 1278,
+  "n_test": 330,
   "split": "按年份划分",
   "train_years": [
     2010,
