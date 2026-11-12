@@ -1,18 +1,18 @@
 {
   "r2": 0.8818,
-  "rmse": 30.3573,
-  "mae": 23.0326,
+  "rmse": 30.3639,
+  "mae": 23.1719,
   "model": "lr",
   "yield_file": "data\\raw\\county_yield_train.csv",
   "data_source": "real",
   "reliable": true,
-  "n_samples": 1517,
+  "n_samples": 1576,
   "n_counties": 110,
   "year_range": [
     2010,
     2024
   ],
-  "n_train": 1191,
+  "n_train": 1250,
   "n_test": 326,
   "split": "按年份划分",
   "train_years": [
