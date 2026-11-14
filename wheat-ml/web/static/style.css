@@ -1295,12 +1295,19 @@ main{overflow-x:clip}
 @media(max-width:640px){.contrib-cols{grid-template-columns:1fr}}
 
 /* ---------- 首页工作台（P0 去介绍化） ---------- */
-.dash-head{padding:34px 0 8px}
+.dash-head{padding:0 0 8px}
 .dash-head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
 .dash-head-copy h1{font-size:clamp(24px,3vw,32px);letter-spacing:-.02em;color:var(--ink-900)}
 .dash-lead{margin-top:8px;max-width:620px;font-size:14px;line-height:1.7;color:var(--ink-600)}
 .dash-status-tags{display:flex;gap:8px;flex-wrap:wrap}
 .dash-chip{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);font-size:12px;color:var(--ink-700)}
+.dash-banner{position:relative;overflow:hidden;background:var(--forest-950)}
+.dash-banner-media{position:absolute;inset:0;background-size:cover;background-position:center 58%}
+.dash-banner-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(12,32,20,.92) 0%,rgba(12,32,20,.6) 52%,rgba(12,32,20,.28) 100%),linear-gradient(0deg,rgba(12,32,20,.88) 0%,rgba(12,32,20,0) 62%)}
+.dash-banner-inner{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;padding:38px 0 30px;color:var(--paper)}
+.dash-banner .dash-head-copy h1{color:var(--paper)}
+.dash-banner .dash-lead{color:rgba(250,246,234,.78)}
+.dash-banner .dash-chip{border-color:rgba(250,246,234,.24);background:rgba(12,32,20,.28);color:rgba(250,246,234,.86)}
 .dash-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-top:22px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
 .dash-stats div{background:var(--rice-50);padding:15px 16px;min-width:0}
 .dash-stats dt{font-size:11px;color:var(--ink-500);letter-spacing:.04em}
@@ -1325,4 +1332,4 @@ main{overflow-x:clip}
 .dash-model .model-metrics dd small{color:var(--ink-500)}
 .dash-model .model-foot{color:var(--ink-600)}
 @media(max-width:1000px){.dash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){.dash-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.dash-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-grid{grid-template-columns:1fr}.dash-banner-inner{padding:26px 0 22px}}

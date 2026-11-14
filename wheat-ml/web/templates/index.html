@@ -2,10 +2,13 @@
 {% from "_macros.html" import icon %}
 {% block content %}
 
-<!-- 工作台头部：系统用途 + 数据状态 -->
+<!-- 工作台头部：麦田横幅 + 数据状态 -->
 <section class="dash-head">
-  <div class="container">
-    <div class="dash-head-row">
+  <div class="dash-banner">
+    <div class="dash-banner-media" role="img" aria-label="麦田背景"
+         style="background-image:url('{{ url_for('static', filename='assets/field/field-band.webp') }}')"></div>
+    <div class="dash-banner-shade" aria-hidden="true"></div>
+    <div class="container dash-banner-inner">
       <div class="dash-head-copy">
         <h1>小麦气象分析与产量预测工作台</h1>
         <p class="dash-lead">按县区与年份查询气象、预测单产、查看干热风风险，并按生育期获取田间管理建议。</p>
@@ -15,6 +18,8 @@
         <span class="dash-chip">{{ stats.label_text }}</span>
       </div>
     </div>
+  </div>
+  <div class="container">
     <dl class="dash-stats">
       <div><dt>覆盖县区</dt><dd>{{ stats.counties }}<span>个</span></dd></div>
       <div><dt>逐日记录</dt><dd>{{ "{:,}".format(stats.rows) }}<span>条</span></dd></div>
