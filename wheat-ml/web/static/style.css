@@ -1293,3 +1293,36 @@ main{overflow-x:clip}
 .contrib-col.is-down .contrib-val{color:var(--alert-600)}
 .contrib-empty{font-size:12px;color:var(--ink-500);padding:6px 0}
 @media(max-width:640px){.contrib-cols{grid-template-columns:1fr}}
+
+/* ---------- 首页工作台（P0 去介绍化） ---------- */
+.dash-head{padding:34px 0 8px}
+.dash-head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.dash-head-copy h1{font-size:clamp(24px,3vw,32px);letter-spacing:-.02em;color:var(--ink-900)}
+.dash-lead{margin-top:8px;max-width:620px;font-size:14px;line-height:1.7;color:var(--ink-600)}
+.dash-status-tags{display:flex;gap:8px;flex-wrap:wrap}
+.dash-chip{display:inline-flex;align-items:center;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--paper);font-size:12px;color:var(--ink-700)}
+.dash-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin-top:22px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
+.dash-stats div{background:var(--rice-50);padding:15px 16px;min-width:0}
+.dash-stats dt{font-size:11px;color:var(--ink-500);letter-spacing:.04em}
+.dash-stats dd{margin-top:5px;font-family:var(--font-num);font-size:22px;font-weight:600;color:var(--ink-900)}
+.dash-stats dd span{font-family:var(--font-sans);font-size:12px;font-weight:400;color:var(--ink-500);margin-left:4px}
+.dash-section{margin-top:26px}
+.dash-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.dash-card{display:flex;flex-direction:column;gap:12px;padding:20px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);transition:transform .2s,border-color .2s}
+.dash-card:hover{transform:translateY(-2px);border-color:var(--line-strong)}
+.dash-card-icon{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:var(--rice-100);color:var(--forest-700)}
+.dash-card-icon .icon{width:20px;height:20px}
+.dash-card-body h3{font-size:16px;color:var(--ink-900)}
+.dash-card-body p{margin-top:5px;font-size:13px;line-height:1.65;color:var(--ink-600)}
+.dash-card-link{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--forest-700)}
+.dash-card-link .icon{width:15px;height:15px}
+.dash-card--upload .dash-card-icon{background:rgba(185,130,46,.12);color:var(--wheat-700)}
+.dash-model{margin:26px 0 40px}
+.dash-model .model-metrics{grid-template-columns:repeat(3,minmax(0,1fr));border-color:var(--line);background:var(--line);margin-top:0}
+.dash-model .model-metrics div{background:var(--rice-50)}
+.dash-model .model-metrics dt{color:var(--ink-500)}
+.dash-model .model-metrics dd{color:var(--ink-900)}
+.dash-model .model-metrics dd small{color:var(--ink-500)}
+.dash-model .model-foot{color:var(--ink-600)}
+@media(max-width:1000px){.dash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.dash-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-grid{grid-template-columns:1fr}}
