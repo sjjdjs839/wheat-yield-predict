@@ -83,9 +83,9 @@
   {% endif %}
 
   {% set label_map = {
-    '平均最高温': '平均最高温', '平均最低温': '平均最低温', '降水日数': '降水日数',
-    '平均相对湿度': '平均湿度', '干热风日数': '干热风日数', '平均辐射': '平均辐射',
-    '平均风速': '平均风速', '大风日数': '大风日数'
+    '平均最高温': '最高气温', '平均最低温': '最低气温', '降水日数': '下雨天数',
+    '平均相对湿度': '空气湿度', '干热风日数': '干热风天数', '平均辐射': '日照辐射',
+    '平均风速': '平均风速', '大风日数': '大风天数'
   } %}
   {% set unit_map = {
     '平均最高温': '℃', '平均最低温': '℃', '降水日数': '天', '平均相对湿度': '%',
@@ -123,8 +123,8 @@
               <div class="stage-kpis">
                 <div class="stage-kpi"><span>累计降水</span><strong>{{ s.stats['累计降水'] }}<small>mm</small></strong></div>
                 <div class="stage-kpi"><span>平均气温</span><strong>{{ s.stats['平均气温'] }}<small>℃</small></strong></div>
-                <div class="stage-kpi"><span>高温日数</span><strong>{{ s.stats['高温日数'] }}<small>天</small></strong></div>
-                <div class="stage-kpi"><span>霜冻日数</span><strong>{{ s.stats['霜冻日数'] }}<small>天</small></strong></div>
+                <div class="stage-kpi"><span>高温天</span><strong>{{ s.stats['高温日数'] }}<small>天</small></strong></div>
+                <div class="stage-kpi"><span>霜冻天</span><strong>{{ s.stats['霜冻日数'] }}<small>天</small></strong></div>
               </div>
               <details class="more">
                 <summary>更多气象指标</summary>

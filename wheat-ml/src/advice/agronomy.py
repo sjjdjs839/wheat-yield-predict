@@ -64,75 +64,75 @@ def stage_climatology(df: pd.DataFrame) -> dict:
 
 
 def stage_flags(key: str, stats: dict, climate: dict) -> list[str]:
-    """按生育期判断气象风险（辅助信息）"""
+    """按生育期判断气象风险（口语化标签，便于普通农户理解）"""
     flags = []
     if not stats:
-        return ["该生育期缺少气象记录"]
+        return ["缺少气象记录"]
     cp = climate.get("precip")
     if cp and stats["累计降水"] < cp * 0.6:
-        flags.append(f"降水偏少（{stats['累计降水']} mm，常年约 {cp:.0f} mm）")
+        flags.append("降水偏少，比常年同期少")
     if cp and stats["累计降水"] > cp * 1.8:
-        flags.append(f"降水偏多（{stats['累计降水']} mm，常年约 {cp:.0f} mm）")
+        flags.append("降水偏多，比常年同期多")
     if stats["高温日数"] >= 3:
-        flags.append(f"高温日数 {stats['高温日数']} 天")
+        flags.append(f"高温天 {stats['高温日数']} 天")
     if stats.get("干热风日数", 0) >= 2:
-        flags.append(f"干热风 {stats['干热风日数']} 天")
+        flags.append(f"干热风天气 {stats['干热风日数']} 天")
     frost_line = 8 if key == "greening" else 3      # 返青期霜冻本身常见，阈值放宽
     if stats["霜冻日数"] >= frost_line:
-        flags.append(f"低温日数 {stats['霜冻日数']} 天")
+        flags.append(f"低温霜冻 {stats['霜冻日数']} 天")
     if stats.get("平均相对湿度", 0) >= 80 and stats["降水日数"] >= stats["days"] * 0.4:
-        flags.append("湿度偏高、降水日数多")
+        flags.append("湿度大、连阴雨偏多")
     if stats.get("大风日数", 0) >= 3:
-        flags.append(f"大风日数 {stats['大风日数']} 天")
+        flags.append(f"大风天 {stats['大风日数']} 天")
     return flags
 
 
 def stage_advice(key: str, stats: dict) -> list[str]:
-    """生育期基础建议 + 气象条件触发建议"""
+    """生育期基础建议 + 气象条件触发建议（大白话、可操作，不写具体剂量）"""
     base = {
-        "greening": ["结合土壤墒情安排灌溉，做好苗情管理。"],
-        "jointing": ["关注水肥管理，结合苗情合理追肥。"],
-        "heading": ["关注田间湿度及病虫害防治。"],
-        "filling": ["关注高温、干旱等天气条件，及时采取田间管理措施。"],
-        "maturity": ["关注天气变化，合理安排收获。"],
+        "greening": ["麦苗刚返青、开始长叶长根，先看长势和土壤干湿，该浇水就浇水，把苗护住。"],
+        "jointing": ["麦苗拔节长秆，需肥需水多，结合长势追肥、浇水。"],
+        "heading": ["麦穗抽出开花，注意查病虫，看好授粉天气。"],
+        "filling": ["麦粒正在灌浆增重，防高温干旱，保住绿叶。"],
+        "maturity": ["临近成熟，盯紧天气，安排好收获。"],
     }.get(key, [])
 
     tips = []
     if not stats:
-        return base + ["该生育期无气象记录，建议人工核查。"]
+        return base + ["这一段没有气象记录，建议到地里人工看看。"]
     if key == "greening":
         if stats["累计降水"] < 20:
-            tips.append("返青期降水偏少，优先核查土壤墒情后再决定是否补灌。")
+            tips.append("这段时间下雨少、地里偏干，先扒开土看干湿，干了再浇，别大水漫灌。")
         if stats["霜冻日数"] >= 8:
-            tips.append("出现持续低温过程，注意防范倒春寒，暂缓大水漫灌。")
+            tips.append("夜里霜冻多，注意防倒春寒，先别急着浇大水。")
     elif key == "jointing":
         if stats["累计降水"] < 30:
-            tips.append("拔节期水分不足，结合苗情与墒情安排追肥与灌溉顺序。")
+            tips.append("地里偏干，先追肥再浇水，让肥跟着水走。")
         if stats["霜冻日数"] >= 2:
-            tips.append("拔节期遇低温，幼穗分化敏感，注意防冷害。")
+            tips.append("拔节期遇冷容易伤穗，注意防冷害。")
         if stats["高温日数"] >= 3:
-            tips.append("气温偏高、蒸发加快，注意保持田间水分。")
+            tips.append("天热蒸发快，注意保持土壤湿润。")
     elif key == "heading":
         if stats.get("平均相对湿度", 0) >= 80:
-            tips.append("田间湿度偏大，重点排查赤霉病等穗部病害。")
+            tips.append("田间湿度大，注意查麦穗病害（如赤霉病），及时防治。")
         if stats["累计降水"] >= 40:
-            tips.append("花期降水较多，注意雨后排涝与病害防治。")
+            tips.append("花期下雨多，雨后及时排水，防止病害。")
         if stats["累计降水"] < 10:
-            tips.append("花期偏干，关注花粉活力与授粉条件。")
+            tips.append("天气偏干，注意授粉结实。")
     elif key == "filling":
         if stats.get("干热风日数", 0) >= 2 or stats["高温日数"] >= 3:
-            tips.append("灌浆期高温 / 干热风明显，可采取喷灌等措施降低冠层温度，减轻逼熟。")
+            tips.append("出现干热风或高温，可喷灌给麦田降温，避免麦粒被逼熟、长瘪。")
         if stats["累计降水"] < 20:
-            tips.append("灌浆期降水不足，关注干旱对粒重的影响。")
+            tips.append("雨水不够，盯紧干旱，别影响麦粒饱满。")
         if stats.get("平均辐射", 99) < 14:
-            tips.append("辐射偏弱，光合积累受限，注意保持叶片功能期。")
+            tips.append("光照偏弱，保住上部绿叶，别让叶片提早干枯。")
     elif key == "maturity":
         if stats["降水日数"] >= 5:
-            tips.append("成熟期降水偏多，注意抢晴收获、及时晾晒，防止穗发芽。")
+            tips.append("下雨偏多，抢晴天收，收完及时晾晒，防止穗发芽。")
         if stats.get("大风日数", 0) >= 3:
-            tips.append("成熟期大风偏多，注意防倒伏与落粒。")
+            tips.append("大风偏多，注意防倒伏、防落粒。")
         if not tips:
-            tips.append("天气条件总体平稳，可按计划安排机械收获。")
+            tips.append("天气平稳，可按计划机械收获。")
     return base + tips
 
 
