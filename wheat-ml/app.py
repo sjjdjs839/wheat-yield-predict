@@ -27,6 +27,7 @@ from src.data.validate import validate_file, load_weather_file
 from src.data.build_features import build_county, CANONICAL_TO_NASA
 from src.analysis.web_charts import build_web
 from src.advice.agronomy import generate_advice
+from src.advice import stage_store
 from src.db import repository as repo
 from county_geo_mapping import to_geo_name
 
@@ -1095,16 +1096,24 @@ def advice():
         county_arg = request.args.get("county")
         county = county_arg if county_arg in counties else ("登封" if "登封" in counties else counties[0])
 
-    data, data_meta = dataset_for_county(county)
-    if scope:
-        years = scope["years"] or list(BASE_YEARS)
-    elif not data.empty and "year" in data.columns:
-        years = sorted(set(BASE_YEARS + [int(y) for y in data["year"].unique().tolist()]))
-    else:
-        years = list(BASE_YEARS)
+    years = list(BASE_YEARS)
     year_arg = request.args.get("year", type=int)
     year = year_arg if year_arg in years else years[-1]
 
+    # 落地链路：优先使用累积的分阶段观测，按当期气象出建议，不依赖年模型
+    stage_df = stage_store.load(county, year)
+    if not stage_df.empty:
+        result = generate_advice(stage_df, county, year)
+        result["alert"] = False
+        result["feature_note"] = False
+        source = f"阶段观测 · 已累积 {len(stage_df)} 天"
+        return render_template("advice.html", title="农事建议", active="advice",
+                               counties=counties, city_groups=scope_city_groups(scope),
+                               county=county, years=years, year=year,
+                               threshold=0, result=result, error=None, source=source)
+
+    # 回退链路：内置全年数据（旧演示保留）；阶段建议基于气象规则，不展示模型预测横幅
+    data, data_meta = dataset_for_county(county)
     if data.empty:
         return render_template("advice.html", title="农事建议", active="advice",
                                counties=counties, city_groups=scope_city_groups(scope),
@@ -1113,42 +1122,48 @@ def advice():
                                source=data_meta["source"],
                                error="当前数据集中没有该县区的记录。")
 
-    binding = load_models()
-    pred, threshold, mean_yield = None, None, None
-    if binding is None or binding[0] is None:
-        return render_template("advice.html", title="农事建议", active="advice",
-                               counties=counties, city_groups=scope_city_groups(scope),
-                               county=county, years=years, year=year,
-                               threshold=0, result=None, source=data_meta["source"],
-                               error="尚未训练模型，无法结合产量预测生成建议。")
-
-    rf, lr, lgbm, stats = binding
-    mean_yield, _ = county_mean_yield(stats, county)
-    ratio = CONFIG["alert"]["default_ratio"]
-    threshold = request.args.get("threshold", type=float)
-    if threshold is None:
-        threshold = round(mean_yield * ratio, 1)
-
-    feats = predict_years(data, county)
-    row = feats[feats["year"] == year]
-    feature_note = False
-    if not row.empty:
-        X = row[FEATS].fillna(feats[FEATS].median(numeric_only=True))
-        feature_note = bool(X.isna().any().any())
-        X = X.fillna(0)
-        pred_rf = float(rf.predict(X)[0]) * mean_yield
-        pred_lr = float(lr.predict(X)[0]) * mean_yield if lr is not None else pred_rf
-        pred_lgbm = float(lgbm.predict(X)[0]) * mean_yield if lgbm is not None else pred_rf
-        pred = round(0.5 * pred_rf + 0.3 * pred_lgbm + 0.2 * pred_lr, 1)
-
-    result = generate_advice(data, county, year, predicted_yield=pred, threshold=threshold)
-    result["alert"] = bool(pred is not None and pred < threshold)
-    result["feature_note"] = feature_note
+    result = generate_advice(data, county, year)
+    result["alert"] = False
+    result["feature_note"] = False
     return render_template("advice.html", title="农事建议", active="advice",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
-                           threshold=round(threshold, 1), result=result, error=None,
+                           threshold=0, result=result, error=None,
                            source=data_meta["source"])
+
+
+@app.route("/advice/upload_stage", methods=["POST"])
+def advice_upload_stage():
+    """上传本期阶段气象观测，累积到阶段观测库（MySQL 优先，CSV 回退）。"""
+    f = request.files.get("file")
+    county = (request.form.get("county") or "").strip()
+    year = request.form.get("year", type=int)
+    if not f or not f.filename:
+        return redirect(url_for("advice", county=county, year=year, stage_error="未选择文件。"))
+    ext = Path(f.filename).suffix.lower()
+    if ext not in CONFIG["upload"]["allowed_ext"]:
+        return redirect(url_for("advice", county=county, year=year,
+                               stage_error=f"不支持的文件类型 {ext}。"))
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    saved = UPLOAD_DIR / f"stage_{uuid.uuid4().hex[:8]}_{f.filename}"
+    f.save(saved)
+    try:
+        df, report = load_weather_file(saved, county)
+        if not report["ok"] or df.empty:
+            tip = "；".join(i["title"] for i in report["issues"] if i["level"] == "error") or "校验未通过。"
+            return redirect(url_for("advice", county=county, year=year, stage_error=tip))
+        stage_store.upsert(county, year, df)
+    finally:
+        saved.unlink(missing_ok=True)
+    return redirect(url_for("advice", county=county, year=year))
+
+
+@app.route("/advice/reset_stage")
+def advice_reset_stage():
+    county = (request.args.get("county") or "").strip()
+    year = request.args.get("year", type=int)
+    stage_store.reset(county, year)
+    return redirect(url_for("advice", county=county, year=year))
 
 
 @app.route("/api/feature_importance")

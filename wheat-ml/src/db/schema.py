@@ -49,4 +49,19 @@ DDL = [
         CONSTRAINT fk_yield_county FOREIGN KEY (county_id) REFERENCES counties(id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """,
+    """
+    CREATE TABLE IF NOT EXISTS stage_observations (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        county_name VARCHAR(64) NOT NULL,
+        year SMALLINT NOT NULL,
+        obs_date DATE NOT NULL,
+        stage_key VARCHAR(16) NOT NULL,
+        t2m_max DOUBLE, t2m_min DOUBLE, t2m DOUBLE, precip DOUBLE,
+        wind DOUBLE, radiation DOUBLE, dew DOUBLE, rh DOUBLE,
+        source VARCHAR(16) NOT NULL DEFAULT 'stage_upload',
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_stage_date (county_name, obs_date),
+        KEY idx_stage (county_name, year, stage_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """,
 ]

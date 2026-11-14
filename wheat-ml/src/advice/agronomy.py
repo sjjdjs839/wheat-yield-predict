@@ -149,20 +149,32 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
         d = d.assign(month_day=d["date"].dt.strftime("%m-%d"))
 
     stages = []
+    main_mask = d["month_day"].apply(
+        lambda m: any(s["start"] <= m <= s["end"] for s in STAGES))
+    offseason = d[~main_mask]
     for st in STAGES:
         sub = d[(d["month_day"] >= st["start"]) & (d["month_day"] <= st["end"])]
         if year:
             sub = sub[sub["year"] == year]
         stats = stage_stats(sub)
-        flags = stage_flags(st["key"], stats, climate.get(st["key"], {}))
-        advice = stage_advice(st["key"], stats)
+        has_data = bool(stats)
+        if has_data:
+            flags = stage_flags(st["key"], stats, climate.get(st["key"], {}))
+            advice = stage_advice(st["key"], stats)
+            date_range = f"{sub['date'].min():%m-%d} ~ {sub['date'].max():%m-%d}"
+        else:
+            flags = ["待上传"]
+            advice = ["该阶段暂无气象记录，可在上方上传本期观测数据。"]
+            date_range = ""
         stages.append({
             "key": st["key"], "name": st["name"],
             "period": f"{st['start']} ~ {st['end']}",
             "focus": st["focus"],
             "stats": stats,
-            "flags": flags if stats else ["该生育期缺少气象记录"],
+            "flags": flags,
             "advice": advice,
+            "has_data": has_data,
+            "date_range": date_range,
         })
 
     yield_note = ""
@@ -181,6 +193,7 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
         "year": int(year) if year else None,
         "stages": stages,
         "yield_note": yield_note,
+        "offseason_days": int(len(offseason)),
         "summary": f"{county} {year} 年：共 {len(stages)} 个生育期，"
                    f"依据当期气象条件给出针对性建议。",
     }

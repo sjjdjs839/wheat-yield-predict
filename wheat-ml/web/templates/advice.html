@@ -1,16 +1,19 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('农事建议', '按生育期，管好每一段生长', '以当期气象条件为主、产量预测为辅，按返青—成熟五个生育期梳理风险提示与管理重点，不直接给出施肥、灌溉剂量。', [source, '五个生育期']) }}
+{{ page_head('农事建议', '按生育期，管好每一段生长', '分批上传本期气象观测，系统自动识别所属生育期并累积保留；依据当期气象条件给出分阶段管理重点，不直接给出施肥、灌溉剂量。', [source, '五个生育期']) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法生成</span><p>{{ error }}</p></div>
+  {% endif %}
+  {% if request.args.get('stage_error') %}
+  <div class="alert warning"><span class="tag">上传未通过</span><p>{{ request.args.get('stage_error') }}</p></div>
   {% endif %}
 
   <form class="filter-panel" method="get" aria-label="建议筛选">
     <div class="field">
       <label for="f-county">县区</label>
-      <select id="f-county" name="county" onchange="var t=document.getElementById('f-threshold'); if(t){t.value='';}">
+      <select id="f-county" name="county">
         {% if city_groups %}
           {% for city, city_counties in city_groups.items() %}
           <optgroup label="{{ city }}">
@@ -28,27 +31,54 @@
         {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
       </select>
     </div>
-    <div class="field">
-      <label for="f-threshold">预警值（kg/亩）</label>
-      <input id="f-threshold" type="number" name="threshold" step="0.1" min="0" value="{{ threshold }}">
-    </div>
     <button class="btn btn-primary" type="submit">生成建议</button>
   </form>
 
-  {% if result %}
-  {% if result.yield_note %}
-  <div class="yield-banner{{ ' is-alert' if result.alert }}" data-reveal>
-    <div class="yield-icon">{{ icon('alert' if result.alert else 'check') }}</div>
-    <div>
-      <strong>{{ '产量预警' if result.alert else '产量正常' }}</strong>
-      <p>{{ result.yield_note }}</p>
+  <section class="block-lg stage-upload-card">
+    <div class="block-head" data-reveal>
+      <div>
+        <p class="eyebrow">STAGE OBSERVATION</p>
+        <h2>上传本期气象观测</h2>
+      </div>
+      <p class="block-note">按生育期分批上传，自动识别所属阶段；多次上传累加保留，同日重复上传自动覆盖</p>
     </div>
-  </div>
-  {% endif %}
-  {% if result.feature_note %}
-  <div class="alert warning">
-    <span class="tag">提示</span>
-    <p>该年部分跨年气象特征缺失，产量预测已按中性值处理，预警与建议仅作趋势参考。</p>
+    <form class="stage-upload-form" method="post" action="{{ url_for('advice_upload_stage') }}" enctype="multipart/form-data">
+      <div class="field">
+        <label for="u-county">县区</label>
+        <select id="u-county" name="county">
+          {% if city_groups %}
+            {% for city, city_counties in city_groups.items() %}
+            <optgroup label="{{ city }}">
+              {% for c in city_counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+            </optgroup>
+            {% endfor %}
+          {% else %}
+            {% for c in counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+          {% endif %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="u-year">年份</label>
+        <select id="u-year" name="year">
+          {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field field-file">
+        <label for="u-file">气象文件（CSV / Excel）</label>
+        <input id="u-file" type="file" name="file" accept=".csv,.xlsx,.xls" required>
+      </div>
+      <button class="btn btn-primary" type="submit">上传并累积</button>
+    </form>
+    <div class="stage-upload-actions">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year) }}">清空本期观测</a>
+    </div>
+  </section>
+
+  {% if result %}
+  {% if result.offseason_days %}
+  <div class="alert info">
+    <span class="tag">备注</span>
+    <p>另有 {{ result.offseason_days }} 天记录在主生育期之外（越冬 / 收获后），未纳入阶段建议。</p>
   </div>
   {% endif %}
 
@@ -69,12 +99,12 @@
         <p class="eyebrow">GROWTH TIMELINE</p>
         <h2>五个生育期，逐段看</h2>
       </div>
-      <p class="block-note">按当期气象条件与产量预测生成</p>
+      <p class="block-note">有记录的阶段给出统计、风险与建议；待上传阶段置灰提示</p>
     </div>
 
     <div class="timeline">
       {% for s in result.stages %}
-      <div class="stage">
+      <div class="stage{{ ' is-empty' if not s.has_data }}">
         <div class="stage-rail">
           <span class="stage-node">{{ '%02d'|format(loop.index) }}</span>
         </div>
@@ -82,14 +112,14 @@
           <div class="stage-head">
             <div>
               <h2>{{ s.name }}</h2>
-              <p class="stage-period">{{ s.period }}</p>
+              <p class="stage-period">{{ s.period }}{% if s.date_range %} · {{ s.date_range }}{% endif %}</p>
             </div>
             <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
           </div>
 
           <div class="stage-body">
+            {% if s.has_data %}
             <div>
-              {% if s.stats %}
               <div class="stage-kpis">
                 <div class="stage-kpi"><span>累计降水</span><strong>{{ s.stats['累计降水'] }}<small>mm</small></strong></div>
                 <div class="stage-kpi"><span>平均气温</span><strong>{{ s.stats['平均气温'] }}<small>℃</small></strong></div>
@@ -108,25 +138,19 @@
                   </dl>
                 </div>
               </details>
-              {% else %}
-              <p class="stage-empty">该生育期没有逐日气象记录。</p>
-              {% endif %}
             </div>
 
             <div class="advice-side">
               <div class="chips">
-                {% if not s.stats %}
-                <span class="chip">气象记录缺失</span>
-                {% elif s.flags %}
-                {% for f in s.flags %}<span class="chip chip--alert"><i class="dot"></i>{{ f }}</span>{% endfor %}
-                {% else %}
-                <span class="chip chip--ok"><i class="dot"></i>气象条件平稳</span>
-                {% endif %}
+                {% for f in s.flags %}<span class="chip{{ ' chip--alert' if s.has_data and f != '气象条件平稳' else '' }}"><i class="dot"></i>{{ f }}</span>{% endfor %}
               </div>
               <ul class="advice-list">
                 {% for a in s.advice %}<li>{{ a }}</li>{% endfor %}
               </ul>
             </div>
+            {% else %}
+            <div class="stage-empty">该阶段暂无气象记录，可在上方上传本期观测数据。</div>
+            {% endif %}
           </div>
         </article>
       </div>

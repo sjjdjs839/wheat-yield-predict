@@ -84,3 +84,76 @@ def stats() -> dict:
         "feature_rows": int(r["feature_rows"]),
         "yield_rows": int(r["yield_rows"]),
     }
+
+# ---- 分阶段农事观测（运行时累积，MySQL 为主、CSV 回退由 stage_store 处理）----
+
+STAGE_WEATHER = ["t2m_max", "t2m_min", "t2m", "precip",
+                 "wind", "radiation", "dew", "rh"]
+
+
+def _clean(v):
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
+def stage_observations(county: str, year: int) -> pd.DataFrame:
+    """某县某年累积的阶段观测逐日记录。"""
+    df = _query("""
+        SELECT county_name AS county, year, obs_date AS date, stage_key,
+               t2m_max, t2m_min, t2m, precip, wind, radiation, dew, rh
+        FROM stage_observations
+        WHERE county_name = %s AND year = %s
+        ORDER BY obs_date
+    """, (county, year))
+    if df.empty:
+        return df
+    df["date"] = pd.to_datetime(df["date"])
+    df["year"] = df["date"].dt.year
+    df["month"] = df["date"].dt.month
+    df["month_day"] = df["date"].dt.strftime("%m-%d")
+    return df.reset_index(drop=True)
+
+
+def upsert_stage(df: pd.DataFrame) -> int:
+    """按 (县区, 日期) upsert；重复日期覆盖更新。返回写入行数。"""
+    if df.empty:
+        return 0
+    conn = connect()
+    cols = ["county_name", "year", "obs_date", "stage_key"] + STAGE_WEATHER + ["source"]
+    placeholders = ", ".join(["%s"] * len(cols))
+    update_cols = ["year", "stage_key"] + STAGE_WEATHER + ["source"]
+    update = ", ".join(f"{c}=VALUES({c})" for c in update_cols)
+    sql = (f"INSERT INTO stage_observations ({', '.join(cols)}) "
+           f"VALUES ({placeholders}) ON DUPLICATE KEY UPDATE {update}")
+    rows = []
+    for _, r in df.iterrows():
+        obs = r["date"].strftime("%Y-%m-%d") if hasattr(r["date"], "strftime") else str(r["date"])
+        rows.append((
+            r["county"], int(r["year"]), obs, r["stage_key"],
+            *[_clean(r.get(c)) for c in STAGE_WEATHER], "stage_upload",
+        ))
+    with conn.cursor() as cur:
+        for i in range(0, len(rows), 2000):
+            cur.executemany(sql, rows[i:i + 2000])
+    conn.commit()
+    conn.close()
+    return len(rows)
+
+
+def delete_stage(county: str, year: int) -> int:
+    """删除某县某年的全部阶段观测，返回删除行数。"""
+    conn = connect()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM stage_observations WHERE county_name = %s AND year = %s",
+                    (county, year))
+        n = cur.rowcount
+    conn.commit()
+    conn.close()
+    return n
+
