@@ -443,6 +443,7 @@ feature_cols:
 
   - hot_dry_days
   - year_index
+  - county_prior
 
 
 

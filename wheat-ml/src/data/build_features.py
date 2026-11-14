@@ -47,6 +47,10 @@ def build_county(df_county: pd.DataFrame) -> pd.DataFrame:
     """
     recs = []
 
+    # 空输入保护：缺记录或缺年份列时直接返回空表，避免下游取列崩溃
+    if df_county is None or len(df_county) == 0 or "year" not in df_county.columns:
+        return pd.DataFrame(columns=["county", "city", "year"])
+
     # 统一到 NASA POWER 列名，兼容传入标准字段名的数据
     rename = {k: v for k, v in CANONICAL_TO_NASA.items()
               if k in df_county.columns and v not in df_county.columns}
@@ -90,6 +94,8 @@ def build_county(df_county: pd.DataFrame) -> pd.DataFrame:
         recs.append(rec)
 
     out = pd.DataFrame(recs)
+    if out.empty:
+        return out
 
     # 距平类特征：以该县多年均值为常年值
     mean_p = out["season_precip"].mean()

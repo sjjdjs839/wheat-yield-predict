@@ -94,6 +94,34 @@
         <div class="metric"><span>该年实测单产</span><strong>{{ result.actual if result.actual is not none else '—' }}{% if result.actual is not none %}<small>kg/亩</small>{% endif %}</strong></div>
       </div>
 
+      {% if result.contrib and result.contrib.available %}
+      <div class="contrib-panel">
+        <div class="contrib-head">
+          <p class="result-kicker">MODEL CONTRIBUTION</p>
+          <h3>今年产量主要被哪些因子影响</h3>
+          <p class="block-note">基于 SHAP 贡献分解：绿色为推高产量的因子，红色为拉低产量的因子；数值按该县常年单产近似折算为 kg/亩，仅反映相对常年的影响方向与幅度。</p>
+        </div>
+        <div class="contrib-cols">
+          <div class="contrib-col is-up">
+            <span class="contrib-title is-up">▲ 推高产量</span>
+            {% if result.contrib.positive %}
+              {% for it in result.contrib.positive %}
+              <div class="contrib-row"><span>{{ it.name }}</span><span class="contrib-val">+{{ (it.shap * result.mean_yield)|round(1) }}</span></div>
+              {% endfor %}
+            {% else %}<p class="contrib-empty">无明显推高因子</p>{% endif %}
+          </div>
+          <div class="contrib-col is-down">
+            <span class="contrib-title is-down">▼ 拉低产量</span>
+            {% if result.contrib.negative %}
+              {% for it in result.contrib.negative %}
+              <div class="contrib-row"><span>{{ it.name }}</span><span class="contrib-val">{{ (it.shap * result.mean_yield)|round(1) }}</span></div>
+              {% endfor %}
+            {% else %}<p class="contrib-empty">无明显拉低因子</p>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       {% if metrics %}
       <p class="model-metrics-line">融合权重 0.5 / 0.3 / 0.2 · RF R² {{ metrics.r2 }} · LGBM R² {{ metrics_lgbm.r2 if metrics_lgbm else '—' }} · LR R² {{ metrics_lr.r2 if metrics_lr else '—' }} · 测试年份 {{ metrics.test_years|join('、') }}，{{ metrics.n_test }} 条样本{% if not metrics.reliable %}（演示标签，指标不作准确率结论）{% endif %}</p>
       {% endif %}
@@ -160,7 +188,7 @@
         <p class="eyebrow">MODEL EXPLAINER</p>
         <h2>哪些气象因子在推动产量</h2>
       </div>
-      <p class="block-note">随机森林特征重要性 · 百分比</p>
+      <p class="block-note">SHAP 平均贡献 · 占比</p>
     </div>
     <article class="chart-card wide">
       <div class="chart-head">
@@ -171,7 +199,7 @@
         </div>
       </div>
       <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
-      <p class="chart-note">数值为随机森林特征重要性占比。品种改良趋势与返青拔节期积温通常是影响最大的因子。</p>
+      <p class="chart-note">数值为 SHAP 平均贡献占比，反映各因子对产量预测的实际影响；年份趋势与生育期积温通常是影响最大的因子。</p>
       <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
     </article>
     <details class="more panel">

@@ -10,3 +10,4 @@ xlrd>=2.0
 PyMySQL>=1.1
 lightgbm>=4.0
 reportlab>=4.0
+shap>=0.46  # 可解释性：缺失时回退分裂增益重要性

@@ -245,12 +245,26 @@ def county_mean_yield(stats: dict, county: str) -> tuple[float, bool]:
     return float(np.median(vals)), False
 
 
+def _attach_prior(feat: pd.DataFrame, stats: dict) -> pd.DataFrame:
+    """补县域先验特征（=该县常年单产）；缺县回退全局中位数，与训练口径一致。"""
+    if "county_prior" not in FEATS:
+        return feat
+    vals = [v["mean_yield"] for v in stats.values()] if stats else []
+    global_mean = float(np.median(vals)) if vals else 0.0
+    feat = feat.copy()
+    feat["county_prior"] = feat["county"].map(
+        lambda c: float(stats[c]["mean_yield"]) if stats and c in stats else global_mean
+    )
+    return feat
+
+
 def batch_predict(feat: pd.DataFrame, bundle, mean_yield) -> list:
     """批量预测：一次性把特征矩阵喂给模型，返回与 feat 等长的还原单产列表（无法预测为 None）。
     单县用传入的县均值；全省逐行按该县在 stats 中的均值还原，缺县回退全局中位数。"""
     if bundle is None or len(feat) == 0:
         return [None] * len(feat)
     rf, lr, lgbm, stats = bundle
+    feat = _attach_prior(feat, stats)
     X = feat[FEATS].fillna(feat[FEATS].median(numeric_only=True))
     try:
         p_rf = rf.predict(X)
@@ -315,20 +329,73 @@ FEATURE_NAMES = {
     "gdd_56": "灌浆成熟期积温",
     "hot_dry_days": "干热风天数",
     "year_index": "品种改良趋势",
+    "county_prior": "县域常年单产先验",
 }
+
+
+def _load_shap_global() -> pd.DataFrame | None:
+    p = REPORTS_DIR / "shap_importance.csv"
+    if not p.exists():
+        return None
+    try:
+        return pd.read_csv(p)
+    except Exception:
+        return None
 
 
 def feature_importance_items() -> list[dict]:
     bundle = load_models()
     if bundle is None or bundle[0] is None:
         return []
+    shap_df = _load_shap_global()
+    if shap_df is not None and len(shap_df):
+        items = []
+        for _, r in shap_df.iterrows():
+            feat = r["feature"]
+            items.append({
+                "name": FEATURE_NAMES.get(feat, feat),
+                "value": round(float(r["pct"]), 2),
+                "mean_shap": round(float(r["mean_shap"]), 6),
+                "source": "shap",
+            })
+        return sorted(items, key=lambda item: item["value"], reverse=True)
+    # 回退：随机森林分裂增益重要性
     items = []
     for feat, importance in zip(FEATS, bundle[0].feature_importances_):
         items.append({
             "name": FEATURE_NAMES.get(feat, feat),
             "value": round(float(importance) * 100, 2),
+            "source": "gain",
         })
     return sorted(items, key=lambda item: item["value"], reverse=True)
+
+
+@lru_cache(maxsize=1)
+def _rf_explainer():
+    bundle = load_models()
+    if bundle is None or bundle[0] is None:
+        return None
+    try:
+        import shap
+        return shap.TreeExplainer(bundle[0])
+    except Exception:
+        return None
+
+
+def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
+    """单样本 SHAP：返回把预测推高 / 拉低的 top 因子（yield_norm 尺度）。"""
+    expl = _rf_explainer()
+    if expl is None:
+        return {"available": False, "positive": [], "negative": []}
+    try:
+        sv = np.asarray(expl.shap_values(np.asarray(x_vec).reshape(1, -1)))[0]
+        rows = [{"feature": f, "name": FEATURE_NAMES.get(f, f),
+                 "shap": round(float(v), 4)} for f, v in zip(FEATS, sv)]
+        pos = sorted([r for r in rows if r["shap"] > 0], key=lambda r: -r["shap"])[:top_n]
+        neg = sorted([r for r in rows if r["shap"] < 0], key=lambda r: r["shap"])[:top_n]
+        return {"available": True, "positive": pos, "negative": neg}
+    except Exception:
+        return {"available": False, "positive": [], "negative": []}
 
 
 # ---------------------------------------------------------------- 路由
@@ -848,6 +915,7 @@ def api_simulate():
     # 获取基准特征
     data, _ = dataset_for_county(county)
     feats = predict_years(data, county)
+    feats["county_prior"] = mean_yield
     row = feats[feats["year"] == year]
     if row.empty:
         return {"error": f"{county} {year} 年无完整数据"}
@@ -955,6 +1023,8 @@ def predict():
             threshold_note = f"预警值超出合理范围，已按 {threshold} kg/亩 处理。"
 
     feats = predict_years(data, county)
+    if not feats.empty:
+        feats["county_prior"] = mean_yield
     row = feats[feats["year"] == year] if not feats.empty else feats
     error = None
     result, history = None, []
@@ -999,6 +1069,7 @@ def predict():
             "alert": pred < threshold,
             "matched": matched,
             "feature_note": feature_note,
+            "contrib": sample_contributions(X.iloc[0].values),
         }
 
         # 历史对比：逐年预测 vs 实测
@@ -1064,7 +1135,7 @@ def predict():
             feature_chart = {
                 "kind": "hBar",
                 "title": "特征重要性",
-                "desc": "随机森林特征重要性占比；数值越高，对产量预测的影响越大。",
+                "desc": "SHAP 平均贡献占比；数值越高，对产量预测的影响越大。",
                 "payload": {
                     "labels": [item["name"] for item in feature_items],
                     "values": [item["value"] for item in feature_items],

@@ -1276,3 +1276,20 @@ main{overflow-x:clip}
   .stage-upload-form .field-file{grid-column:1/-1}
   .stage-upload-form .btn{grid-column:1/-1}
 }
+
+/* ---------- SHAP 单样本贡献 ---------- */
+.contrib-panel{margin-top:22px;padding:20px 22px;border:1px solid var(--line);border-radius:14px;background:var(--rice-50)}
+.contrib-head h3{font-size:15px;color:var(--ink-900);margin-top:6px}
+.contrib-head .block-note{font-size:12px;color:var(--ink-500);margin-top:5px;line-height:1.6}
+.contrib-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.contrib-col{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.contrib-title{display:block;font-size:12px;font-weight:600;margin-bottom:10px}
+.contrib-title.is-up{color:var(--forest-700)}
+.contrib-title.is-down{color:var(--alert-600)}
+.contrib-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;color:var(--ink-700)}
+.contrib-row:last-child{border-bottom:0}
+.contrib-val{font-family:var(--font-num);font-size:13px;font-weight:600;white-space:nowrap}
+.contrib-col.is-up .contrib-val{color:var(--forest-700)}
+.contrib-col.is-down .contrib-val{color:var(--alert-600)}
+.contrib-empty{font-size:12px;color:var(--ink-500);padding:6px 0}
+@media(max-width:640px){.contrib-cols{grid-template-columns:1fr}}

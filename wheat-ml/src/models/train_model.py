@@ -27,6 +27,11 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from lightgbm import LGBMRegressor
 
+try:
+    import shap
+except Exception:  # shap 缺失时回退到分裂增益重要性，不阻断训练
+    shap = None
+
 from src.data.build_features import match_county
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -80,7 +85,8 @@ def load_matrix() -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray, np.ndarray, d
     df = feat.merge(y[["county", "year", "wheat_yield"]], on=["county", "year"], how="left")
     df = df.dropna(subset=["wheat_yield"]).copy().reset_index(drop=True)
 
-    X = df[FEATS].fillna(df[FEATS].median(numeric_only=True))
+    _base_cols = [c for c in FEATS if c in df.columns]
+    X = df[_base_cols].fillna(df[_base_cols].median(numeric_only=True))
 
     meta = {
         "yield_file": str(ypath.relative_to(PROJECT_ROOT)),
@@ -125,8 +131,11 @@ def run_train() -> dict:
     county_mean = train_df.groupby("county")["wheat_yield"].mean()
     global_mean = train_df["wheat_yield"].mean()
     df["county_mean_yield"] = df["county"].map(county_mean).fillna(global_mean)
+    # 县域产量先验特征：仅用训练集县均产（与归一化同口径，避免标签泄露）
+    df["county_prior"] = df["county_mean_yield"]
     y_norm = (df["wheat_yield"] / df["county_mean_yield"]).values
     means = df["county_mean_yield"].values
+    X = df[FEATS].fillna(df[FEATS].median(numeric_only=True))
 
     X_tr, X_te = X.loc[train_idx], X.loc[test_idx]
     y_tr, y_te = y_norm[train_idx], y_norm[test_idx]
@@ -179,6 +188,27 @@ def run_train() -> dict:
         tag = "" if meta["reliable"] else "  [演示标签，不可作为准确率结论]"
         print(f"[{name.upper()}] R²={met['r2']}  RMSE={met['rmse']}  MAE={met['mae']}"
               f"  (训练 {len(X_tr)} / 测试 {len(X_te)} 条){tag}")
+
+    # SHAP 全局可解释性：以随机森林为主模型，平均 |SHAP| 衡量各因子对产量的贡献
+    try:
+        if shap is not None:
+            expl = shap.TreeExplainer(models_to_run["rf"])
+            sv = np.asarray(expl.shap_values(X))
+            mean_abs = np.abs(sv).mean(axis=0)
+            mean_signed = sv.mean(axis=0)
+            total = float(mean_abs.sum()) or 1.0
+            shap_df = pd.DataFrame({
+                "feature": FEATS,
+                "mean_abs_shap": np.round(mean_abs, 6),
+                "mean_shap": np.round(mean_signed, 6),
+                "pct": np.round(mean_abs / total * 100, 2),
+            }).sort_values("mean_abs_shap", ascending=False)
+            shap_df.to_csv(REPORTS / "shap_importance.csv", index=False, encoding="utf-8")
+            print(f"[SHAP] 全局因子贡献已保存 -> {REPORTS / 'shap_importance.csv'}")
+        else:
+            print("[SHAP] shap 未安装，跳过全局贡献计算（回退分裂增益重要性）")
+    except Exception as e:
+        print(f"[SHAP] 计算失败（不阻断训练）: {e}")
 
     # 供 Web / 大屏做情景预测：县均值单产 + 县内各特征多年基准
     stats = {}

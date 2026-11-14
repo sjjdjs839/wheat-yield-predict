@@ -19,6 +19,7 @@ wheat-ml/data/processed/weather_clean.csv
 # ---- 训练产出的模型与缓存（由 scripts 训练流水线重建）----
 wheat-ml/output/models/*.joblib
 wheat-ml/output/dashboard/model.json
+wheat-ml/output/dashboard/predict_dashboard.html
 
 # ---- 本地上传临时文件 ----
 wheat-ml/web/uploads/*
