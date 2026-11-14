@@ -18,6 +18,7 @@ import yaml
 import joblib
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -1096,9 +1097,11 @@ def advice():
         county_arg = request.args.get("county")
         county = county_arg if county_arg in counties else ("登封" if "登封" in counties else counties[0])
 
-    years = list(BASE_YEARS)
+    today_year = datetime.now().year
+    years = sorted(set(BASE_YEARS + [today_year - 1, today_year, today_year + 1]))
     year_arg = request.args.get("year", type=int)
-    year = year_arg if year_arg in years else years[-1]
+    year = year_arg if year_arg in years else (
+        today_year if today_year not in BASE_YEARS else BASE_YEARS[-1])
 
     # 落地链路：优先使用累积的分阶段观测，按当期气象出建议，不依赖年模型
     stage_df = stage_store.load(county, year)
@@ -1148,7 +1151,7 @@ def advice_upload_stage():
     saved = UPLOAD_DIR / f"stage_{uuid.uuid4().hex[:8]}_{f.filename}"
     f.save(saved)
     try:
-        df, report = load_weather_file(saved, county)
+        df, report = load_weather_file(saved, county, stage_mode=True)
         if not report["ok"] or df.empty:
             tip = "；".join(i["title"] for i in report["issues"] if i["level"] == "error") or "校验未通过。"
             return redirect(url_for("advice", county=county, year=year, stage_error=tip))

@@ -218,7 +218,12 @@ def _build_dates(df: pd.DataFrame, issues: list) -> pd.DataFrame:
     return df
 
 
-def _check_constraints(df: pd.DataFrame, issues: list) -> pd.DataFrame:
+def _check_constraints(df: pd.DataFrame, issues: list, stage_mode: bool = False) -> pd.DataFrame:
+    """缺失值 / 重复 / 异常值 / 单位检查。
+
+    stage_mode=True 用于分阶段农事观测上传：只覆盖部分生育期、年份可能是当年或来年，
+    因此跳过「历史年份区间」「单年满 300 天完整度」两条面向全年历史回测的告警。
+    """
     """缺失值 / 重复 / 异常值 / 单位检查"""
     n = len(df)
 
@@ -294,8 +299,8 @@ def _check_constraints(df: pd.DataFrame, issues: list) -> pd.DataFrame:
                 })
                 df.loc[odd, "radiation"] = np.nan
 
-    # 7) 年份范围
-    if "year" in df.columns and df["year"].notna().any():
+    # 7) 年份范围（阶段上传允许当年 / 来年，跳过历史区间告警）
+    if not stage_mode and "year" in df.columns and df["year"].notna().any():
         lo_y, hi_y = UP["year_min"], UP["year_max"]
         out_y = df["year"].notna() & ((df["year"] < lo_y) | (df["year"] > hi_y))
         if int(out_y.sum()):
@@ -314,8 +319,8 @@ def _check_constraints(df: pd.DataFrame, issues: list) -> pd.DataFrame:
                            "title": f"闰年缺少 2 月 29 日：{missing_leap}",
                            "detail": "闰年应保留 2 月 29 日记录，否则年度特征会偏差。"})
 
-    # 9) 单年记录完整度
-    if "year" in df.columns and df["year"].notna().any():
+    # 9) 单年记录完整度（阶段上传只覆盖部分生育期，不按全年 300 天要求）
+    if not stage_mode and "year" in df.columns and df["year"].notna().any():
         counts = df.groupby("year").size()
         thin = counts[counts < UP["min_days_per_year"]]
         if len(thin):
@@ -342,9 +347,11 @@ def _summary(df: pd.DataFrame) -> dict:
     }
 
 
-def load_weather_file(path: str | Path, county: str | None = None) -> tuple[pd.DataFrame, dict]:
+def load_weather_file(path: str | Path, county: str | None = None,
+                      stage_mode: bool = False) -> tuple[pd.DataFrame, dict]:
     """
     读取并清洗任意上传的气象文件
+    stage_mode=True：分阶段观测上传，放宽新年份与短记录的告警
     Returns: (清洗后的长表, 校验报告)
     """
     path = Path(path)
@@ -385,7 +392,7 @@ def load_weather_file(path: str | Path, county: str | None = None) -> tuple[pd.D
         })
 
     df = _build_dates(df, report["issues"])
-    df = _check_constraints(df, report["issues"])
+    df = _check_constraints(df, report["issues"], stage_mode=stage_mode)
 
     # 县级标识：上传文件未带县名时用参数补齐
     if "county" not in df.columns:

@@ -27,9 +27,10 @@
     </div>
     <div class="field">
       <label for="f-year">年份</label>
-      <select id="f-year" name="year">
-        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
-      </select>
+      <input id="f-year" name="year" list="year-options" type="number" min="2010" max="{{ years[-1] }}" value="{{ year }}">
+      <datalist id="year-options">
+        {% for y in years %}<option value="{{ y }}">{{ y }} 年</option>{% endfor %}
+      </datalist>
     </div>
     <button class="btn btn-primary" type="submit">生成建议</button>
   </form>
@@ -59,9 +60,7 @@
       </div>
       <div class="field">
         <label for="u-year">年份</label>
-        <select id="u-year" name="year">
-          {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
-        </select>
+        <input id="u-year" name="year" list="year-options" type="number" min="2010" max="{{ years[-1] }}" value="{{ year }}">
       </div>
       <div class="field field-file">
         <label for="u-file">气象文件（CSV / Excel）</label>
