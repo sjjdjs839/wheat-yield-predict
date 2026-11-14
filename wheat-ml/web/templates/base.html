@@ -70,13 +70,18 @@
       <a href="{{ url_for('map_view') }}" class="{{ 'is-active' if active == 'map' }}" {% if active == 'map' %}aria-current="page"{% endif %}>产量地图</a>
       <a href="{{ url_for('dry_hot') }}" class="{{ 'is-active' if active == 'dry_hot' }}" {% if active == 'dry_hot' %}aria-current="page"{% endif %}>干热风预警</a>
       <a href="{{ url_for('predict') }}" class="{{ 'is-active' if active == 'predict' }}" {% if active == 'predict' %}aria-current="page"{% endif %}>产量预测</a>
-      <a href="{{ url_for('advice') }}" class="{{ 'is-active' if active == 'advice' }}" {% if active == 'advice' %}aria-current="page"{% endif %}>农事建议</a>
     </nav>
 
-    <a class="btn btn-primary btn-upload{{ ' is-active' if active == 'upload' }}" href="{{ url_for('upload') }}" {% if active == 'upload' %}aria-current="page"{% endif %}>
-      <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-upload"></use></svg>
-      <span>上传数据</span>
-    </a>
+    <div class="nav-actions">
+      <a class="btn btn-gold btn-advice{{ ' is-active' if active == 'advice' }}" href="{{ url_for('advice') }}" {% if active == 'advice' %}aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-leaf"></use></svg>
+        <span>农事建议</span>
+      </a>
+      <a class="btn btn-primary btn-upload{{ ' is-active' if active == 'upload' }}" href="{{ url_for('upload') }}" {% if active == 'upload' %}aria-current="page"{% endif %}>
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-upload"></use></svg>
+        <span>上传数据</span>
+      </a>
+    </div>
   </div>
 </header>
 
