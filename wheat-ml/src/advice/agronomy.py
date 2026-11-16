@@ -1,4 +1,4 @@
-"""
+﻿"""
 农事建议模块（对齐项目方案 2.4 + 表 1）
 ==========================================
 输入：某县某年的逐日气象数据、该年预测单产、产量预警线
@@ -10,9 +10,12 @@
 """
 
 import yaml
+from datetime import date
 from pathlib import Path
 import numpy as np
 import pandas as pd
+
+from .actions import build_cards, top_actions
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 with open(PROJECT_ROOT / "config" / "config.yaml", "r", encoding="utf-8") as f:
@@ -138,11 +141,16 @@ def stage_advice(key: str, stats: dict) -> list[str]:
 
 def generate_advice(weather: pd.DataFrame, county: str, year: int,
                     predicted_yield: float | None = None,
-                    threshold: float | None = None) -> dict:
+                    threshold: float | None = None,
+                    today: date | None = None,
+                    dry_ref: dict | None = None) -> dict:
     """
     生成某县某年的生育期建议
     Returns: {"county","year","stages":[...],"yield_note","summary"}
     """
+    today = today or date.today()
+    today_md = today.strftime("%m-%d")
+    cur_year = today.year
     climate = stage_climatology(weather)
     d = weather
     if "month_day" not in d.columns:
@@ -166,6 +174,11 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
             flags = ["待上传"]
             advice = ["该阶段暂无气象记录，可在上方上传本期观测数据。"]
             date_range = ""
+        cards = []
+        if has_data:
+            cards = build_cards(st["key"], stats, climate.get(st["key"], {}),
+                                st["end"], today_md, year, cur_year,
+                                view=st["name"], dry_ref=dry_ref)
         stages.append({
             "key": st["key"], "name": st["name"],
             "period": f"{st['start']} ~ {st['end']}",
@@ -173,6 +186,8 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
             "stats": stats,
             "flags": flags,
             "advice": advice,
+            "cards": cards,
+            "top_priority": cards[0]["priority"] if cards else None,
             "has_data": has_data,
             "date_range": date_range,
         })
@@ -192,6 +207,7 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
         "county": county,
         "year": int(year) if year else None,
         "stages": stages,
+        "top_actions": top_actions(stages),
         "yield_note": yield_note,
         "offseason_days": int(len(offseason)),
         "summary": f"{county} {year} 年：共 {len(stages)} 个生育期，"

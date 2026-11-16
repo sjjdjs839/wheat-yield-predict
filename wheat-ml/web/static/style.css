@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    豫麦智测 · 麦浪智域设计系统
    Tokens → Base → Layout → Components → Pages → Responsive
    ============================================================ */
@@ -1391,3 +1391,39 @@ main{overflow-x:clip}
 .risk-brief-top a{padding:3px 9px;border:1px solid var(--line);border-radius:999px;background:var(--rice-50);font-size:11.5px;color:var(--ink-700)}
 .risk-brief-top a:hover{border-color:var(--line-strong);color:var(--forest-700)}
 @media(max-width:640px){.risk-brief-stats{grid-template-columns:1fr 1fr}}
+
+/* 农事决策卡 */
+.act-queue{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.act-q{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:var(--paper);
+  border:1px solid var(--line);border-left:3px solid var(--line-strong);border-radius:var(--radius-sm)}
+.act-q--p0{border-left-color:var(--alert-600)}
+.act-q--p1{border-left-color:var(--wheat-600)}
+.act-q-body{min-width:0}
+.act-q-body strong{font-size:14px;color:var(--ink-900)}
+.act-q-body p{margin:2px 0 0;font-size:12.5px;color:var(--ink-600)}
+.act-pri{display:inline-block;font-family:var(--font-num);font-size:12px;letter-spacing:.04em;
+  padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;line-height:1.5}
+.act-pri--p0{color:var(--alert-600)}
+.act-pri--p1{color:var(--wheat-700)}
+.act-pri--p2{color:var(--field-600)}
+.act-cards{display:grid;gap:12px}
+.act-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.act-card--p0{border-color:rgba(180,71,47,.3);box-shadow:inset 3px 0 0 rgba(180,71,47,.5)}
+.act-card--p1{border-color:rgba(185,130,46,.28);box-shadow:inset 3px 0 0 rgba(185,130,46,.4)}
+.act-head{display:flex;gap:10px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.act-head h3{font-size:15px;margin:0;color:var(--ink-900)}
+.act-window{font-size:12.5px;color:var(--ink-600);margin:0 0 10px}
+.act-sec{margin-top:8px}
+.act-label{font-size:11.5px;color:var(--ink-500);letter-spacing:.06em}
+.act-sec ul{margin:4px 0 0;padding-left:18px}
+.act-sec li{font-size:13px;line-height:1.62;color:var(--ink-700)}
+.act-skip{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;
+  line-height:1.6;color:var(--ink-700)}
+.act-skip .act-label{margin-right:6px;color:var(--alert-600)}
+.act-ref{margin-top:8px;font-size:12.5px;line-height:1.6;color:var(--ink-600);
+  background:var(--rice-50);padding:9px 11px;border-radius:var(--radius-sm)}
+.stage-head-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+@media (max-width:620px){
+  .act-q{flex-direction:column;gap:6px}
+  .act-head h3{font-size:14px}
+}

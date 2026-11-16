@@ -1,7 +1,7 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('农事建议', '按生育期查看当期气象条件与管理重点；不给出施肥、灌溉剂量处方。', [source]) }}
+{{ page_head('农事建议', '按生育期把当期气象条件排成可执行的作业清单：依据 → 时间窗 → 优先级 → 不处理的后果；施肥与灌溉剂量需结合地块墒情、品种与土壤测试，本系统不给处方。', [source]) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法生成</span><p>{{ error }}</p></div>
@@ -73,11 +73,39 @@
   </section>
 
   {% if result %}
+  {% if result.year_fallback %}
+  <div class="alert info">
+    <span class="tag">提示</span>
+    <p>当年观测尚未上传，当前展示 {{ result.eff_year }} 年数据（最近完整观测年）。上传当年各生育期观测后，时间窗会按当期日历实时计算剩余天数。</p>
+  </div>
+  {% endif %}
   {% if result.offseason_days %}
   <div class="alert info">
     <span class="tag">备注</span>
     <p>另有 {{ result.offseason_days }} 天记录在主生育期之外（越冬 / 收获后），未纳入阶段建议。</p>
   </div>
+  {% endif %}
+
+  {% if result.top_actions %}
+  <section class="block-lg">
+    <div class="block-head" data-reveal>
+      <div>
+        <h2>本县当期优先处理</h2>
+      </div>
+      <p class="block-note">跨生育期按优先级汇总 {{ result.top_actions|length }} 条 P0 / P1 事项</p>
+    </div>
+    <ol class="act-queue">
+      {% for a in result.top_actions %}
+      <li class="act-q act-q--{{ a.priority|lower }}">
+        <span class="act-pri act-pri--{{ a.priority|lower }}">{{ a.priority }}·{{ a.priority_label }}</span>
+        <div class="act-q-body">
+          <strong>{{ a.title }}</strong>
+          <p>{{ a.stage }} · {{ a.window }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
   {% endif %}
 
   {% set label_map = {
@@ -111,7 +139,12 @@
               <h2>{{ s.name }}</h2>
               <p class="stage-period">{{ s.period }}{% if s.date_range %} · {{ s.date_range }}{% endif %}</p>
             </div>
-            <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
+            <div class="stage-head-right">
+              {% if s.top_priority %}
+              <span class="act-pri act-pri--{{ s.top_priority|lower }}">{{ s.top_priority }}·{{ {'P0': '立即', 'P1': '本周', 'P2': '常规'}[s.top_priority] }}</span>
+              {% endif %}
+              <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
+            </div>
           </div>
 
           <div class="stage-body">
@@ -138,12 +171,48 @@
             </div>
 
             <div class="advice-side">
+              {% if s.cards %}
+              <div class="act-cards">
+                {% for c in s.cards %}
+                <article class="act-card act-card--{{ c.priority|lower }}">
+                  <header class="act-head">
+                    <span class="act-pri act-pri--{{ c.priority|lower }}">{{ c.priority }}·{{ c.priority_label }}</span>
+                    <h3>{{ c.title }}</h3>
+                  </header>
+                  <p class="act-window">{{ c.window }}</p>
+                  {% if c.basis %}
+                  <div class="act-sec">
+                    <span class="act-label">依据</span>
+                    <ul>{% for b in c.basis %}<li>{{ b }}</li>{% endfor %}</ul>
+                  </div>
+                  {% endif %}
+                  <div class="act-sec">
+                    <span class="act-label">怎么做</span>
+                    <ul>{% for a in c.actions %}<li>{{ a }}</li>{% endfor %}</ul>
+                  </div>
+                  {% if c.skip %}
+                  <p class="act-skip"><span class="act-label">不处理</span>{{ c.skip }}</p>
+                  {% endif %}
+                  {% if c.evidence %}
+                  <p class="act-ref">{{ c.evidence }}</p>
+                  {% endif %}
+                </article>
+                {% endfor %}
+              </div>
+              {% endif %}
               <div class="chips">
                 {% for f in s.flags %}<span class="chip{{ ' chip--alert' if s.has_data and f != '气象条件平稳' else '' }}"><i class="dot"></i>{{ f }}</span>{% endfor %}
               </div>
-              <ul class="advice-list">
-                {% for a in s.advice %}<li>{{ a }}</li>{% endfor %}
-              </ul>
+              {% if s.advice %}
+              <details class="more">
+                <summary>补充提示</summary>
+                <div class="detail-body">
+                  <ul class="advice-list">
+                    {% for a in s.advice %}<li>{{ a }}</li>{% endfor %}
+                  </ul>
+                </div>
+              </details>
+              {% endif %}
             </div>
             {% else %}
             <div class="stage-empty">该阶段暂无气象记录，可在上方上传本期观测数据。</div>

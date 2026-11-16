@@ -317,6 +317,37 @@ def load_yield_labels() -> tuple[pd.DataFrame | None, bool]:
     return None, False
 
 
+@lru_cache(maxsize=256)
+def dry_hot_reference(county: str) -> dict | None:
+    """本县历年灌浆期干热风 ≥3 天年份的单产表现（相对本县常年），仅供参考。
+
+    刻意只给样本量与区间：县域尺度上气象与单产的统计关联较弱，
+    不能据此推算"今年会减产多少"，见 output/reports/_legacy_note.md。
+    """
+    if not FEATURE_CSV.exists():
+        return None
+    try:
+        feat = pd.read_csv(FEATURE_CSV)
+    except Exception:
+        return None
+    if "wheat_yield" not in feat.columns or "hot_dry_days" not in feat.columns:
+        return None
+    d = feat[(feat["county"] == county) & feat["wheat_yield"].notna()].copy()
+    if d.empty:
+        return None
+    d["norm"] = d["wheat_yield"] / d["wheat_yield"].mean() * 100
+    heavy = d[d["hot_dry_days"] >= 3]
+    if len(heavy) < 3:      # 样本过少时区间退化，不展示以免误导
+        return None
+    return {
+        "n": int(len(heavy)),
+        "mean": float(heavy["norm"].mean()),
+        "low": float(heavy["norm"].min()),
+        "high": float(heavy["norm"].max()),
+        "range": f"{int(d['year'].min())}—{int(d['year'].max())}",
+    }
+
+
 FEATURE_NAMES = {
     "spi_12": "标准化降水指数",
     "precip_anom": "降水距平",
@@ -1393,7 +1424,8 @@ def advice():
     # 落地链路：优先使用累积的分阶段观测，按当期气象出建议，不依赖年模型
     stage_df = stage_store.load(county, year)
     if not stage_df.empty:
-        result = generate_advice(stage_df, county, year)
+        result = generate_advice(stage_df, county, year,
+                                 dry_ref=dry_hot_reference(county))
         result["alert"] = False
         result["feature_note"] = False
         source = f"阶段观测 · 已累积 {len(stage_df)} 天"
@@ -1412,9 +1444,21 @@ def advice():
                                source=data_meta["source"],
                                error="当前数据集中没有该县区的记录。")
 
-    result = generate_advice(data, county, year)
+    # 当年观测尚未上传时，回退到最近一个完整观测年，避免打开页面全是「待上传」
+    year_fallback = False
+    eff_year = year
+    try:
+        max_year = int(data["year"].max())
+        if year and year > max_year:
+            eff_year, year_fallback = max_year, True
+    except Exception:
+        pass
+    result = generate_advice(data, county, eff_year,
+                             dry_ref=dry_hot_reference(county))
     result["alert"] = False
     result["feature_note"] = False
+    result["eff_year"] = eff_year
+    result["year_fallback"] = year_fallback
     return render_template("advice.html", title="农事建议", active="advice",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
