@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, page_head %}
+{% block content %}
+{% set badges = [year ~ ' 年', summary.count ~ ' 个县区', '近 ' ~ summary.year_rank_total ~ ' 年第 ' ~ summary.year_rank ~ ' 重'] %}
+{{ page_head('风险总览', '按年份汇总全省各县灌浆期干热风风险与单产偏离，可按地市与等级筛选，并导出县级风险清单。', badges) }}
+
+<div class="container page-content">
+  <div class="dh-summary">
+    <div class="dh-card is-alert">
+      <span class="dh-label">重度干热风县区</span>
+      <strong>{{ summary.heavy }}</strong>
+      <small>≥ 3 天 · 占 {{ summary.count }} 县区的 {{ (summary.heavy / summary.count * 100)|round(0)|int }}%</small>
+    </div>
+    <div class="dh-card">
+      <span class="dh-label">轻度干热风县区</span>
+      <strong>{{ summary.light }}</strong>
+      <small>1—2 天</small>
+    </div>
+    <div class="dh-card">
+      <span class="dh-label">未出现干热风</span>
+      <strong>{{ summary.none }}</strong>
+      <small>0 天</small>
+    </div>
+    <div class="dh-card">
+      <span class="dh-label">全省预测单产均值</span>
+      <strong>{{ summary.avg_pred if summary.avg_pred else '—' }}<small style="font-size:12px"> kg/亩</small></strong>
+      <small>{{ year }} 年融合模型预测</small>
+    </div>
+  </div>
+
+  {% if top %}
+  <div class="alert warning risk-focus">
+    <span class="tag">重点关注</span>
+    <p>
+      {% for x in top[:3] %}<strong>{{ x.county }}</strong>（{{ x.days }} 天{% if x.rank %} · 近 {{ x.rank_total }} 年第 {{ x.rank }} 高{% endif %}）{% if not loop.last %}、{% endif %}{% endfor %}
+      {% if summary.alerts == 0 %}；本年各县预测单产均未跌破预警线，产量预警未触发。{% else %}；其中 {{ summary.alerts }} 个县区预测单产低于预警线。{% endif %}
+    </p>
+  </div>
+  {% endif %}
+
+  <form class="filter-panel" method="get" aria-label="风险筛选">
+    <div class="field">
+      <label for="r-year">年份</label>
+      <select id="r-year" name="year">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }} 年</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="r-city">地市</label>
+      <select id="r-city" name="city">
+        <option value="">全部地市</option>
+        {% for c in cities %}<option value="{{ c }}" {{ 'selected' if c == city }}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="r-level">风险等级</label>
+      <select id="r-level" name="level">
+        <option value="">全部等级</option>
+        <option value="heavy" {{ 'selected' if level == 'heavy' }}>重度（≥ 3 天）</option>
+        <option value="light" {{ 'selected' if level == 'light' }}>轻度（1—2 天）</option>
+        <option value="none" {{ 'selected' if level == 'none' }}>无（0 天）</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">应用筛选</button>
+    <a class="filter-reset" href="{{ url_for('risk') }}">重置</a>
+  </form>
+  <p class="filter-hint">清单按干热风天数从高到低排列，仅覆盖有产量标签的 {{ summary.count }} 个县区；无产量基准的县区只参与气象统计，不计入风险清单。</p>
+
+  <section class="block-lg">
+    <div class="block-head">
+      <div>
+        <h2>{{ year }} 年县级风险清单</h2>
+      </div>
+      <p class="block-note">当前显示 {{ items|length }} 个县区{% if city %} · {{ city }}{% endif %}{% if level %} · {{ {'heavy':'重度','light':'轻度','none':'无'}[level] }}{% endif %}</p>
+    </div>
+
+    <div class="risk-actions">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('export_risk', year=year) }}">{{ icon('download') }} 导出 EXCEL 清单</a>
+    </div>
+
+    <div class="table-wrap">
+      <table class="rk-table">
+        <thead>
+          <tr>
+            <th>县区</th>
+            <th>地市</th>
+            <th>干热风天数</th>
+            <th>近 15 年排位</th>
+            <th>等级</th>
+            <th>预测单产</th>
+            <th>常年单产</th>
+            <th>较常年</th>
+            <th>产量预警</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for x in items %}
+          <tr class="rk-row is-{{ x.level }}">
+            <td><strong>{{ x.county }}</strong></td>
+            <td>{{ x.city }}</td>
+            <td><span class="rk-days">{{ x.days }}</span> 天</td>
+            <td>{% if x.rank %}第 {{ x.rank }} / {{ x.rank_total }}{% else %}—{% endif %}</td>
+            <td><span class="chip {{ 'chip--alert' if x.level == 'heavy' else ('chip--gold' if x.level == 'light' else 'chip--ok') }}"><i class="dot"></i>{{ x.level_text }}</span></td>
+            <td>{{ x.pred if x.pred is not none else '—' }}</td>
+            <td>{{ x.mean }}</td>
+            <td>{% if x.vs_mean is not none %}<span class="rk-vs {{ 'rk-down' if x.vs_mean < 0 else 'rk-up' }}">{{ '+' if x.vs_mean > 0 }}{{ x.vs_mean }}%</span>{% else %}—{% endif %}</td>
+            <td>{% if x.alert %}<span class="chip chip--alert"><i class="dot"></i>触发</span>{% else %}<span class="chip chip--ok"><i class="dot"></i>未触发</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+          {% if not items %}
+          <tr><td colspan="9" class="rk-empty">当前筛选条件下没有县区。</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+  </section>
+
+  <p class="chart-note">
+    口径说明：干热风天数按县区逐日气象统计（灌浆期高温低湿日）；等级为 0 天无、1—2 天轻度、≥ 3 天重度；
+    「近 15 年排位」为该县当年天数在其自有历史年份中的降序名次；产量预警按「预测单产低于常年单产的 {{ (ratio * 100)|round(0)|int }}%」判定，属经验阈值，不替代实地灾情评估。
+  </p>
+</div>
+{% endblock %}

@@ -401,6 +401,10 @@ def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
 # ---------------------------------------------------------------- 路由
 @app.route("/")
 def index():
+    try:
+        risk_brief = risk_snapshot(list(BASE_YEARS)[-1])
+    except Exception:
+        risk_brief = None
     mm = model_meta()
     best_m, best_label = best_model_metrics()
     label_text = "真实产量" if (mm and mm.get("reliable")) else ("演示标签" if mm else "缺失")
@@ -431,7 +435,7 @@ def index():
                 }
             return render_template("index.html", title=CONFIG["web"]["title"],
                                    active="index", stats=stats, model=mm, db_online=True,
-                                   best=best_m, best_label=best_label)
+                                   best=best_m, best_label=best_label, risk=risk_brief)
         except Exception:
             pass
     df, meta = current_dataset()
@@ -446,7 +450,7 @@ def index():
     }
     return render_template("index.html", title=CONFIG["web"]["title"], active="index",
                            stats=stats, model=mm, db_online=False,
-                           best=best_m, best_label=best_label)
+                           best=best_m, best_label=best_label, risk=risk_brief)
 
 
 @app.route("/upload", methods=["GET", "POST"])
@@ -656,6 +660,198 @@ def dry_hot():
 
     return render_template("dry_hot.html", title="干热风预警", active="dry_hot",
                            years=years, year=year, data=data, stats=stats, city_map=city_map)
+
+
+# ---------------------------------------------------------------- 风险总览
+def _risk_feature_table() -> pd.DataFrame:
+    """风险总览数据源：MySQL 特征表优先，回退内置 feature_table.csv。"""
+    feat = None
+    if repo.available():
+        try:
+            feat = repo.feature_rows()
+        except Exception:
+            feat = None
+    if feat is None or feat.empty:
+        feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
+    return feat
+
+
+def _county_city_map() -> dict:
+    city_map = {}
+    for city, counties_dict in CONFIG["counties"].items():
+        for c in counties_dict.values():
+            city_map[c] = city
+    return city_map
+
+
+@lru_cache(maxsize=16)
+def risk_snapshot(year: int) -> dict:
+    """按年份计算全省县级风险清单。
+
+    仅纳入有产量标签（county_stats 有常年单产）的县区，保证「预测单产 / 预警线」
+    口径可解释；无标签县区仍参与气象统计，但不进风险清单。
+    风险登记以干热风天数为准（0 天无 / 1—2 天轻度 / ≥3 天重度），
+    并给出该县当年天数在自有历史年份中的排位。
+    """
+    feat = _risk_feature_table()
+    bundle = load_models()
+    stats = bundle[3] if bundle else {}
+    city_map = _county_city_map()
+
+    rows = feat[feat["year"] == year].reset_index(drop=True)
+    preds = batch_predict(rows, bundle, None)
+
+    # 该县历年干热风天数降序序列，用于计算当年排位
+    hist = {}
+    for county, grp in feat.groupby("county"):
+        hist[county] = sorted(
+            [int(v) if pd.notna(v) else 0 for v in grp["hot_dry_days"]],
+            reverse=True,
+        )
+
+    items = []
+    for i, r in rows.iterrows():
+        county = r["county"]
+        if county not in stats:
+            continue
+        days = int(r["hot_dry_days"]) if pd.notna(r["hot_dry_days"]) else 0
+        mean = float(stats[county]["mean_yield"])
+        pred = preds[i]
+        pred = round(float(pred), 1) if pred is not None else None
+        threshold = round(mean * CONFIG["alert"]["default_ratio"], 1)
+
+        seq = hist.get(county, [])
+        if seq:
+            rank = sum(1 for v in seq if v > days) + 1
+            total = len(seq)
+        else:
+            rank, total = None, 0
+
+        level = "heavy" if days >= 3 else ("light" if days >= 1 else "none")
+        vs_mean = round((pred / mean - 1) * 100, 1) if (pred is not None and mean) else None
+        alert = bool(pred is not None and pred < threshold)
+
+        items.append({
+            "county": county,
+            "city": city_map.get(county, "其他"),
+            "days": days,
+            "rank": rank,
+            "rank_total": total,
+            "level": level,
+            "level_text": {"heavy": "重度", "light": "轻度", "none": "无"}[level],
+            "pred": pred,
+            "mean": round(mean, 1),
+            "threshold": threshold,
+            "vs_mean": vs_mean,
+            "alert": alert,
+            "actual": None,
+        })
+
+    # 实测对照（有标签年份）
+    labels, _ = load_yield_labels()
+    if labels is not None and not labels.empty:
+        y = labels[labels["year"] == year]
+        if not y.empty:
+            act = dict(zip(y["county"], y["wheat_yield"]))
+            for it in items:
+                if it["county"] in act:
+                    it["actual"] = round(float(act[it["county"]]), 1)
+
+    items.sort(key=lambda x: (-x["days"], x["county"]))
+
+    # 当年全省干热风总天数在历史年份中的排位（数值越高越严重）
+    year_totals = {}
+    for y, grp in feat.groupby("year"):
+        year_totals[int(y)] = int(grp["hot_dry_days"].fillna(0).sum())
+    cur_total = year_totals.get(year, 0)
+    year_rank = sum(1 for v in year_totals.values() if v > cur_total) + 1
+
+    heavy = sum(1 for x in items if x["level"] == "heavy")
+    light = sum(1 for x in items if x["level"] == "light")
+    none_ = sum(1 for x in items if x["level"] == "none")
+    alerts = sum(1 for x in items if x["alert"])
+    preds_ok = [x["pred"] for x in items if x["pred"] is not None]
+
+    return {
+        "year": year,
+        "items": items,
+        "cities": sorted({x["city"] for x in items}),
+        "summary": {
+            "count": len(items),
+            "heavy": heavy,
+            "light": light,
+            "none": none_,
+            "alerts": alerts,
+            "avg_pred": round(sum(preds_ok) / len(preds_ok), 1) if preds_ok else None,
+            "max_days": items[0]["days"] if items else 0,
+            "max_county": items[0]["county"] if items else "—",
+            "year_total": cur_total,
+            "year_rank": year_rank,
+            "year_rank_total": len(year_totals),
+        },
+        "top": items[:5],
+    }
+
+
+@app.route("/risk")
+def risk():
+    years = list(BASE_YEARS)
+    year_arg = request.args.get("year", type=int)
+    year = year_arg if year_arg in years else years[-1]
+    city_arg = (request.args.get("city") or "").strip()
+    level_arg = (request.args.get("level") or "").strip()
+
+    snap = risk_snapshot(year)
+    items = snap["items"]
+    if city_arg:
+        items = [x for x in items if x["city"] == city_arg]
+    if level_arg in ("heavy", "light", "none"):
+        items = [x for x in items if x["level"] == level_arg]
+
+    return render_template("risk.html", title="风险总览", active="risk",
+                           years=years, year=year, cities=snap["cities"],
+                           city=city_arg, level=level_arg,
+                           items=items, summary=snap["summary"], top=snap["top"],
+                           total=len(snap["items"]),
+                           ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100)
+
+
+@app.route("/export_risk")
+def export_risk():
+    """导出当年全省县级风险清单 Excel。"""
+    from io import BytesIO
+    from flask import send_file
+
+    years = list(BASE_YEARS)
+    year_arg = request.args.get("year", type=int)
+    year = year_arg if year_arg in years else years[-1]
+    snap = risk_snapshot(year)
+
+    rows = [{
+        "区县": x["county"],
+        "地市": x["city"],
+        "干热风天数": x["days"],
+        "近15年排位": f"第{x['rank']}/{x['rank_total']}" if x["rank"] else "",
+        "干热风等级": x["level_text"],
+        "预测单产(kg/亩)": x["pred"] if x["pred"] is not None else "",
+        "常年单产(kg/亩)": x["mean"],
+        "较常年(%)": x["vs_mean"] if x["vs_mean"] is not None else "",
+        "预警线(kg/亩)": x["threshold"],
+        "产量预警": "触发" if x["alert"] else "未触发",
+        "实测单产(kg/亩)": x["actual"] if x["actual"] is not None else "",
+    } for x in snap["items"]]
+
+    df = pd.DataFrame(rows)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, sheet_name=f"{year}年县级风险清单", index=False)
+    output.seek(0)
+    return send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"{year}年县级风险清单.xlsx",
+    )
 
 
 @app.route("/export_report")

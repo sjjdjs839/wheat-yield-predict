@@ -50,6 +50,10 @@ def warm_caches() -> None:
         wheat.builtin_dataset()
         wheat.load_models()
         wheat.feature_importance_items()
+        # 首页要读库表规模（82 万行全表 COUNT 约 0.9 秒）与当年风险快照，
+        # 启动阶段先算一次，避免首屏等统计
+        wheat.repo.stats()
+        wheat.risk_snapshot(list(wheat.BASE_YEARS)[-1])
     except Exception:
         pass
 

@@ -29,6 +29,31 @@
   </div>
 </section>
 
+{% if risk %}
+<!-- 当年风险速览：一屏看到全省态势 -->
+<section class="container dash-section">
+  <div class="risk-brief">
+    <div class="risk-brief-head">
+      <div>
+        <h2>{{ risk.year }} 年全省风险速览</h2>
+        <p>{{ risk.summary.count }} 个有产量基准的县区中，{{ risk.summary.heavy + risk.summary.light }} 个受灌浆期干热风影响；本年严重度为近 {{ risk.summary.year_rank_total }} 年第 {{ risk.summary.year_rank }}。</p>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('risk') }}">查看县级风险清单 {{ icon('arrow') }}</a>
+    </div>
+    <dl class="risk-brief-stats">
+      <div><dt>重度干热风</dt><dd class="is-alert">{{ risk.summary.heavy }}<span>县</span></dd></div>
+      <div><dt>轻度</dt><dd>{{ risk.summary.light }}<span>县</span></dd></div>
+      <div><dt>未受影响</dt><dd>{{ risk.summary.none }}<span>县</span></dd></div>
+      <div><dt>最高天数</dt><dd>{{ risk.summary.max_days }}<span>天 · {{ risk.summary.max_county }}</span></dd></div>
+    </dl>
+    <div class="risk-brief-top">
+      <span>重点关注</span>
+      {% for x in risk.top[:4] %}<a href="{{ url_for('risk') }}">{{ x.county }} {{ x.days }} 天</a>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <!-- 功能入口 -->
 <section class="container dash-section">
   <div class="dash-grid">

@@ -1,5 +1,7 @@
 """应用层查询接口：县列表、单县逐日气象、年度特征、产量标签与库内统计"""
 
+import time
+
 import pandas as pd
 
 from src.db.conn import connect, available  # noqa: F401
@@ -66,7 +68,27 @@ def feature_rows() -> pd.DataFrame:
     """)
 
 
-def stats() -> dict:
+_STATS_TTL = 120.0
+_STATS_CACHE = {"value": None, "ts": 0.0}
+
+
+def clear_stats_cache() -> None:
+    """数据重建或重新入库后主动失效概览统计缓存。"""
+    _STATS_CACHE["value"] = None
+    _STATS_CACHE["ts"] = 0.0
+
+
+def stats(force: bool = False) -> dict:
+    """库表规模统计。
+
+    weather_daily 约 82 万行，InnoDB 下 COUNT(*) 需全表扫描（实测约 0.9 秒），
+    首页每次渲染都查会明显拖慢首屏，故缓存 120 秒；数据重建后可调用
+    clear_stats_cache() 或 stats(force=True) 立即刷新。
+    """
+    now = time.time()
+    if not force and _STATS_CACHE["value"] is not None and now - _STATS_CACHE["ts"] < _STATS_TTL:
+        return _STATS_CACHE["value"]
+
     df = _query("""
         SELECT (SELECT COUNT(*) FROM weather_daily) AS weather_rows,
                (SELECT COUNT(*) FROM counties) AS counties,
@@ -76,7 +98,7 @@ def stats() -> dict:
                (SELECT COUNT(*) FROM yield_labels) AS yield_rows
     """)
     r = df.iloc[0]
-    return {
+    result = {
         "weather_rows": int(r["weather_rows"]),
         "counties": int(r["counties"]),
         "year_min": int(pd.Timestamp(r["dmin"]).year) if r["dmin"] else 2010,
@@ -84,6 +106,9 @@ def stats() -> dict:
         "feature_rows": int(r["feature_rows"]),
         "yield_rows": int(r["yield_rows"]),
     }
+    _STATS_CACHE["value"] = result
+    _STATS_CACHE["ts"] = now
+    return result
 
 # ---- 分阶段农事观测（运行时累积，MySQL 为主、CSV 回退由 stage_store 处理）----
 
