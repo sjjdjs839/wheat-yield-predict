@@ -1,4 +1,4 @@
-"""
+﻿"""
 交互式预测大屏生成器
 ======================
 把 model.json 内嵌进单文件 HTML，浏览器端用 JS 遍历随机森林做推理。
@@ -82,13 +82,13 @@ HTML = r"""<!DOCTYPE html>
           <span class="val" id="p34v">0 %</span>
         </div>
 
-        <label>灌浆期最高温（5-6月）偏移 <span style="color:#64829b">— 高温逼熟</span></label>
+        <label>灌浆期最高温（5月）偏移 <span style="color:#64829b">— 高温逼熟</span></label>
         <div class="slider-row">
           <input type="range" id="dt" min="-4" max="6" value="0" step="0.5">
           <span class="val" id="dtv">0 ℃</span>
         </div>
 
-        <label>干热风日数（5-6月）</label>
+        <label>干热风日数（5月）</label>
         <div class="slider-row">
           <input type="range" id="dhw" min="0" max="15" value="0" step="1">
           <span class="val" id="dhwv">0 天</span>

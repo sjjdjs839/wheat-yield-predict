@@ -1,7 +1,7 @@
 {
-  "r2": 0.8957,
-  "rmse": 28.532,
-  "mae": 22.1017,
+  "r2": 0.9174,
+  "rmse": 25.3881,
+  "mae": 20.8243,
   "model": "lr",
   "yield_file": "data\\raw\\county_yield_train.csv",
   "data_source": "real",

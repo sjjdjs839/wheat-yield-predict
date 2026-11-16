@@ -1,4 +1,4 @@
-"""
+﻿"""
 特征工程模块（对齐任务书步骤 6 + 表 4 的 20 个特征）
 ====================================================
 输入：data/processed/weather_clean.csv（clean.py 产出）
@@ -19,9 +19,9 @@ with open(PROJECT_ROOT / "config" / "config.yaml", "r", encoding="utf-8") as f:
 PROCESSED_DIR = PROJECT_ROOT / CONFIG["paths"]["processed"]
 YIELD_PATH = PROJECT_ROOT / CONFIG["paths"]["raw_yield"]
 
-FULL = CONFIG["stages"]["full_season"]     # [3,4,5,6]
+FULL = CONFIG["stages"]["full_season"]     # [3,4,5] 截至 5/31，收获前约 1 个月
 S34 = CONFIG["stages"]["stage_34"]         # [3,4]
-S56 = CONFIG["stages"]["stage_56"]         # [5,6]
+S56 = CONFIG["stages"]["stage_56"]         # [5]   灌浆期
 BASE_T = CONFIG["gdd_base_temp"]           # 10
 
 # 兼容标准小写字段名（上传校验 / Web 应用产出的数据）与 NASA POWER 原始列名
@@ -63,7 +63,7 @@ def build_county(df_county: pd.DataFrame) -> pd.DataFrame:
         d34 = d[d["month"].isin(S34)]
         d56 = d[d["month"].isin(S56)]
 
-        if len(full) < 100:
+        if len(full) < 80:      # 3—5 月约 92 天，阈值同步下调
             continue
 
         season_precip = float(full["PRECTOTCORR"].sum())

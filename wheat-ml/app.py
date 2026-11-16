@@ -1,4 +1,4 @@
-"""
+﻿"""
 河南省小麦气象数据分析与产量预测系统 · Web 应用
 ==================================================
 页面路由：
@@ -322,18 +322,18 @@ FEATURE_NAMES = {
     "precip_anom": "降水距平",
     "hot_days": "极端高温天数",
     "cold_days": "极端低温天数",
-    "gdd": "全生育期积温",
-    "season_tmax": "全生育期最高温",
-    "season_tmin": "全生育期最低温",
-    "season_precip": "全生育期降水",
-    "season_wind": "全生育期风速",
-    "season_sunshine": "全生育期日照",
+    "gdd": "生育期积温",
+    "season_tmax": "生育期最高温",
+    "season_tmin": "生育期最低温",
+    "season_precip": "生育期降水",
+    "season_wind": "生育期风速",
+    "season_sunshine": "生育期日照",
     "season_tmax_34": "返青拔节期最高温",
     "season_precip_34": "返青拔节期降水",
     "gdd_34": "返青拔节期积温",
-    "season_tmax_56": "灌浆成熟期最高温",
-    "season_precip_56": "灌浆成熟期降水",
-    "gdd_56": "灌浆成熟期积温",
+    "season_tmax_56": "灌浆期最高温",
+    "season_precip_56": "灌浆期降水",
+    "gdd_56": "灌浆期积温",
     "hot_dry_days": "干热风天数",
     "year_index": "品种改良趋势",
     "county_prior": "县域常年单产先验",

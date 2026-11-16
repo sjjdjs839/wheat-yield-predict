@@ -1,8 +1,8 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {% set badges = [source] %}
-{{ page_head('产量预测', '按县区与年份输出预测单产，对比多年平均与实测值，并按自定义预警线判断是否触发产量预警。', badges) }}
+{{ page_head('产量预测', '按县区与年份输出预测单产；特征截至 5 月 31 日灌浆末期，比收获提前约 1 个月，可直接用于收购、储运与防灾调度。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法预测</span><p>{{ error }}</p></div>
@@ -133,7 +133,7 @@
             <div><dt>线性回归 R²</dt><dd>{{ metrics_lr.r2 if metrics_lr else '—' }}</dd></div>
             <div><dt>测试年份 / 样本</dt><dd>{{ metrics.test_years|join('、') }} · {{ metrics.n_test }} 条</dd></div>
             {% endif %}
-            <div><dt>特征数</dt><dd>{{ feature_count|default(19) }} 项生育期气象特征</dd></div>
+            <div><dt>特征数</dt><dd>{{ feature_count|default(19) }} 项生育期特征（截至 5 月 31 日）</dd></div>
             <div><dt>因子影响口径</dt><dd>基于 SHAP 贡献分解，按该县常年单产折算为 kg/亩</dd></div>
           </dl>
           {% if not reliable %}<p class="chart-note">当前模型使用演示产量标签训练，指标仅用于验证系统链路，不作准确率结论。</p>{% endif %}

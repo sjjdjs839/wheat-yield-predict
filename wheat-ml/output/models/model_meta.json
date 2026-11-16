@@ -43,9 +43,9 @@
     2024
   ],
   "metrics_rf": {
-    "r2": 0.9431,
-    "rmse": 21.0735,
-    "mae": 16.2141,
+    "r2": 0.9499,
+    "rmse": 19.7713,
+    "mae": 14.9296,
     "model": "rf",
     "yield_file": "data\\raw\\county_yield_train.csv",
     "data_source": "real",
