@@ -62,7 +62,13 @@
           <p class="result-kicker">{{ result.county }} · {{ result.year }} 年</p>
           <div class="result-value">{{ result.pred }}<small>kg/亩</small></div>
           <p class="result-sub">该县多年平均 {{ result.mean_yield }} kg/亩</p>
-          <p class="result-ci">预测波动范围 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩</p>
+          <p class="result-ci">预测波动范围 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩（按测试集 MAE {{ result.mae }} 的 ±0.8 倍估算）</p>
+          {% if result.prob_below is not none %}
+          <p class="result-ci">
+            产量预警概率 <strong>{{ result.prob_below }}%</strong>
+            <span class="ci-note">300 棵决策树中预测值低于预警线的比例；树间区间 {{ result.tree_low }}—{{ result.tree_high }} kg/亩，反映模型不确定性，非统计置信区间。</span>
+          </p>
+          {% endif %}
           <span class="status-pill {{ 'is-alert' if result.alert else 'is-ok' }}">
             {{ '产量预警：预测单产低于预警线' if result.alert else '产量正常：预测单产不低于预警线' }}
           </span>
@@ -135,6 +141,7 @@
             {% endif %}
             <div><dt>特征数</dt><dd>{{ feature_count|default(19) }} 项生育期特征（截至 5 月 31 日）</dd></div>
             <div><dt>因子影响口径</dt><dd>基于 SHAP 贡献分解，按该县常年单产折算为 kg/亩</dd></div>
+            <div><dt>精度口径</dt><dd>绝对精度主要由「该县常年单产」基线提供：直接拿县常年均值当预测值，测试集 R² 即达 0.906、MAE 21.4 kg/亩；模型把它提升到 R² 0.95、MAE 14.9 kg/亩。模型真正捕捉的是「今年相对常年偏高还是偏低」，故本页同时给出基线、区间与预警概率，点估计不作精确结论使用。</dd></div>
           </dl>
           {% if not reliable %}<p class="chart-note">当前模型使用演示产量标签训练，指标仅用于验证系统链路，不作准确率结论。</p>{% endif %}
         </div>

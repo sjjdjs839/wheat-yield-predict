@@ -1304,6 +1304,17 @@ def predict():
         pred_low = round(pred - 0.8 * interval_mae, 1)
         pred_high = round(pred + 0.8 * interval_mae, 1)
 
+        # 概率化预警：随机森林 300 棵树的预测分布。
+        # 这是模型内部不确定性（决策树离散度），不是统计置信区间，页面上有明确标注。
+        prob_below, tree_low, tree_high = None, None, None
+        try:
+            tree_vals = np.array([float(t.predict(X)[0]) for t in rf.estimators_]) * mean_yield
+            prob_below = round(float((tree_vals < threshold).mean()) * 100, 1)
+            tree_low = round(float(np.percentile(tree_vals, 10)), 1)
+            tree_high = round(float(np.percentile(tree_vals, 90)), 1)
+        except Exception:
+            pass
+
         result = {
             "county": county, "year": year,
             "pred_rf": round(pred_rf, 1), "pred_lr": round(pred_lr, 1), "pred_lgbm": round(pred_lgbm, 1),
@@ -1314,6 +1325,8 @@ def predict():
             "vs_threshold": round((pred - threshold) / threshold * 100, 1) if threshold else 0,
             "vs_mean": round((pred / mean_yield - 1) * 100, 1),
             "alert": pred < threshold,
+            "prob_below": prob_below, "tree_low": tree_low, "tree_high": tree_high,
+            "mae": round(interval_mae, 1),
             "matched": matched,
             "feature_note": feature_note,
             "contrib": sample_contributions(X.iloc[0].values),

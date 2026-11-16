@@ -1,110 +1,65 @@
 {
-  "base": {
-    "n_features": 18,
+  "window": "3—5 月（截至 5 月 31 日灌浆末期）",
+  "split": {
+    "train_years": "2010—2021",
+    "test_years": "2022—2024",
     "n_train": 1305,
     "n_test": 330,
-    "models": {
-      "lgbm": {
-        "r2": 0.9346,
-        "rmse": 22.5963,
-        "mae": 17.6613
+    "n_counties": 110
+  },
+  "groups": {
+    "baseline_county_mean": {
+      "label": "直接用县常年均值（不训练）",
+      "n_features": 0,
+      "metrics": {
+        "r2": 0.9063,
+        "rmse": 27.0398,
+        "mae": 21.4091
       },
-      "rf": {
-        "r2": 0.9283,
-        "rmse": 23.6583,
-        "mae": 18.3055
+      "metrics_on_deviation": null
+    },
+    "weather_only": {
+      "label": "纯气象 17 项",
+      "n_features": 17,
+      "metrics": {
+        "r2": 0.9255,
+        "rmse": 24.1074,
+        "mae": 18.6277
       },
-      "lr": {
-        "r2": 0.8984,
-        "rmse": 28.1503,
-        "mae": 21.8649
+      "metrics_on_deviation": {
+        "r2": 0.0371,
+        "rmse": 0.0667,
+        "mae": 0.0497
+      }
+    },
+    "weather_trend": {
+      "label": "气象 + 年份趋势",
+      "n_features": 18,
+      "metrics": {
+        "r2": 0.9409,
+        "rmse": 21.482,
+        "mae": 16.3475
       },
-      "ensemble": {
-        "r2": 0.9286,
-        "rmse": 23.5965,
-        "mae": 18.2994
+      "metrics_on_deviation": {
+        "r2": 0.2974,
+        "rmse": 0.057,
+        "mae": 0.0424
+      }
+    },
+    "full": {
+      "label": "气象 + 趋势 + 县先验（当前模型）",
+      "n_features": 19,
+      "metrics": {
+        "r2": 0.9497,
+        "rmse": 19.8211,
+        "mae": 14.8679
+      },
+      "metrics_on_deviation": {
+        "r2": 0.3853,
+        "rmse": 0.0533,
+        "mae": 0.0388
       }
     }
   },
-  "stage": {
-    "n_features": 34,
-    "n_train": 1305,
-    "n_test": 330,
-    "models": {
-      "lgbm": {
-        "r2": 0.9298,
-        "rmse": 23.401,
-        "mae": 17.9978
-      },
-      "rf": {
-        "r2": 0.9275,
-        "rmse": 23.779,
-        "mae": 18.2815
-      },
-      "lr": {
-        "r2": 0.8987,
-        "rmse": 28.1149,
-        "mae": 22.9925
-      },
-      "ensemble": {
-        "r2": 0.9293,
-        "rmse": 23.4956,
-        "mae": 18.3284
-      }
-    }
-  },
-  "stage_prior": {
-    "n_features": 35,
-    "n_train": 1305,
-    "n_test": 330,
-    "models": {
-      "lgbm": {
-        "r2": 0.9356,
-        "rmse": 22.4115,
-        "mae": 16.8278
-      },
-      "rf": {
-        "r2": 0.9383,
-        "rmse": 21.9411,
-        "mae": 16.6557
-      },
-      "lr": {
-        "r2": 0.8933,
-        "rmse": 28.8537,
-        "mae": 23.4277
-      },
-      "ensemble": {
-        "r2": 0.936,
-        "rmse": 22.3415,
-        "mae": 17.1531
-      }
-    }
-  },
-  "prior_only": {
-    "n_features": 19,
-    "n_train": 1305,
-    "n_test": 330,
-    "models": {
-      "lgbm": {
-        "r2": 0.943,
-        "rmse": 21.0896,
-        "mae": 16.0345
-      },
-      "rf": {
-        "r2": 0.9431,
-        "rmse": 21.0735,
-        "mae": 16.2141
-      },
-      "lr": {
-        "r2": 0.8957,
-        "rmse": 28.532,
-        "mae": 22.1017
-      },
-      "ensemble": {
-        "r2": 0.9384,
-        "rmse": 21.9234,
-        "mae": 16.8689
-      }
-    }
-  }
+  "conclusion": "绝对精度的主体来自「该县常年单产」基线（R²≈0.906）；模型增益体现为对当代偏离方向的判断。纯气象特征对「相对常年偏离」的解释力有限，故页面同时给出基线、区间与预警概率，不将点估计作为精确结论。"
 }

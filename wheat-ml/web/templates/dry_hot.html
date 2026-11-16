@@ -1,7 +1,7 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('干热风预警', '按城市展开查看各区县灌浆期干热风天数、等级与产量影响预估。', [year ~ ' 年', '县级天数']) }}
+{{ page_head('干热风预警', '按城市展开查看各区县灌浆期干热风天数与等级，并给出应对方向；天数是暴露强度指标，不等同于减产幅度。', [year ~ ' 年', '县级天数']) }}
 <div class="container page-content dh-page">
   <div class="dh-summary">
     <div class="dh-card" data-reveal>
@@ -53,14 +53,14 @@
             <th style="width:30%">区域</th>
             <th>干热风天数</th>
             <th>等级</th>
-            <th>对产量影响预估</th>
+            <th>应对方向</th>
           </tr>
         </thead>
         <tbody id="dhTableBody">
         </tbody>
       </table>
     </div>
-    <p class="chart-note">干热风天数按县区逐日气象统计；等级与产量影响为经验参考，不替代实地灾情评估。</p>
+    <p class="chart-note">干热风天数按县区逐日气象统计（日最高温 ≥35℃ 且相对湿度 ≤40%）；等级按天数划分暴露强度，不等同于减产幅度——县域尺度上气象与单产的统计关联较弱，实际损失需结合实地灾情评估。</p>
   </section>
 
   <section class="dh-levels">
@@ -72,7 +72,7 @@
     <article class="dh-level">
       <span class="chip chip--gold"><i class="dot"></i>轻度</span>
       <strong>1—2 天</strong>
-      <p>可能造成轻度减产，建议关注土壤墒情与叶面补水。</p>
+      <p>灌浆期叶片可能提前衰老，建议查墒情、叶面补肥，盯住土壤水分。</p>
     </article>
     <article class="dh-level is-alert">
       <span class="chip chip--alert"><i class="dot"></i>重度</span>
@@ -101,9 +101,9 @@
   }
 
   function getLevel(days) {
-    if (days === 0) return { level: 0, text: '无', chip: 'chip--ok', effect: '无影响' };
-    if (days <= 2) return { level: 1, text: '轻度', chip: 'chip--gold', effect: '轻度减产约 3—5%' };
-    return { level: 2, text: '重度', chip: 'chip--alert', effect: '重度减产约 5—10%' };
+    if (days === 0) return { level: 0, text: '无', chip: 'chip--ok', effect: '无暴露 · 正常关注灌浆期水分供应' };
+    if (days <= 2) return { level: 1, text: '轻度', chip: 'chip--gold', effect: '叶片可能提前衰老 · 建议查墒情、叶面补肥' };
+    return { level: 2, text: '重度', chip: 'chip--alert', effect: '灌浆期缩短风险 · 优先安排降温补水，跟踪成熟期' };
   }
 
   function toggleCity(city) {
