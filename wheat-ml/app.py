@@ -132,6 +132,13 @@ def scope_city_groups(scope: dict | None) -> dict | None:
 
 
 def builtin_dataset() -> pd.DataFrame:
+    """内置逐日气象宽表。
+
+    新克隆的仓库里 weather_clean.csv 是可重建产物、不随仓库提交；文件缺失时
+    返回空表让 MySQL 分支接管，避免整页抛 FileNotFoundError。
+    """
+    if not PROCESSED.exists():
+        return pd.DataFrame()
     return _read_processed(str(PROCESSED), PROCESSED.stat().st_mtime)
 
 
@@ -676,6 +683,19 @@ def _risk_feature_table() -> pd.DataFrame:
     return feat
 
 
+def _county_stats_baseline() -> dict:
+    """县常年单产基准。
+
+    模型 joblib 不随仓库提交，新克隆后未训练时 load_models() 返回 None；
+    county_stats.json 随仓库提交，用它兜底可让风险清单照常可用，
+    仅「预测单产」列留空。
+    """
+    try:
+        return json.loads((MODELS_DIR / "county_stats.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
 def _county_city_map() -> dict:
     city_map = {}
     for city, counties_dict in CONFIG["counties"].items():
@@ -695,11 +715,11 @@ def risk_snapshot(year: int) -> dict:
     """
     feat = _risk_feature_table()
     bundle = load_models()
-    stats = bundle[3] if bundle else {}
+    stats = bundle[3] if bundle else _county_stats_baseline()
     city_map = _county_city_map()
 
     rows = feat[feat["year"] == year].reset_index(drop=True)
-    preds = batch_predict(rows, bundle, None)
+    preds = batch_predict(rows, bundle, None) if bundle else [None] * len(rows)
 
     # 该县历年干热风天数降序序列，用于计算当年排位
     hist = {}

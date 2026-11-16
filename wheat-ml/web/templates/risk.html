@@ -9,7 +9,7 @@
     <div class="dh-card is-alert">
       <span class="dh-label">重度干热风县区</span>
       <strong>{{ summary.heavy }}</strong>
-      <small>≥ 3 天 · 占 {{ summary.count }} 县区的 {{ (summary.heavy / summary.count * 100)|round(0)|int }}%</small>
+      <small>≥ 3 天 · 占 {{ summary.count }} 县区的 {{ ((summary.heavy / summary.count * 100)|round(0)|int) if summary.count else 0 }}%</small>
     </div>
     <div class="dh-card">
       <span class="dh-label">轻度干热风县区</span>

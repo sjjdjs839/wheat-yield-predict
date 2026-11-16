@@ -163,7 +163,9 @@ def run_build() -> pd.DataFrame:
     feat = pd.concat(frames, ignore_index=True)
 
     # 调整列顺序：标识列 + 20 特征 + 产量
-    feats = CONFIG["feature_cols"]
+    # county_prior 是训练期在折内派生的先验特征，不落盘到特征表；
+    # 这里取交集，避免 config 与落盘口径不一致时 KeyError（重建流水线曾经卡在这）
+    feats = [c for c in CONFIG["feature_cols"] if c in feat.columns]
     feat = feat[["county", "city", "year"] + feats]
     feat = attach_yield(feat)
 
