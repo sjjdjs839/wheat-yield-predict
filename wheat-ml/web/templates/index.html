@@ -38,7 +38,17 @@
         <h2>{{ risk.year }} 年全省风险与决策提示</h2>
         <p>{{ risk.summary.count }} 个有产量基准的县区中，{{ risk.summary.heavy + risk.summary.light }} 个受灌浆期干热风影响；本年严重度为近 {{ risk.summary.year_rank_total }} 年第 {{ risk.summary.year_rank }}。</p>
       </div>
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('risk') }}">查看县级风险清单 {{ icon('arrow') }}</a>
+      <div class="risk-head-actions">
+        <form class="risk-year-form" method="get" action="{{ url_for('index') }}">
+          <label class="risk-year-label" for="risk-year">年份</label>
+          <select id="risk-year" name="year" onchange="this.form.submit()">
+            {% for y in risk_years %}
+            <option value="{{ y }}" {{ 'selected' if y == risk.year }}>{{ y }} 年{% if yearly_heavy.get(y, 0) >= 10 %} · 干热风重{% endif %}</option>
+            {% endfor %}
+          </select>
+        </form>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('risk') }}?year={{ risk.year }}">查看县级风险清单 {{ icon('arrow') }}</a>
+      </div>
     </div>
     <dl class="risk-brief-stats">
       <div><dt>重度干热风</dt><dd class="is-alert">{{ risk.summary.heavy }}<span>县</span></dd></div>

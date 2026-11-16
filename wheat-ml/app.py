@@ -437,12 +437,34 @@ def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
 
 
 # ---------------------------------------------------------------- 路由
+_YEARLY_HEAVY_CACHE: dict = {}
+
+
+def _yearly_heavy_counties() -> dict:
+    """每年干热风重度县数（≥3 天）。只依赖气象表，算一次缓存住，供首页下拉标注。"""
+    if _YEARLY_HEAVY_CACHE:
+        return _YEARLY_HEAVY_CACHE
+    try:
+        _f = _risk_feature_table()
+        for y, g in _f.groupby("year"):
+            _YEARLY_HEAVY_CACHE[int(y)] = int((g["hot_dry_days"].fillna(0) >= 3).sum())
+    except Exception:
+        pass
+    return _YEARLY_HEAVY_CACHE
+
+
 @app.route("/")
 def index():
+    risk_years = list(BASE_YEARS)
+    y_arg = request.args.get("year", type=int)
+    risk_year = y_arg if y_arg in risk_years else risk_years[-1]
     try:
-        risk_brief = risk_snapshot(list(BASE_YEARS)[-1])
+        risk_brief = risk_snapshot(risk_year)
     except Exception:
         risk_brief = None
+
+    # 每年重度县数（只看气象，不跑预测），用于在下拉里标出「干热风重」的年份
+    yearly_heavy = _yearly_heavy_counties()
     mm = model_meta()
     best_m, best_label = best_model_metrics()
     label_text = "真实产量" if (mm and mm.get("reliable")) else ("演示标签" if mm else "缺失")
@@ -473,7 +495,8 @@ def index():
                 }
             return render_template("index.html", title=CONFIG["web"]["title"],
                                    active="index", stats=stats, model=mm, db_online=True,
-                                   best=best_m, best_label=best_label, risk=risk_brief)
+                                   best=best_m, best_label=best_label, risk=risk_brief,
+                                   risk_years=risk_years, yearly_heavy=yearly_heavy)
         except Exception:
             pass
     df, meta = current_dataset()
@@ -488,7 +511,8 @@ def index():
     }
     return render_template("index.html", title=CONFIG["web"]["title"], active="index",
                            stats=stats, model=mm, db_online=False,
-                           best=best_m, best_label=best_label, risk=risk_brief)
+                           best=best_m, best_label=best_label, risk=risk_brief,
+                           risk_years=risk_years, yearly_heavy=yearly_heavy)
 
 
 @app.route("/upload", methods=["GET", "POST"])
@@ -875,7 +899,7 @@ def risk_snapshot(year: int) -> dict:
 
     # ① 产量：有触发预警的取最严重；轻年没有触发时，退给「最接近预警线」的县
     d_warned = sorted([x for x in items if x["alert"] and x["pred"] and x["mean"]],
-                    key=lambda x: x["pred"] / x["mean"])[:2]
+                    key=lambda x: x["pred"] / x["mean"])[:1]
     if d_warned:
         for x in d_warned:
             gap = round(x["pred"] / x["mean"] * 100 - 100, 1)
@@ -889,7 +913,8 @@ def risk_snapshot(year: int) -> dict:
             thr = round(x["pred"] / (x["mean"] * 0.95) * 100 - 100, 1)
             gap_txt = ("与常年基本持平" if abs(gap) < 0.15
                        else f"比常年{'低' if gap < 0 else '高'} {abs(gap)}%")
-            _push("接近预警线", x["county"],
+            label = "接近预警线" if x["pred"] < x["mean"] else "产量关注"
+            _push(label, x["county"],
                   f"预测 {x['pred']} kg/亩，{gap_txt}，距预警线 {abs(thr)}%",
                   "predict", "alert")
 
@@ -897,8 +922,9 @@ def risk_snapshot(year: int) -> dict:
     d_hot = sorted(items, key=lambda x: (-x["days"], x["county"]))
     d_heavy = [x for x in d_hot if x["days"] >= 3]
     if d_heavy:
+        heavy_note = f" · 全省 {heavy} 县重度" if heavy >= 5 else ""
         _push("干热风", d_heavy[0]["county"],
-              f"{d_heavy[0]['days']} 天（重度），优先备降温补水", "dry_hot", "hot")
+              f"{d_heavy[0]['days']} 天（重度）{heavy_note}，优先备降温补水", "dry_hot", "hot")
     else:
         d_mild = [x for x in d_hot if x["days"] >= 1]
         if d_mild:

@@ -1483,3 +1483,22 @@ main{overflow-x:clip}
   .dd-text{min-width:100%;order:3}
   .dd-link{order:4}
 }
+
+.risk-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.risk-year-form{display:inline-flex;align-items:center;gap:6px}
+.risk-year-label{font-size:12.5px;color:var(--ink-500)}
+.risk-year-form select{
+  padding:5px 26px 5px 10px;font-size:13px;border-radius:8px;
+  border:1px solid #d8ded8;background:#fff;color:var(--ink-800);
+  appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,#8a978d 50%),linear-gradient(135deg,#8a978d 50%,transparent 50%);
+  background-position:calc(100% - 14px) calc(50% + 1px),calc(100% - 9px) calc(50% + 1px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;cursor:pointer;
+}
+.risk-year-form select:focus{outline:none;border-color:#1f6b45}
+
+@media (max-width:620px){
+  .risk-head-actions{width:100%}
+  .risk-year-form{flex:1}
+  .risk-year-form select{width:100%}
+}
