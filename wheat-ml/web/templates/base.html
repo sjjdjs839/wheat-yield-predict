@@ -10,7 +10,7 @@
 <script>document.documentElement.classList.add('js');</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 {% block preload %}
-{% if active != 'index' %}
+{% if active == 'index' %}
 <link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/field-band.webp') }}" type="image/webp">
 {% endif %}
 {% endblock %}
@@ -109,7 +109,7 @@
   </div>
   <div class="container foot-meta">
     <span>数据范围 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 个气象县区 · 按年份划分训练 / 测试集</span>
-    <span>真实产量标签 · 图表与地图全部本地渲染，断网可用</span>
+    <span>图表与地图本地渲染，断网可用</span>
   </div>
 </footer>
 

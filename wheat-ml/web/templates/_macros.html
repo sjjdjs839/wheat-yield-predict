@@ -6,19 +6,16 @@
 <svg class="{{ cls }}" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
 {%- endmacro %}
 
-{% macro page_head(kicker, title, lead, badges=None) -%}
-<section class="page-head">
-  <div class="page-head-media" style="background-image:url('{{ url_for('static', filename='assets/field/field-band.webp') }}')" aria-hidden="true"></div>
-  <div class="page-head-shade" aria-hidden="true"></div>
-  <div class="container page-head-inner">
-    <div class="page-head-copy">
-      <p class="eyebrow eyebrow--light">{{ kicker }}</p>
+{% macro page_head(title, lead=None, badges=None) -%}
+<section class="work-head">
+  <div class="container work-head-inner">
+    <div class="work-head-copy">
       <h1>{{ title }}</h1>
-      <p class="page-head-lead">{{ lead }}</p>
+      {% if lead %}<p class="work-head-lead">{{ lead }}</p>{% endif %}
     </div>
     {% if badges %}
-    <div class="page-head-badges">
-      {% for badge in badges if badge %}<span class="ph-badge">{{ badge }}</span>{% endfor %}
+    <div class="work-head-meta">
+      {% for badge in badges if badge %}<span class="wh-chip">{{ badge }}</span>{% endfor %}
     </div>
     {% endif %}
   </div>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('农事建议', '按生育期，管好每一段生长', '分批上传本期气象观测，系统自动识别所属生育期并累积保留；依据当期气象条件给出分阶段管理重点，不直接给出施肥、灌溉剂量。', [source, '五个生育期']) }}
+{{ page_head('农事建议', '按生育期查看当期气象条件与管理重点；不给出施肥、灌溉剂量处方。', [source]) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法生成</span><p>{{ error }}</p></div>
@@ -38,7 +38,6 @@
   <section class="block-lg stage-upload-card">
     <div class="block-head" data-reveal>
       <div>
-        <p class="eyebrow">STAGE OBSERVATION</p>
         <h2>上传本期气象观测</h2>
       </div>
       <p class="block-note">按生育期分批上传，自动识别所属阶段；多次上传累加保留，同日重复上传自动覆盖</p>
@@ -95,8 +94,7 @@
   <section class="block-lg">
     <div class="block-head" data-reveal>
       <div>
-        <p class="eyebrow">GROWTH TIMELINE</p>
-        <h2>五个生育期，逐段看</h2>
+        <h2>五个生育期明细</h2>
       </div>
       <p class="block-note">有记录的阶段给出统计、风险与建议；待上传阶段置灰提示</p>
     </div>

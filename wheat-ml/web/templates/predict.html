@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{% set badges = [source, '多模型融合', 'MAE 近似区间'] %}
-{{ page_head('产量预测与预警', '预测单产，盯住预警线', '按县区与年份融合随机森林、LightGBM 与线性回归输出预测单产，对比多年平均与实测值，并按自定义预警线判断是否触发产量预警。', badges) }}
+{% set badges = [source] %}
+{{ page_head('产量预测', '按县区与年份输出预测单产，对比多年平均与实测值，并按自定义预警线判断是否触发产量预警。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法预测</span><p>{{ error }}</p></div>
@@ -59,10 +59,10 @@
       {% endif %}
       <div class="result-head">
         <div class="result-summary">
-          <p class="result-kicker">{{ result.county }} · {{ result.year }} 年 · ENSEMBLE FORECAST</p>
+          <p class="result-kicker">{{ result.county }} · {{ result.year }} 年</p>
           <div class="result-value">{{ result.pred }}<small>kg/亩</small></div>
-          <p class="result-sub">随机森林 {{ result.pred_rf }} · LightGBM {{ result.pred_lgbm }} · 线性回归 {{ result.pred_lr }} kg/亩<br>该县多年平均 {{ result.mean_yield }} kg/亩</p>
-          <p class="result-ci">MAE 近似区间 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩</p>
+          <p class="result-sub">该县多年平均 {{ result.mean_yield }} kg/亩</p>
+          <p class="result-ci">预测波动范围 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩</p>
           <span class="status-pill {{ 'is-alert' if result.alert else 'is-ok' }}">
             {{ '产量预警：预测单产低于预警线' if result.alert else '产量正常：预测单产不低于预警线' }}
           </span>
@@ -81,7 +81,7 @@
               <span><i class="legend-dot"></i>预测值 {{ result.pred }}</span>
               <span><i class="legend-line"></i>预警线 {{ result.threshold }}</span>
               <span><i class="legend-mean"></i>多年平均 {{ result.mean_yield }}</span>
-              <span><i class="legend-band"></i>近似区间 {{ result.pred_low }}—{{ result.pred_high }}</span>
+              <span><i class="legend-band"></i>波动范围 {{ result.pred_low }}—{{ result.pred_high }}</span>
             </div>
           </div>
         </div>
@@ -97,9 +97,8 @@
       {% if result.contrib and result.contrib.available %}
       <div class="contrib-panel">
         <div class="contrib-head">
-          <p class="result-kicker">MODEL CONTRIBUTION</p>
           <h3>今年产量主要被哪些因子影响</h3>
-          <p class="block-note">基于 SHAP 贡献分解：绿色为推高产量的因子，红色为拉低产量的因子；数值按该县常年单产近似折算为 kg/亩，仅反映相对常年的影响方向与幅度。</p>
+          <p class="block-note">绿色为推高产量的因子，红色为拉低产量的因子；数值按该县常年单产近似折算为 kg/亩，仅反映相对常年的影响方向与幅度。</p>
         </div>
         <div class="contrib-cols">
           <div class="contrib-col is-up">
@@ -122,9 +121,24 @@
       </div>
       {% endif %}
 
-      {% if metrics %}
-      <p class="model-metrics-line">融合权重 0.5 / 0.3 / 0.2 · RF R² {{ metrics.r2 }} · LGBM R² {{ metrics_lgbm.r2 if metrics_lgbm else '—' }} · LR R² {{ metrics_lr.r2 if metrics_lr else '—' }} · 测试年份 {{ metrics.test_years|join('、') }}，{{ metrics.n_test }} 条样本{% if not metrics.reliable %}（演示标签，指标不作准确率结论）{% endif %}</p>
-      {% endif %}
+      <details class="more panel">
+        <summary>模型说明：融合口径与精度指标</summary>
+        <div class="detail-body">
+          <dl class="stat-list">
+            <div><dt>融合权重</dt><dd>随机森林 50% · LightGBM 30% · 线性回归 20%</dd></div>
+            <div><dt>本县本年各模型输出</dt><dd>{{ result.pred_rf }} / {{ result.pred_lgbm }} / {{ result.pred_lr }} kg/亩</dd></div>
+            {% if metrics %}
+            <div><dt>随机森林 R²</dt><dd>{{ metrics.r2 }}</dd></div>
+            <div><dt>LightGBM R²</dt><dd>{{ metrics_lgbm.r2 if metrics_lgbm else '—' }}</dd></div>
+            <div><dt>线性回归 R²</dt><dd>{{ metrics_lr.r2 if metrics_lr else '—' }}</dd></div>
+            <div><dt>测试年份 / 样本</dt><dd>{{ metrics.test_years|join('、') }} · {{ metrics.n_test }} 条</dd></div>
+            {% endif %}
+            <div><dt>特征数</dt><dd>{{ feature_count|default(19) }} 项生育期气象特征</dd></div>
+            <div><dt>因子影响口径</dt><dd>基于 SHAP 贡献分解，按该县常年单产折算为 kg/亩</dd></div>
+          </dl>
+          {% if not reliable %}<p class="chart-note">当前模型使用演示产量标签训练，指标仅用于验证系统链路，不作准确率结论。</p>{% endif %}
+        </div>
+      </details>
 
       <div class="result-actions">
         <a class="btn btn-primary btn-sm" href="{{ url_for('export_report', county=result.county) }}">{{ icon('download') }} 导出 Excel 报告</a>
@@ -133,14 +147,13 @@
     </section>
     {% else %}
     <div class="result-empty">
-      <p>填写左侧县区、年份与预警值后点击「计算预测」，结果会显示在这里。</p>
+      <p>填写县区、年份与预警值后点击「计算预测」，结果会显示在这里。</p>
     </div>
     {% endif %}
   </div>
 
   <div class="export-bar">
     <div class="export-bar-title">
-      <span class="result-kicker">BATCH EXPORT</span>
       <p>批量导出全省各县区逐年预测结果（Excel / PDF）</p>
     </div>
     <div class="result-actions export-actions">
@@ -149,26 +162,16 @@
     </div>
   </div>
 
-  <div class="pipeline" data-reveal>
-    <span class="pipeline-node">气象数据</span><span class="pipeline-arrow">→</span>
-    <span class="pipeline-node">{{ feature_count|default(18) }} 项生育期特征</span><span class="pipeline-arrow">→</span>
-    <span class="pipeline-node">多模型融合</span><span class="pipeline-arrow">→</span>
-    <span class="pipeline-node">预测单产</span>
-    <span class="pipeline-meta">RF 50% + LGBM 30% + LR 20%{% if metrics %} · TEST {{ metrics.test_years|join(' / ') }} · N {{ metrics.n_test }}{% endif %}</span>
-  </div>
-
   {% if result and trend_chart %}
   <section class="block-lg">
     <div class="block-head" data-reveal>
       <div>
-        <p class="eyebrow">YIELD TREND</p>
-        <h2>实测与预测，放在同一条线上</h2>
+        <h2>历年实测与预测对比</h2>
       </div>
       <p class="block-note">预警线 {{ trend_chart.payload.threshold }} kg/亩 · 选中年份已放大</p>
     </div>
     <article class="chart-card wide">
       <div class="chart-head">
-        <span class="chart-index">趋势</span>
         <div>
           <h3>{{ trend_chart.title }}</h3>
           <p>{{ trend_chart.desc }}</p>
@@ -185,21 +188,19 @@
   <section class="block-lg">
     <div class="block-head" data-reveal>
       <div>
-        <p class="eyebrow">MODEL EXPLAINER</p>
-        <h2>哪些气象因子在推动产量</h2>
+        <h2>气象因子影响排序</h2>
       </div>
-      <p class="block-note">SHAP 平均贡献 · 占比</p>
+      <p class="block-note">按平均贡献占比排序</p>
     </div>
     <article class="chart-card wide">
       <div class="chart-head">
-        <span class="chart-index">IMP</span>
         <div>
           <h3>{{ feature_chart.title }}</h3>
           <p>{{ feature_chart.desc }}</p>
         </div>
       </div>
       <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
-      <p class="chart-note">数值为 SHAP 平均贡献占比，反映各因子对产量预测的实际影响；年份趋势与生育期积温通常是影响最大的因子。</p>
+      <p class="chart-note">数值为各因子平均贡献占比，反映其对产量预测的实际影响程度；年份趋势与生育期积温通常影响最大。</p>
       <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
     </article>
     <details class="more panel">
@@ -225,10 +226,9 @@
   <section class="block-lg" id="simulation">
     <div class="block-head" data-reveal>
       <div>
-        <p class="eyebrow">SCENARIO</p>
-        <h2>把气象条件，拨一拨</h2>
+        <h2>情景模拟</h2>
       </div>
-      <p class="block-note">拖动滑块 · 300ms 防抖 · 实时重算</p>
+      <p class="block-note">拖动滑块即时重算预测单产</p>
     </div>
     <div class="sim-layout">
       <div class="sim-controls control-card" data-reveal>
@@ -253,7 +253,7 @@
         <p class="control-hint">模拟基于当前县区与年份的生育期特征；极端输入会按各模型基准值 ±30% 截断，避免外推失真，结果仅用于趋势判断。</p>
       </div>
       <div class="sim-result" data-reveal>
-        <p class="result-kicker">SIMULATED YIELD</p>
+        <p class="result-kicker">模拟预测单产</p>
         <div class="sim-value"><span id="simResult" aria-live="polite">—</span><small>kg/亩</small></div>
         <dl class="sim-meta">
           <div><dt>基准值</dt><dd><span id="simBaseline">—</span> kg/亩</dd></div>

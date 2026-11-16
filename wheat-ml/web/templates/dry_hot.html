@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('干热风预警', '盯住灌浆期的那阵热风', '干热风是小麦灌浆期的灾害性天气，高温低湿会导致青枯逼熟、粒重下降。按城市展开，查看各区县干热风天数、等级与产量影响预估。', ['近 15 年', year ~ ' 年', '县级干热风天数']) }}
+{{ page_head('干热风预警', '按城市展开查看各区县灌浆期干热风天数、等级与产量影响预估。', [year ~ ' 年', '县级天数']) }}
 <div class="container page-content dh-page">
   <div class="dh-summary">
     <div class="dh-card" data-reveal>
@@ -42,7 +42,6 @@
   <section class="panel dh-panel" data-reveal>
     <div class="block-head">
       <div>
-        <p class="eyebrow">CITY &amp; COUNTY</p>
         <h2>{{ year }} 年干热风分布</h2>
       </div>
       <p class="block-note">点击城市行展开 / 收起区县明细；城市行等级取该市最高县。</p>

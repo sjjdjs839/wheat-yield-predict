@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('产量地图', '把单产放回地图', '按年份查看县级小麦单产与生育期降水的空间分布。颜色越深，数值越高；没有产量标签或降水记录的区县保持浅色留白。', ['县级单元', year ~ ' 年', '可缩放地图']) }}
+{{ page_head('产量地图', '按年份查看县级小麦单产与生育期降水的空间分布；颜色越深数值越高，无记录的区县为浅色留白。', [year ~ ' 年', '县级单元']) }}
 <div class="container page-content map-page">
   <div class="map-toolbar-panel">
     <div class="filter-panel map-filter">
@@ -34,15 +34,13 @@
 
     <aside class="map-side">
       <div class="map-side-block">
-        <p class="eyebrow">TOP 5</p>
         <h2>当前指标最高的 5 个县区</h2>
         <ol class="map-rank" id="mapTop" aria-live="polite">
           <li class="map-rank-empty">加载中…</li>
         </ol>
       </div>
       <div class="map-side-block map-legend-note">
-        <p class="eyebrow">READING</p>
-        <h2>怎么看这张图</h2>
+        <h2>读图说明</h2>
         <ul class="map-notes">
           <li>{{ icon('check') }}颜色深浅表示数值高低，不是产量增减幅度。</li>
           <li>{{ icon('check') }}浅米色区县表示该年没有对应指标记录。</li>
