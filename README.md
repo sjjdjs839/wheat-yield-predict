@@ -4,23 +4,60 @@
 
 ## 快速开始
 
-双击 [启动小麦系统.bat](启动小麦系统.bat) 即可：脚本会检测 Python 与依赖、清理旧的 app.py/run.py 服务、启动 Flask，并在服务就绪后自动用系统默认浏览器打开 `http://127.0.0.1:5000`。
+### Windows
 
-关闭控制台窗口即停止系统；浏览器标签可以保留，但刷新会无法连接。也可以手动启动：
+双击 [启动小麦系统.bat](启动小麦系统.bat)。脚本按顺序自检，不需要手动做任何事：
+
+1. 定位 Python（`python` → `py -3` → 常见安装路径），找不到会提示下载地址
+2. 检查依赖，缺什么就自动 `pip install -r requirements.txt`（首次约 2—5 分钟）
+3. 检查 `data/processed/weather_clean.csv` 与 `output/models/model_rf.joblib`，
+   缺失则自动从 `data/raw` 重建一次（实测约 50 秒，仅首次）
+4. 清理占用 5000 端口的旧服务，启动 Flask，并自动打开 `http://127.0.0.1:5000`
+
+关闭控制台窗口即停止服务。任一步失败，窗口都会停在原地并给出可操作提示。
+
+### macOS / Linux
 
 ```bash
-cd wheat-ml
-pip install -r requirements.txt
-python run.py              # 自动打开默认浏览器
-# python run.py --no-browser   # 只启动服务，不弹浏览器
+chmod +x 启动小麦系统.sh && ./启动小麦系统.sh
 ```
+
+### 手动启动（调试用）
+
+```bash
+# 在仓库根目录
+pip install -r requirements.txt      # 含 lightgbm / reportlab / xlrd / shap
+
+cd wheat-ml
+python -m scripts.run_pipeline       # 首次需要：清洗 821850 行 -> 特征 -> 训练三模型
+python run.py                        # 加 --no-browser 则不弹浏览器
+```
+
+### 换电脑为什么能直接跑
+
+仓库里已提交原始气象 CSV（`data/raw`，41 MB）与特征表、县单产基准、指标报告；
+`weather_clean.csv`（72 MB）与模型 `.joblib`（18 MB）是可重建产物，**不随仓库提交**，
+由启动脚本在首次运行时自动生成。因此：
+
+- 有 MySQL：走库表（更快，`python -m scripts.init_database` 可导入）
+- 没有 MySQL：自动回退 CSV，功能完整，只是少了库查询的便利
+- 没有模型/清洗数据：启动脚本自动重建，指标可复现（R² 0.9430 / 0.9431 / 0.8957）
+
+常见问题：
+
+| 现象 | 处理 |
+|---|---|
+| `pip install` 卡住或超时 | 加国内源：`pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple` |
+| 提示没有 Python | 安装 3.12+，勾选 “Add Python to PATH” |
+| 数据重建报错 | 把窗口报错截图发团队；多为依赖未装全 |
+| 端口 5000 被占用 | 脚本会自动清理；仍失败则关闭旧控制台窗口 |
 
 ## 目录结构
 
 ```text
 人工智能大赛数据集/
 ├─ README.md                     # 本文件
-├─ 启动小麦系统.bat               # 唯一启动入口
+├─ 启动小麦系统.bat / .sh         # 一键启动入口（Windows / macOS·Linux）
 ├─ wheat-ml/                     # 唯一运行项目（Flask + 前端 + 数据 + 模型）
 │  ├─ app.py
 │  ├─ run.py                    # 一键启动器（健康检查 + 自动开浏览器）
@@ -34,7 +71,7 @@ python run.py              # 自动打开默认浏览器
 │  │  │  ├─ county_yield_train.csv
 │  │  │  ├─ weather/             # 18 个市、150 个县的原始气象 CSV
 │  │  │  └─ source_yield/        # 16 个市级产量标签 CSV + 河南省总表
-│  │  ├─ processed/              # weather_clean.csv / feature_table.csv（74MB）
+│  │  ├─ processed/              # feature_table.csv（入库）；weather_clean.csv 首次运行自动生成
 │  │  └─ demo/
 │  ├─ output/                    # models / reports / dashboard
 │  └─ README.md
