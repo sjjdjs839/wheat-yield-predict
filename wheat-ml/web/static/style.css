@@ -1429,3 +1429,57 @@ main{overflow-x:clip}
 }
 
 .ci-note{display:block;margin-top:2px;font-size:12px;line-height:1.55;color:var(--ink-500)}
+
+.act-progress{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.act-progress-txt{font-size:13px;color:var(--ink-600);margin:0}
+.act-progress-txt strong{color:var(--ink-900);font-weight:650}
+
+.act-check{margin-top:12px}
+.act-check-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  border-radius:8px;border:1px solid #d3ddd5;background:#f5f8f5;color:#2f5540;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.act-check-btn:hover{border-color:#a9c2ae;background:#eef5ef}
+.act-check-btn.is-done{background:#1f6b45;border-color:#1f6b45;color:#fff}
+.act-check-btn.is-done:hover{background:#1a5c3b;border-color:#1a5c3b}
+.act-check--sm .act-check-btn{padding:3px 10px;font-size:12px;font-weight:500;margin-top:0}
+.act-card--p0 .act-check-btn{border-color:#e6c9c2}
+
+@media (max-width:620px){
+  .act-progress{align-items:flex-start}
+  .act-check--sm{margin-top:6px}
+  .act-check-btn{width:100%;justify-content:center}
+}
+
+.rk-same{white-space:nowrap}
+.rk-same-main{display:block;font-size:13px;font-weight:600;color:var(--ink-800)}
+.rk-same-main.is-weak{font-weight:500;color:var(--ink-500)}
+.rk-same-sub{display:block;font-size:11.5px;color:var(--ink-500);margin-top:2px;line-height:1.4}
+
+.dash-decision{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line,#e3e7e2)}
+.dd-title{margin:0 0 8px;font-size:13px;font-weight:650;color:var(--ink-800);letter-spacing:.02em}
+.dd-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dd-item{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 12px;border-radius:9px;background:#fafbfa;border:1px solid #eaeeea;
+}
+.dd-item.dd-alert{background:#fdf6f4;border-color:#f0dcd6}
+.dd-item.dd-hot{background:#fdf9f2;border-color:#efe2cd}
+.dd-kind{
+  flex:none;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:6px;
+  background:#eef2ee;color:#3c5a46;
+}
+.dd-item.dd-alert .dd-kind{background:#f6e3dd;color:#8a3a2a}
+.dd-item.dd-hot .dd-kind{background:#f5e8d2;color:#7a5320}
+.dd-county{font-size:14px;color:var(--ink-900)}
+.dd-text{flex:1;min-width:180px;font-size:13px;color:var(--ink-600)}
+.dd-link{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:#1f6b45;text-decoration:none;font-weight:600}
+.dd-link:hover{text-decoration:underline}
+
+@media (max-width:620px){
+  .dd-item{align-items:flex-start}
+  .dd-text{min-width:100%;order:3}
+  .dd-link{order:4}
+}

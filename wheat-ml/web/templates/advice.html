@@ -92,7 +92,12 @@
       <div>
         <h2>本县当期优先处理</h2>
       </div>
-      <p class="block-note">跨生育期按优先级汇总 {{ result.top_actions|length }} 条 P0 / P1 事项</p>
+      <div class="act-progress">
+        <p class="block-note">跨生育期按优先级汇总 {{ result.top_actions|length }} 条 P0 / P1 事项</p>
+        {% if result.done_total %}
+        <p class="act-progress-txt">本期作业已完成 <strong>{{ result.done_count }}/{{ result.done_total }}</strong> 项（{{ result.done_pct }}%）</p>
+        {% endif %}
+      </div>
     </div>
     <ol class="act-queue">
       {% for a in result.top_actions %}
@@ -102,6 +107,16 @@
           <strong>{{ a.title }}</strong>
           <p>{{ a.stage }} · {{ a.window }}</p>
         </div>
+        {% if a.card_key %}
+        <form class="act-check act-check--sm" method="post" action="{{ url_for('advice_check') }}">
+          <input type="hidden" name="county" value="{{ result.county or county }}">
+          <input type="hidden" name="year" value="{{ result.eff_year or year }}">
+          <input type="hidden" name="stage_key" value="{{ a.stage_key }}">
+          <input type="hidden" name="card_key" value="{{ a.card_key }}">
+          <input type="hidden" name="done" value="{{ '0' if a.done else '1' }}">
+          <button type="submit" class="act-check-btn{{ ' is-done' if a.done }}">{{ '已执行' if a.done else '标记执行' }}</button>
+        </form>
+        {% endif %}
       </li>
       {% endfor %}
     </ol>
@@ -119,7 +134,7 @@
   } %}
   {% set extra_keys = ['平均最高温', '平均最低温', '降水日数', '平均相对湿度', '干热风日数', '平均辐射', '平均风速', '大风日数'] %}
 
-  <section class="block-lg">
+  <section class="block-lg" id="stage-cards">
     <div class="block-head" data-reveal>
       <div>
         <h2>五个生育期明细</h2>
@@ -196,6 +211,16 @@
                   {% if c.evidence %}
                   <p class="act-ref">{{ c.evidence }}</p>
                   {% endif %}
+                  <form class="act-check" method="post" action="{{ url_for('advice_check') }}">
+                    <input type="hidden" name="county" value="{{ result.county or county }}">
+                    <input type="hidden" name="year" value="{{ result.eff_year or year }}">
+                    <input type="hidden" name="stage_key" value="{{ s.key }}">
+                    <input type="hidden" name="card_key" value="{{ c.key }}">
+                    <input type="hidden" name="done" value="{{ '0' if c.done else '1' }}">
+                    <button type="submit" class="act-check-btn{{ ' is-done' if c.done }}">
+                      {{ '✓ 已执行，点此撤销' if c.done else '标记为已执行' }}
+                    </button>
+                  </form>
                 </article>
                 {% endfor %}
               </div>

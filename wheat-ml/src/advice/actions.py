@@ -1,4 +1,4 @@
-"""
+﻿"""
 农事决策卡（作业清单）
 ======================
 把「生育期气象统计」翻译成可以直接排产的动作清单，回答四个问题：
@@ -219,6 +219,11 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
             "无明显气象风险，按当地常规做法执行",
             win))
 
+    # 给每张卡一个稳定标识（阶段 key + 生成顺序），供执行勾选持久化。
+    # 注意：规则按现有顺序排列，新增规则请追加到对应分段的末尾，避免已有勾选错位。
+    for i, c in enumerate(cards):
+        c["key"] = f"{key}_{i}"
+
     cards.sort(key=lambda c: _ORDER[c["priority"]])
     return cards[:3]
 
@@ -230,6 +235,7 @@ def top_actions(stages: list[dict], limit: int = 5) -> list[dict]:
         for c in (s.get("cards") or []):
             if c["priority"] in (P0, P1):
                 pool.append({"priority": c["priority"], "priority_label": c["priority_label"],
-                             "stage": s["name"], "title": c["title"], "window": c["window"]})
+                             "stage": s["name"], "title": c["title"], "window": c["window"],
+                             "stage_key": s["key"], "card_key": c.get("key")})
     pool.sort(key=lambda x: _ORDER[x["priority"]])
     return pool[:limit]

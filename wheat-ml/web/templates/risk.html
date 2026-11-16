@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {% set badges = [year ~ ' 年', summary.count ~ ' 个县区', '近 ' ~ summary.year_rank_total ~ ' 年第 ' ~ summary.year_rank ~ ' 重'] %}
@@ -91,6 +91,7 @@
             <th>常年单产</th>
             <th>较常年</th>
             <th>产量预警</th>
+            <th>历史同强度年</th>
           </tr>
         </thead>
         <tbody>
@@ -105,10 +106,21 @@
             <td>{{ x.mean }}</td>
             <td>{% if x.vs_mean is not none %}<span class="rk-vs {{ 'rk-down' if x.vs_mean < 0 else 'rk-up' }}">{{ '+' if x.vs_mean > 0 }}{{ x.vs_mean }}%</span>{% else %}—{% endif %}</td>
             <td>{% if x.alert %}<span class="chip chip--alert"><i class="dot"></i>触发</span>{% else %}<span class="chip chip--ok"><i class="dot"></i>未触发</span>{% endif %}</td>
+            <td class="rk-same">
+              {% if x.same_mean is not none %}
+              <span class="rk-same-main">{{ x.same_n }} 年 · 单产 {{ '+' if x.same_mean > 0 }}{{ x.same_mean }}%</span>
+              <small class="rk-same-sub">区间 {{ x.same_low }}%—{{ x.same_high }}% · {{ x.same_years|join('、') }}</small>
+              {% elif x.same_n %}
+              <span class="rk-same-main is-weak">{{ x.same_n }} 年（样本少）</span>
+              <small class="rk-same-sub">{{ x.same_years|join('、') }}</small>
+              {% else %}
+              <span class="rk-same-main is-weak">无同类年份</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="9" class="rk-empty">当前筛选条件下没有县区。</td></tr>
+          <tr><td colspan="10" class="rk-empty">当前筛选条件下没有县区。</td></tr>
           {% endif %}
         </tbody>
       </table>

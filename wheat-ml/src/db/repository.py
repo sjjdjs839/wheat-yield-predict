@@ -1,4 +1,4 @@
-"""应用层查询接口：县列表、单县逐日气象、年度特征、产量标签与库内统计"""
+﻿"""应用层查询接口：县列表、单县逐日气象、年度特征、产量标签与库内统计"""
 
 import time
 
@@ -181,4 +181,46 @@ def delete_stage(county: str, year: int) -> int:
     conn.commit()
     conn.close()
     return n
+
+
+def ensure_check_table() -> None:
+    """确保作业卡勾选表存在（首次使用时建表）。"""
+    conn = connect()
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS advice_checks (
+                county VARCHAR(64) NOT NULL,
+                year SMALLINT NOT NULL,
+                stage_key VARCHAR(32) NOT NULL,
+                card_key VARCHAR(64) NOT NULL,
+                done TINYINT NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (county, year, stage_key, card_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+    conn.commit()
+    conn.close()
+
+
+def advice_checks(county: str, year: int) -> pd.DataFrame:
+    """某县某年的作业卡勾选记录。"""
+    return _query("""
+        SELECT county, year, stage_key, card_key, done, updated_at
+        FROM advice_checks
+        WHERE county = %s AND year = %s
+    """, (county, int(year)))
+
+
+def upsert_check(row: dict) -> None:
+    """按四元组 upsert 勾选状态。"""
+    conn = connect()
+    sql = ("INSERT INTO advice_checks (county, year, stage_key, card_key, done) "
+           "VALUES (%s, %s, %s, %s, %s) "
+           "ON DUPLICATE KEY UPDATE done = VALUES(done), updated_at = CURRENT_TIMESTAMP")
+    with conn.cursor() as cur:
+        cur.execute(sql, (row["county"], int(row["year"]),
+                          row["stage_key"], row["card_key"], int(row["done"])))
+    conn.commit()
+    conn.close()
 

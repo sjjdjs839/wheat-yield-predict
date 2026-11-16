@@ -35,7 +35,7 @@
   <div class="risk-brief">
     <div class="risk-brief-head">
       <div>
-        <h2>{{ risk.year }} 年全省风险速览</h2>
+        <h2>{{ risk.year }} 年全省风险与决策提示</h2>
         <p>{{ risk.summary.count }} 个有产量基准的县区中，{{ risk.summary.heavy + risk.summary.light }} 个受灌浆期干热风影响；本年严重度为近 {{ risk.summary.year_rank_total }} 年第 {{ risk.summary.year_rank }}。</p>
       </div>
       <a class="btn btn-ghost btn-sm" href="{{ url_for('risk') }}">查看县级风险清单 {{ icon('arrow') }}</a>
@@ -46,6 +46,28 @@
       <div><dt>未受影响</dt><dd>{{ risk.summary.none }}<span>县</span></dd></div>
       <div><dt>最高天数</dt><dd>{{ risk.summary.max_days }}<span>天 · {{ risk.summary.max_county }}</span></dd></div>
     </dl>
+    {% if risk.decision %}
+    <div class="dash-decision">
+      <p class="dd-title">当期该盯的 {{ risk.decision|length }} 件事</p>
+      <ul class="dd-list">
+        {% for d in risk.decision %}
+        {% if d.target == 'predict' %}
+        {% set href = url_for('predict', county=d.county, year=risk.year) %}
+        {% elif d.target == 'advice' %}
+        {% set href = url_for('advice', county=d.county, year=risk.year) %}
+        {% else %}
+        {% set href = url_for('dry_hot') %}
+        {% endif %}
+        <li class="dd-item dd-{{ d.tone }}">
+          <span class="dd-kind">{{ d.kind }}</span>
+          <strong class="dd-county">{{ d.county }}</strong>
+          <span class="dd-text">{{ d.text }}</span>
+          <a class="dd-link" href="{{ href }}">去处理 {{ icon('arrow') }}</a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
     <div class="risk-brief-top">
       <span>重点关注</span>
       {% for x in risk.top[:4] %}<a href="{{ url_for('risk') }}">{{ x.county }} {{ x.days }} 天</a>{% endfor %}

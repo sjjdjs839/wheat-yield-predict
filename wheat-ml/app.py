@@ -28,7 +28,7 @@ from src.data.validate import validate_file, load_weather_file
 from src.data.build_features import build_county, CANONICAL_TO_NASA
 from src.analysis.web_charts import build_web
 from src.advice.agronomy import generate_advice
-from src.advice import stage_store
+from src.advice import stage_store, check_store
 from src.db import repository as repo
 from county_geo_mapping import to_geo_name
 
@@ -810,6 +810,45 @@ def risk_snapshot(year: int) -> dict:
 
     items.sort(key=lambda x: (-x["days"], x["county"]))
 
+    # 历史同强度年对照：同一县里干热风天数落在同一档（0 / 1—2 / ≥3）的历史年份，
+    # 以及这些年份的单产相对该县常年偏了多少。样本少于 3 年不给区间，避免区间退化成一个点。
+    def _band(d: float) -> str:
+        return "none" if (d or 0) < 1 else ("light" if (d or 0) < 3 else "heavy")
+
+    if labels is not None and not labels.empty:
+        lab_map = {(r["county"], int(r["year"])): float(r["wheat_yield"])
+                   for _, r in labels.iterrows()}
+        county_mean_hist = {c: float(g["wheat_yield"].mean()) for c, g in labels.groupby("county")}
+        days_by_county: dict = {}
+        for c, g in feat.groupby("county"):
+            days_by_county[c] = {int(r["year"]): float(r["hot_dry_days"] or 0) for _, r in g.iterrows()}
+
+        for it in items:
+            cur_band = _band(it["days"])
+            hist = days_by_county.get(it["county"], {})
+            same = [y for y, d in hist.items()
+                    if y != year and _band(d) == cur_band and (it["county"], y) in lab_map]
+            it["same_n"] = len(same)
+            it["same_years"] = sorted(same)
+            it["same_mean"] = it["same_low"] = it["same_high"] = None
+            if len(same) >= 3:
+                cm = county_mean_hist.get(it["county"])
+                if cm:
+                    pcts = [(lab_map[(it["county"], y)] / cm - 1) * 100 for y in same]
+                    it["same_mean"] = round(sum(pcts) / len(pcts), 1)
+                    it["same_low"] = round(min(pcts))
+                    it["same_high"] = round(max(pcts))
+
+    # 降水距平入列，供「墒情」类决策提示使用
+    d_fy = feat[feat["year"] == year]
+    d_anom = {}
+    for _, r in d_fy.iterrows():
+        v = r.get("precip_anom")
+        if pd.notna(v):
+            d_anom[r["county"]] = float(v)
+    for it in items:
+        it["precip_anom"] = d_anom.get(it["county"])
+
     # 当年全省干热风总天数在历史年份中的排位（数值越高越严重）
     year_totals = {}
     for y, grp in feat.groupby("year"):
@@ -822,6 +861,57 @@ def risk_snapshot(year: int) -> dict:
     none_ = sum(1 for x in items if x["level"] == "none")
     alerts = sum(1 for x in items if x["alert"])
     preds_ok = [x["pred"] for x in items if x["pred"] is not None]
+
+    # 决策提示：不只给统计，直接回答「先盯哪几个县、盯什么、去哪处理」
+    decision: list = []
+    seen: set = set()
+
+    def _push(kind: str, county: str, text: str, target: str, tone: str = "") -> None:
+        if county in seen or len(decision) >= 3:
+            return
+        seen.add(county)
+        decision.append({"kind": kind, "county": county, "text": text,
+                         "target": target, "tone": tone})
+
+    # ① 产量：有触发预警的取最严重；轻年没有触发时，退给「最接近预警线」的县
+    d_warned = sorted([x for x in items if x["alert"] and x["pred"] and x["mean"]],
+                    key=lambda x: x["pred"] / x["mean"])[:2]
+    if d_warned:
+        for x in d_warned:
+            gap = round(x["pred"] / x["mean"] * 100 - 100, 1)
+            _push("产量预警", x["county"], f"预测 {x['pred']} kg/亩，比常年低 {abs(gap)}%",
+                  "predict", "alert")
+    else:
+        d_near = sorted([x for x in items if x["pred"] and x["mean"]],
+                        key=lambda x: x["pred"] / x["mean"])[:1]
+        for x in d_near:
+            gap = round(x["pred"] / x["mean"] * 100 - 100, 1)
+            thr = round(x["pred"] / (x["mean"] * 0.95) * 100 - 100, 1)
+            gap_txt = ("与常年基本持平" if abs(gap) < 0.15
+                       else f"比常年{'低' if gap < 0 else '高'} {abs(gap)}%")
+            _push("接近预警线", x["county"],
+                  f"预测 {x['pred']} kg/亩，{gap_txt}，距预警线 {abs(thr)}%",
+                  "predict", "alert")
+
+    # ② 干热风：≥3 天优先；没有重度时给 1—2 天的轻度暴露县
+    d_hot = sorted(items, key=lambda x: (-x["days"], x["county"]))
+    d_heavy = [x for x in d_hot if x["days"] >= 3]
+    if d_heavy:
+        _push("干热风", d_heavy[0]["county"],
+              f"{d_heavy[0]['days']} 天（重度），优先备降温补水", "dry_hot", "hot")
+    else:
+        d_mild = [x for x in d_hot if x["days"] >= 1]
+        if d_mild:
+            _push("干热风暴露", d_mild[0]["county"],
+                  f"{d_mild[0]['days']} 天轻度暴露，备好降温补水", "dry_hot", "hot")
+
+    # ③ 墒情：降水距平最负（阈值放宽到 -10%，否则轻年常常为空）
+    for x in sorted([x for x in items if x.get("precip_anom") is not None],
+                    key=lambda x: x["precip_anom"])[:2]:
+        if x["precip_anom"] <= -10:
+            _push("墒情", x["county"],
+                  f"生育期降水比常年少 {abs(round(x['precip_anom']))}%，先查墒情再决定浇不浇",
+                  "advice", "dry")
 
     return {
         "year": year,
@@ -841,6 +931,7 @@ def risk_snapshot(year: int) -> dict:
             "year_rank_total": len(year_totals),
         },
         "top": items[:5],
+        "decision": decision,
     }
 
 
@@ -1416,6 +1507,51 @@ def predict():
                            error=error, source=data_meta["source"])
 
 
+def _apply_checks(result, county: str, fallback_year: int):
+    """把「已执行」勾选注入决策卡，并统计本期作业完成度。"""
+    if not result:
+        return result
+    eff_year = result.get("eff_year") or fallback_year
+    result["eff_year"] = eff_year
+    try:
+        done_map = check_store.load(county, eff_year)
+    except Exception:
+        done_map = {}
+    total = done = 0
+    for s in (result.get("stages") or []):
+        for c in (s.get("cards") or []):
+            total += 1
+            c["stage_key"] = s.get("key")
+            c["done"] = bool(done_map.get((str(s.get("key")), str(c.get("key"))), False))
+            if c["done"]:
+                done += 1
+    for a in (result.get("top_actions") or []):
+        a["done"] = bool(done_map.get((str(a.get("stage_key")), str(a.get("card_key"))), False))
+    result["done_total"] = total
+    result["done_count"] = done
+    result["done_pct"] = round(done / total * 100) if total else 0
+    return result
+
+
+@app.route("/advice/check", methods=["POST"])
+def advice_check():
+    """勾选 / 撤销某张作业卡的执行状态，回到农事建议页。"""
+    county = (request.form.get("county") or "").strip()
+    year = request.form.get("year", type=int)
+    stage_key = (request.form.get("stage_key") or "").strip()
+    card_key = (request.form.get("card_key") or "").strip()
+    done = request.form.get("done") == "1"
+    scope = uploaded_scope()
+    allowed = scope["counties"] if scope else ALL_COUNTIES
+    if not (county and year and stage_key and card_key) or county not in allowed:
+        return redirect(url_for("advice"))
+    try:
+        check_store.toggle(county, year, stage_key, card_key, done)
+    except Exception:
+        pass
+    return redirect(url_for("advice", county=county, year=year) + "#stage-cards")
+
+
 @app.route("/advice")
 def advice():
     scope = uploaded_scope()
@@ -1441,6 +1577,7 @@ def advice():
                                  dry_ref=dry_hot_reference(county))
         result["alert"] = False
         result["feature_note"] = False
+        result = _apply_checks(result, county, year)
         source = f"阶段观测 · 已累积 {len(stage_df)} 天"
         return render_template("advice.html", title="农事建议", active="advice",
                                counties=counties, city_groups=scope_city_groups(scope),
@@ -1472,6 +1609,7 @@ def advice():
     result["feature_note"] = False
     result["eff_year"] = eff_year
     result["year_fallback"] = year_fallback
+    result = _apply_checks(result, county, year)
     return render_template("advice.html", title="农事建议", active="advice",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
