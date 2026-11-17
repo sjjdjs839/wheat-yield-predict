@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('产量地图', '按年份查看县级小麦单产与生育期降水的空间分布；颜色越深数值越高，无记录的区县为浅色留白。', [year ~ ' 年', '县级单元']) }}
+{{ page_head('灾害风险地图', '按年份查看 4 月低温造成的县级减产空间分布；颜色越深减产越重，已剔除全省共同年景，只反映县与县之间的差异。', [year ~ ' 年', '县级单元']) }}
 <div class="container page-content map-page">
   <div class="map-toolbar-panel">
     <div class="filter-panel map-filter">
@@ -16,6 +16,7 @@
       <div class="field">
         <label for="metricSelect">显示指标</label>
         <select id="metricSelect">
+          <option value="disaster" selected>4 月低温预估减产（%）</option>
           <option value="yield">小麦单产（kg/亩）</option>
           <option value="rainfall">生育期降水（mm）</option>
         </select>
@@ -23,7 +24,7 @@
       <button class="btn btn-primary" id="mapUpdate" type="button">更新地图</button>
       <a class="filter-reset" href="{{ url_for('map_view') }}">重置</a>
     </div>
-    <p class="filter-hint">地图支持滚轮缩放与拖拽平移；悬停区县查看具体数值。地图包含有产量标签的城区，气象分析覆盖 {{ footer.counties }} 个县区。</p>
+    <p class="filter-hint">地图支持滚轮缩放与拖拽平移；悬停区县查看具体数值。减产幅度为县距平口径，已扣除该年全省共同年景，因此全省不会是同一个颜色。</p>
   </div>
 
   <div class="map-layout">
@@ -34,7 +35,7 @@
 
     <aside class="map-side">
       <div class="map-side-block">
-        <h2>当前指标最高的 5 个县区</h2>
+        <h2>当前指标最突出的 5 个县区</h2>
         <ol class="map-rank" id="mapTop" aria-live="polite">
           <li class="map-rank-empty">加载中…</li>
         </ol>
@@ -42,9 +43,9 @@
       <div class="map-side-block map-legend-note">
         <h2>读图说明</h2>
         <ul class="map-notes">
-          <li>{{ icon('check') }}颜色深浅表示数值高低，不是产量增减幅度。</li>
+          <li>{{ icon('check') }}灾害指标下，颜色越深表示预估减产越重；单产、降水指标下表示数值越高。</li>
           <li>{{ icon('check') }}浅米色区县表示该年没有对应指标记录。</li>
-          <li>{{ icon('check') }}单产与降水使用不同的顺序色板，切换指标时图例会同步变化。</li>
+          <li>{{ icon('check') }}减产幅度已剔除全省年景，只比较县与县之间；浅米色表示该年该县没有低温记录。</li>
         </ul>
       </div>
     </aside>
@@ -61,11 +62,13 @@
 
   var PALETTES = {
     yield: ['#F3EDDD', '#E7DEC8', '#C9D6B4', '#A9BE8C', '#5B7F3F', '#1D4A2C'],
-    rainfall: ['#FAF6EA', '#E3ECEC', '#C6DBDE', '#9FBFC4', '#5C7E86', '#2F5560']
+    rainfall: ['#FAF6EA', '#E3ECEC', '#C6DBDE', '#9FBFC4', '#5C7E86', '#2F5560'],
+    disaster: ['#F6F2E4', '#F3DCC4', '#E8B98C', '#D98A5C', '#B85C3A', '#8C2F2A']
   };
   var METRIC_LABEL = {
     yield: '小麦单产（kg/亩）',
-    rainfall: '生育期降水（mm）'
+    rainfall: '生育期降水（mm）',
+    disaster: '4 月低温预估减产（%）'
   };
 
   function byId(id) { return document.getElementById(id); }

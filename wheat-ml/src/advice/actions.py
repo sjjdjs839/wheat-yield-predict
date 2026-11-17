@@ -143,6 +143,24 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
                     if own is not None and ye is not None:
                         line += f"，其中全省年景 {ye:.2f}%、本县偏冷再叠加 {own:.2f}%"
                     basis.append(line)
+                    b4 = fr.get("base4")
+                    if b4 is not None:
+                        gap = max(0.0, float(fz4) - float(b4))
+                        if gap > 0.01:
+                            basis.append(
+                                f"防灾空间：本县比常年多 {gap:.1f} 天低温暴露，"
+                                f"若用覆盖、冬灌、熏烟这类措施把超出常年的部分压回去，"
+                                f"按同一弹性折算可少损失约 {gap * 1.96:.1f} 个百分点"
+                            )
+                        else:
+                            basis.append(
+                                "防灾空间：本县 4 月低温没有超出常年水平，"
+                                "减产主要来自全省年景，本地可腾挪的空间有限"
+                            )
+                    basis.append(
+                        "折算是「暴露天数—单产损失」的模型换算，不是措施的实测挽回率；"
+                        "具体能抢回多少要以当地品种与管理条件下的试验为准"
+                    )
                 ev = ("4 月低温是本项目面板回归中唯一稳定的减产因子（干热风六种口径均不显著）。"
                       "该系数为县域平均弹性，地力、品种与灌溉条件不同的地块实际损失会有差异。")
             else:

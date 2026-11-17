@@ -173,6 +173,84 @@
     <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
   </section>
 
+  {% if dose and dose.fz4 %}
+  <section class="block-lg">
+    <div class="block-head">
+      <div>
+        <h2>4 月低温几天开始真正减产</h2>
+      </div>
+      <p class="block-note">剔除县效应与年份效应后的残差分档 · {{ dose.n_total }} 条观测</p>
+    </div>
+    <div id="doseChart" style="width:100%;height:340px"></div>
+    <p class="table-hint">柱高为该档单产相对常年的平均偏离（%），悬停可看样本量与 95% 置信区间。颜色深＝置信区间不跨 0，即统计上确实在减产。</p>
+    <div class="dose-read">
+      <p><strong>0—2 天：</strong>偏离落在 ±1% 以内，属于该县气候常态，不构成实质减产信号。</p>
+      <p><strong>3 天：</strong>偏离跳到 −2.6%，斜率在这里明显变陡——这条线即"该准备防灾"的警戒线。</p>
+      <p><strong>≥5 天：</strong>平均 −7.8%（区间 −3.4% ~ −12.1%），置信区间不跨 0，是唯一统计上站得住的重灾档。</p>
+    </div>
+    <script>
+      (function () {
+        var wrap = document.getElementById('doseChart');
+        if (!wrap || typeof echarts === 'undefined') return;
+        var B = {{ dose.fz4.bands|tojson }};
+        var base = B.length ? B[0].dev_pct : 0;
+        var data = B.map(function (b) {
+          var sig = Math.abs(b.dev_pct - base) > 1.96 * Math.hypot(b.se_pct, B[0].se_pct);
+          return {
+            value: b.dev_pct,
+            itemStyle: { color: sig && b.dev_pct < 0 ? '#1D4A2C' : '#A9BE8C', borderRadius: [3, 3, 0, 0] },
+            ci: [b.dev_pct - 1.96 * b.se_pct, b.dev_pct + 1.96 * b.se_pct],
+            n: b.n
+          };
+        });
+        var chart = echarts.init(wrap);
+        chart.setOption({
+          grid: { left: 54, right: 26, top: 34, bottom: 40 },
+          tooltip: {
+            trigger: 'item',
+            formatter: function (p) {
+              var d = p.data;
+              return '<b>' + p.name + '</b><br/>单产偏离 ' + d.value.toFixed(2) + '%'
+                + '<br/>95% 区间 ' + d.ci[0].toFixed(2) + '% ~ ' + d.ci[1].toFixed(2) + '%'
+                + '<br/>样本 ' + d.n + ' 个县年';
+            }
+          },
+          xAxis: {
+            type: 'category',
+            data: B.map(function (b) { return b.edge; }),
+            axisTick: { show: false },
+            axisLine: { lineStyle: { color: '#d9d5c6' } },
+            axisLabel: { color: '#6b6b5e', fontSize: 12 }
+          },
+          yAxis: {
+            type: 'value',
+            name: '偏离 %',
+            nameTextStyle: { color: '#8a8778', fontSize: 11 },
+            axisLabel: { formatter: '{value}%', color: '#8a8778' },
+            splitLine: { lineStyle: { color: '#efecdf' } }
+          },
+          series: [{
+            type: 'bar',
+            data: data,
+            barWidth: '46%',
+            markLine: {
+              silent: true, symbol: 'none',
+              lineStyle: { color: '#b7b3a4', type: 'dashed', width: 1 },
+              label: { show: false },
+              data: [{ yAxis: 0 }]
+            },
+            label: {
+              show: true, position: 'top', color: '#3f4238', fontSize: 11,
+              formatter: function (p) { return p.value.toFixed(2) + '%'; }
+            }
+          }]
+        });
+        window.addEventListener('resize', function () { chart.resize(); });
+      })();
+    </script>
+  </section>
+  {% endif %}
+
   <p class="chart-note">
     口径说明：晚霜冻 = 4 月逐日最低温 ≤0℃ 的天数；等级衡量低温过程本身的强度（0 天无、1 天轻度、2—3 天中度、≥4 天重度），与"减产多少"是两件事。
     预估影响由双向固定效应面板回归折算（县 + 年固定效应，按县聚类稳健标准误，2010—2024 共 1635 条观测；4 月低温弹性 −1.96%/天，95%CI −2.55%~−1.38%，p&lt;0.001；3 月 −0.57%/天），分两级：

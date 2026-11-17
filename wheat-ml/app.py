@@ -13,6 +13,7 @@
 """
 
 import json
+import re
 import uuid
 import yaml
 import joblib
@@ -660,8 +661,8 @@ def analysis():
 def map_view():
     years = list(BASE_YEARS)
     year_arg = request.args.get("year", type=int)
-    year = year_arg if year_arg in years else years[-1]
-    return render_template("map.html", title="产量地图", active="map", years=years, year=year)
+    year = year_arg if year_arg in years else (2018 if 2018 in years else years[-1])
+    return render_template("map.html", title="灾害风险地图", active="map", years=years, year=year)
 
 
 @app.route("/api/map_data")
@@ -689,6 +690,16 @@ def api_map_data():
             geo_name = to_geo_name(r["county"])
             if geo_name:
                 items.append({"county": geo_name, "value": float(r["wheat_yield"])})
+    elif metric == "disaster":
+        # 4 月低温的县距平减产幅度（已剔除全省年景），值越大减产越重
+        ev = disaster_events_table()
+        if not ev.empty:
+            sub = ev[ev["year"] == year]
+            for _, r in sub.iterrows():
+                geo_name = to_geo_name(r["county"])
+                v = r.get("frost_anom_loss")
+                if geo_name and pd.notna(v):
+                    items.append({"county": geo_name, "value": round(-float(v), 2)})
     else:
         # 降水从feature_table取
         feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
@@ -1005,12 +1016,34 @@ def disaster_events_table():
     return _FROST_CACHE["df"]
 
 
+_DOSE_CACHE = {}
+
+
+def _dose_payload():
+    """剂量响应（4 月低温分档），供灾害预警页展示阈值依据。"""
+    if "d" in _DOSE_CACHE:
+        return _DOSE_CACHE["d"]
+    p = Path(__file__).resolve().parent / "output" / "reports" / "dose_frost.json"
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        d = None
+    _DOSE_CACHE["d"] = d
+    return d
+
+
+def _norm_county(x):
+    """灾害表与配置表县名不统一（'南召县' vs '南召'），比较前去掉行政区后缀。"""
+    return re.sub(r"[县市区旗]$", "", str(x).strip())
+
+
 def frost_reference(county: str, year: int):
     """该县该年的低温画像，供农事决策卡给出可追溯的量化依据。"""
     ev = disaster_events_table()
     if ev.empty:
         return None
-    row = ev[(ev["county"] == county) & (ev["year"] == year)]
+    key = _norm_county(county)
+    row = ev[(ev["county"].map(_norm_county) == key) & (ev["year"] == year)]
     if row.empty:
         return None
     r = row.iloc[0]
@@ -1033,6 +1066,8 @@ def frost_reference(county: str, year: int):
         "frost_own": num("frost_anom_loss"),
         "year_eff": num("year_effect"),
         "cold3_loss": num("cold3_loss"),
+        "base4": num("base4"),
+        "base3": num("base3"),
         "level": r.get("frost_level"),
     }
 
@@ -1125,6 +1160,7 @@ def risk():
                            frost_worst=min([x for x in items if (x["frost_loss"] or 0) < -0.05],
                                            key=lambda x: x["frost_loss"], default=None),
                            last_frost=_last_frost(year),
+                           dose=_dose_payload(),
                            ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100)
 
 
@@ -1490,7 +1526,7 @@ def predict():
     else:
         counties = ALL_COUNTIES
         county_arg = request.args.get("county")
-        county = county_arg if county_arg in counties else ("登封" if "登封" in counties else counties[0])
+        county = county_arg if county_arg in counties else counties[0]
 
     bundle = load_models()
     mm = model_meta()
@@ -1737,7 +1773,7 @@ def advice():
     else:
         counties = ALL_COUNTIES
         county_arg = request.args.get("county")
-        county = county_arg if county_arg in counties else ("登封" if "登封" in counties else counties[0])
+        county = county_arg if county_arg in counties else counties[0]
 
     today_year = datetime.now().year
     years = sorted(set(BASE_YEARS + [today_year - 1, today_year, today_year + 1]))
