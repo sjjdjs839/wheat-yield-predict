@@ -1042,6 +1042,22 @@ def _dose_payload():
     return d
 
 
+_MH_CACHE = {}
+
+
+def _multihazard_payload():
+    """四灾种面板检验结果，供灾害预警页说明"为什么只有晚霜冻折算减产"。"""
+    if "d" in _MH_CACHE:
+        return _MH_CACHE["d"]
+    p = Path(__file__).resolve().parent / "output" / "reports" / "multihazard.json"
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        d = None
+    _MH_CACHE["d"] = d
+    return d
+
+
 def _norm_county(x):
     """灾害表与配置表县名不统一（'南召县' vs '南召'），比较前去掉行政区后缀。"""
     return re.sub(r"[县市区旗]$", "", str(x).strip())
@@ -1171,6 +1187,7 @@ def risk():
                                            key=lambda x: x["frost_loss"], default=None),
                            last_frost=_last_frost(year),
                            dose=_dose_payload(),
+                           mh=_multihazard_payload(),
                            ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100)
 
 
