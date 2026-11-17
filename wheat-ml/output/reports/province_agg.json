@@ -1,0 +1,33 @@
+{
+  "by_year": [
+    {
+      "year": 2022,
+      "counties": 83,
+      "pred_kgmu": 452.2,
+      "obs_kgmu": 456.0,
+      "dev_pct": -0.83
+    },
+    {
+      "year": 2023,
+      "counties": 79,
+      "pred_kgmu": 434.1,
+      "obs_kgmu": 424.4,
+      "dev_pct": 2.28
+    },
+    {
+      "year": 2024,
+      "counties": 79,
+      "pred_kgmu": 444.3,
+      "obs_kgmu": 451.5,
+      "dev_pct": -1.59
+    }
+  ],
+  "total": {
+    "n": 241,
+    "pred_kgmu": 443.7,
+    "obs_kgmu": 444.1,
+    "dev_pct": -0.11
+  },
+  "county_mae": 13.18,
+  "county_mape_median": 2.49
+}
