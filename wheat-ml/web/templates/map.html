@@ -17,6 +17,7 @@
         <label for="metricSelect">显示指标</label>
         <select id="metricSelect">
           <option value="disaster" selected>4 月低温预估减产（%）</option>
+          <option value="frostdays">4 月低温天数（天）</option>
           <option value="yield">小麦单产（kg/亩）</option>
           <option value="rainfall">生育期降水（mm）</option>
         </select>
@@ -63,12 +64,14 @@
   var PALETTES = {
     yield: ['#F3EDDD', '#E7DEC8', '#C9D6B4', '#A9BE8C', '#5B7F3F', '#1D4A2C'],
     rainfall: ['#FAF6EA', '#E3ECEC', '#C6DBDE', '#9FBFC4', '#5C7E86', '#2F5560'],
-    disaster: ['#F6F2E4', '#F3DCC4', '#E8B98C', '#D98A5C', '#B85C3A', '#8C2F2A']
+    disaster: ['#F6F2E4', '#F3DCC4', '#E8B98C', '#D98A5C', '#B85C3A', '#8C2F2A'],
+    frostdays: ['#F7F3E6', '#EFE3C2', '#DFC98A', '#C79E5E', '#A97243', '#7D4A2E']
   };
   var METRIC_LABEL = {
     yield: '小麦单产（kg/亩）',
     rainfall: '生育期降水（mm）',
-    disaster: '4 月低温预估减产（%）'
+    disaster: '4 月低温预估减产（%）',
+    frostdays: '4 月低温天数（天）'
   };
 
   function byId(id) { return document.getElementById(id); }
@@ -80,10 +83,18 @@
     if (info) info.textContent = message;
   }
 
-  function renderRank(items) {
+  function renderRank(items, metric) {
     var list = byId('mapTop');
     if (!list) return;
-    var top = items.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
+    var pool = items;
+    if (metric === 'disaster') {
+      pool = items.filter(function (x) { return x.value > 0.05; });
+      if (!pool.length) {
+        list.innerHTML = '<li class="map-rank-empty">该年没有县出现超出常年的低温减产。</li>';
+        return;
+      }
+    }
+    var top = pool.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
     if (!top.length) {
       list.innerHTML = '<li class="map-rank-empty">该年没有可用数据。</li>';
       return;
@@ -106,8 +117,12 @@
         var items = data.items || [];
         var values = items.map(function (item) { return ({ name: item.county, value: item.value }); });
         var numbers = values.map(function (item) { return item.value; }).filter(function (value) { return typeof value === 'number'; });
-        var max = numbers.length ? Math.max.apply(null, numbers) : 1;
-        var min = numbers.length ? Math.min.apply(null, numbers) : 0;
+        var rawMax = numbers.length ? Math.max.apply(null, numbers) : 1;
+        var rawMin = numbers.length ? Math.min.apply(null, numbers) : 0;
+        // 灾害指标固定从 0 起色：比常年暖、没减产的县压到最浅，否则整省会假性染成深红
+        var max = metric === 'disaster' ? Math.max(3, rawMax)
+                : (metric === 'frostdays' ? Math.max(4, rawMax) : rawMax);
+        var min = (metric === 'disaster' || metric === 'frostdays') ? 0 : rawMin;
 
         if (!chart) {
           chart = echarts.init(byId('map'));
@@ -129,7 +144,8 @@
             textStyle: { color: '#1B241A', fontSize: 12 },
             formatter: function (params) {
               var value = params.value;
-              var text = (typeof value === 'number') ? value.toFixed(1) : '无数据';
+              var text = (typeof value !== 'number') ? '无数据'
+                : (metric === 'frostdays' ? value + ' 天' : value.toFixed(1) + (metric === 'disaster' ? '%' : ''));
               return params.name + '<br>' + METRIC_LABEL[metric] + '：' + text;
             }
           },
@@ -171,11 +187,20 @@
             ? ' 个有产量标签的区县'
             : (metric === 'disaster'
               ? ' 个有产量基准的区县（减产幅度已剔除全省年景）'
-              : ' 个有生育期降水记录的区县');
-          info.textContent = year + ' 年共显示 ' + (data.count || 0) + countLabel +
-            '；指标：' + METRIC_LABEL[metric] + '。';
+              : (metric === 'frostdays'
+                ? ' 个有产量基准的区县，天数为 4 月逐日最低温 ≤0℃ 的累计天数'
+                : ' 个有生育期降水记录的区县'));
+          var noLoss = !numbers.length || Math.max.apply(null, numbers) <= (metric === 'frostdays' ? 0 : 0.05);
+          if ((metric === 'disaster' || metric === 'frostdays') && noLoss) {
+            info.textContent = year + ' 年 4 月没有出现 ≤0℃ 低温，全省未发生晚霜冻，不存在县级减产。';
+          } else if (metric === 'disaster' && (!numbers.length || Math.max.apply(null, numbers) <= 0.05)) {
+            info.textContent = year + ' 年 4 月低温没有造成县级减产：各县低温天数都没有超出常年水平，该年整体属正常偏丰。';
+          } else {
+            info.textContent = year + ' 年共显示 ' + (data.count || 0) + countLabel +
+              '；指标：' + METRIC_LABEL[metric] + '。';
+          }
         }
-        renderRank(items);
+        renderRank(items, metric);
       })
       .catch(function () {
         showFallback('地图数据加载失败，请刷新页面重试。');

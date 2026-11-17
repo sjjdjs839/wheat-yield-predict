@@ -699,7 +699,17 @@ def api_map_data():
                 geo_name = to_geo_name(r["county"])
                 v = r.get("frost_anom_loss")
                 if geo_name and pd.notna(v):
-                    items.append({"county": geo_name, "value": round(-float(v), 2)})
+                    items.append({"county": geo_name, "value": round(max(0.0, -float(v)), 2)})
+    elif metric == "frostdays":
+        # 4 月逐日最低温 ≤0℃ 的天数：暴露强度，与预警页的剂量响应同一口径
+        ev = disaster_events_table()
+        if not ev.empty:
+            sub = ev[ev["year"] == year]
+            for _, r in sub.iterrows():
+                geo_name = to_geo_name(r["county"])
+                v = r.get("fz4_0")
+                if geo_name and pd.notna(v):
+                    items.append({"county": geo_name, "value": int(v)})
     else:
         # 降水从feature_table取
         feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
