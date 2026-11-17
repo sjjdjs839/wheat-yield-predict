@@ -1,0 +1,25 @@
+{
+ "fetched_at": "2026-11-17 16:09:37",
+ "range": [
+  "20261101",
+  "20261114"
+ ],
+ "source": "NASA POWER daily point API (community=AG)",
+ "params": [
+  "T2M_MAX",
+  "T2M_MIN",
+  "T2M",
+  "PRECTOTCORR",
+  "WS2M",
+  "ALLSKY_SFC_SW_DWN",
+  "T2MDEW",
+  "RH2M"
+ ],
+ "counties_total": 151,
+ "ok": 135,
+ "failed": 0,
+ "fail_detail": [],
+ "rows_total": 2114,
+ "rows_dropped_999": 0,
+ "elapsed_sec": 11.3
+}
