@@ -1745,6 +1745,22 @@ def predict():
                            error=error, source=data_meta["source"])
 
 
+def _empty_advice(county: str, year: int) -> dict:
+    """该年尚无任何观测时的空结构：五段全空、无建议卡，让模板正常渲染「待上传」。"""
+    stages = []
+    for st in stage_store.STAGES:
+        stages.append({
+            "key": st["key"], "name": st["name"],
+            "period": f"{st['start']} ~ {st['end']}",
+            "focus": st["focus"], "stats": {}, "flags": ["待上传"],
+            "advice": ["该阶段暂无气象记录，可在上方上传本期观测数据。"],
+            "cards": [], "top_priority": None,
+            "has_data": False, "date_range": "",
+        })
+    return {"county": county, "year": year, "stages": stages,
+            "yield_note": "", "summary": {}, "empty_year": True}
+
+
 def _apply_checks(result, county: str, fallback_year: int):
     """把「已执行」勾选注入决策卡，并统计本期作业完成度。"""
     if not result:
@@ -1800,7 +1816,7 @@ def advice():
     else:
         counties = ALL_COUNTIES
         county_arg = request.args.get("county")
-        county = county_arg if county_arg in counties else counties[0]
+        county = county_arg if county_arg in counties else counties
 
     today_year = datetime.now().year
     years = sorted(set(BASE_YEARS + [today_year - 1, today_year, today_year + 1]))
@@ -1808,53 +1824,56 @@ def advice():
     year = year_arg if year_arg in years else (
         today_year if today_year not in BASE_YEARS else BASE_YEARS[-1])
 
-    # 落地链路：优先使用累积的分阶段观测，按当期气象出建议，不依赖年模型
+    # ---- 该县该年的数据状态：只有「本期观测库」里的数据才算当年实测 ----
     stage_df = stage_store.load(county, year)
-    if not stage_df.empty:
+    counts = stage_store.stage_counts(county, year)
+    has_stage = not stage_df.empty
+    staged_days = len(stage_df)
+
+    data, data_meta = dataset_for_county(county)
+    try:
+        builtin_max = int(data["year"].max()) if not data.empty else 0
+    except Exception:
+        builtin_max = 0
+
+    stage_keys = [s["key"] for s in stage_store.STAGES]
+    stages_complete = all(counts.get(k, 0) > 0 for k in stage_keys)
+    # 历史完整年（有内置数据、且没上传过本期观测）不显示上传入口，避免误导
+    is_history = (bool(year) and year <= builtin_max and not has_stage)
+    upload_needed = (not stages_complete) and (not is_history)
+
+    if has_stage:
+        # 本期观测优先：按累积的当阶段气象出建议
         result = generate_advice(stage_df, county, year,
                                  dry_ref=dry_hot_reference(county),
                                  frost_ref=frost_reference(county, year))
         result["alert"] = False
         result["feature_note"] = False
-        result = _apply_checks(result, county, year)
-        source = f"阶段观测 · 已累积 {len(stage_df)} 天"
-        return render_template("advice.html", title="农事建议", active="advice",
-                               counties=counties, city_groups=scope_city_groups(scope),
-                               county=county, years=years, year=year,
-                               threshold=0, result=result, error=None, source=source)
+        source = f"阶段观测 · 已累积 {staged_days} 天"
+    elif data.empty or (year and year > builtin_max):
+        # 未来年 / 无数据县：不回落到历史年，直接给空壳（五段待上传）
+        result = _empty_advice(county, year)
+        source = "该年尚无观测数据"
+    else:
+        # 历史年：内置全年数据
+        result = generate_advice(data, county, year,
+                                 dry_ref=dry_hot_reference(county),
+                                 frost_ref=frost_reference(county, year))
+        result["alert"] = False
+        result["feature_note"] = False
+        source = data_meta["source"]
 
-    # 回退链路：内置全年数据（旧演示保留）；阶段建议基于气象规则，不展示模型预测横幅
-    data, data_meta = dataset_for_county(county)
-    if data.empty:
-        return render_template("advice.html", title="农事建议", active="advice",
-                               counties=counties, city_groups=scope_city_groups(scope),
-                               county=county, years=years, year=year,
-                               threshold=0, result=None,
-                               source=data_meta["source"],
-                               error="当前数据集中没有该县区的记录。")
-
-    # 当年观测尚未上传时，回退到最近一个完整观测年，避免打开页面全是「待上传」
-    year_fallback = False
-    eff_year = year
-    try:
-        max_year = int(data["year"].max())
-        if year and year > max_year:
-            eff_year, year_fallback = max_year, True
-    except Exception:
-        pass
-    result = generate_advice(data, county, eff_year,
-                             dry_ref=dry_hot_reference(county),
-                             frost_ref=frost_reference(county, eff_year))
-    result["alert"] = False
-    result["feature_note"] = False
-    result["eff_year"] = eff_year
-    result["year_fallback"] = year_fallback
     result = _apply_checks(result, county, year)
     return render_template("advice.html", title="农事建议", active="advice",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
-                           threshold=0, result=result, error=None,
-                           source=data_meta["source"])
+                           threshold=0, result=result, error=None, source=source,
+                           counts=counts, staged_days=staged_days,
+                           upload_needed=upload_needed,
+                           stages_complete=stages_complete,
+                           is_history=is_history,
+                           builtin_max=builtin_max,
+                           stage_defs=stage_store.STAGES)
 
 
 @app.route("/advice/upload_stage", methods=["POST"])
@@ -1887,7 +1906,11 @@ def advice_upload_stage():
 def advice_reset_stage():
     county = (request.args.get("county") or "").strip()
     year = request.args.get("year", type=int)
-    stage_store.reset(county, year)
+    stage = (request.args.get("stage") or "").strip()
+    if stage:
+        stage_store.reset_stage(county, year, stage)
+    else:
+        stage_store.reset(county, year)
     return redirect(url_for("advice", county=county, year=year))
 
 

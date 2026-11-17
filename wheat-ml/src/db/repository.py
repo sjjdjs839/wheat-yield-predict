@@ -171,12 +171,19 @@ def upsert_stage(df: pd.DataFrame) -> int:
     return len(rows)
 
 
-def delete_stage(county: str, year: int) -> int:
-    """删除某县某年的全部阶段观测，返回删除行数。"""
+def delete_stage(county: str, year: int, stage_key: str | None = None) -> int:
+    """删除某县某年阶段观测，返回删除行数；给出 stage_key 时只删该生育期。"""
     conn = connect()
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM stage_observations WHERE county_name = %s AND year = %s",
-                    (county, year))
+        if stage_key:
+            cur.execute(
+                "DELETE FROM stage_observations "
+                "WHERE county_name = %s AND year = %s AND stage_key = %s",
+                (county, year, stage_key))
+        else:
+            cur.execute(
+                "DELETE FROM stage_observations WHERE county_name = %s AND year = %s",
+                (county, year))
         n = cur.rowcount
     conn.commit()
     conn.close()

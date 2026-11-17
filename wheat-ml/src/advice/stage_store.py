@@ -127,3 +127,30 @@ def _csv_reset(county: str, year: int) -> None:
         return
     df = df[~((df["county"] == county) & (df["year"] == year))]
     df.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
+
+def stage_counts(county: str, year: int) -> dict[str, int]:
+    """各生育期已累积天数（键为 stage_key；不含 offseason）。"""
+    df = load(county, year)
+    if df.empty or "stage_key" not in df.columns:
+        return {}
+    return {str(k): int(v) for k, v in df.groupby("stage_key").size().items()}
+
+
+def reset_stage(county: str, year: int, stage_key: str) -> int:
+    """只清空某一生育期的观测，其余阶段保留。"""
+    n = 0
+    if available():
+        try:
+            n = repo.delete_stage(county, year, stage_key=stage_key)
+        except Exception:
+            n = 0
+    _csv_reset_stage(county, year, stage_key)
+    return n
+
+
+def _csv_reset_stage(county: str, year: int, stage_key: str) -> None:
+    df = _read_csv()
+    if df.empty:
+        return
+    keep = ~((df["county"] == county) & (df["year"] == year) & (df["stage_key"] == stage_key))
+    df[keep].to_csv(CSV_PATH, index=False, encoding="utf-8-sig")

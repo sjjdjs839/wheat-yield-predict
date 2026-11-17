@@ -1502,3 +1502,26 @@ main{overflow-x:clip}
   .risk-year-form{flex:1}
   .risk-year-form select{width:100%}
 }
+
+
+/* ---- 农事建议：本期观测管理 ---- */
+.stage-hint { margin: .7rem 0 0; color: #8a8577; font-size: .88rem; }
+.stage-upload-card.is-compact .block-head { margin-bottom: .2rem; }
+.stage-reupload { margin-top: .4rem; }
+.stage-manage-list { display: flex; flex-direction: column; gap: .45rem; }
+.sm-row {
+  display: flex; align-items: center; gap: .9rem;
+  padding: .5rem .95rem; background: #fff;
+  border: 1px solid #e5e0d5; border-radius: 8px;
+}
+.sm-name { min-width: 6.2rem; font-weight: 600; }
+.sm-period { color: #8a8577; font-size: .86rem; min-width: 7.5rem; font-variant-numeric: tabular-nums; }
+.sm-days { font-variant-numeric: tabular-nums; }
+.sm-days.is-zero { color: #b3ad9e; }
+.sm-wait { color: #b3ad9e; font-size: .86rem; }
+.stage-manage-actions { margin-top: .75rem; }
+.stage-head-right .stage-clear {
+  font-size: .78rem; color: #8a8577; text-decoration: none;
+  border: 1px solid #ddd7c9; border-radius: 6px; padding: .08rem .48rem;
+}
+.stage-head-right .stage-clear:hover { color: #2f4f3e; border-color: #2f4f3e; }

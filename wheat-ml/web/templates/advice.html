@@ -2,6 +2,34 @@
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {{ page_head('农事建议', '按生育期把当期气象条件排成可执行的作业清单：依据 → 时间窗 → 优先级 → 不处理的后果；施肥与灌溉剂量需结合地块墒情、品种与土壤测试，本系统不给处方。', [source]) }}
+
+{% macro upload_form(county, city_groups, counties, year, years) %}
+<form class="stage-upload-form" method="post" action="{{ url_for('advice_upload_stage') }}" enctype="multipart/form-data">
+  <div class="field">
+    <label for="u-county">县区</label>
+    <select id="u-county" name="county">
+      {% if city_groups %}
+        {% for city, city_counties in city_groups.items() %}
+        <optgroup label="{{ city }}">
+          {% for c in city_counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+        </optgroup>
+        {% endfor %}
+      {% else %}
+        {% for c in counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
+      {% endif %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="u-year">年份</label>
+    <input id="u-year" name="year" list="year-options" type="number" min="2010" max="{{ years[-1] }}" value="{{ year }}">
+  </div>
+  <div class="field field-file">
+    <label for="u-file">气象文件（CSV / Excel）</label>
+    <input id="u-file" type="file" name="file" accept=".csv,.xlsx,.xls" required>
+  </div>
+  <button class="btn btn-primary" type="submit">上传并累积</button>
+</form>
+{% endmacro %}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法生成</span><p>{{ error }}</p></div>
@@ -35,6 +63,7 @@
     <button class="btn btn-primary" type="submit">生成建议</button>
   </form>
 
+  {% if upload_needed %}
   <section class="block-lg stage-upload-card">
     <div class="block-head" data-reveal>
       <div>
@@ -42,37 +71,64 @@
       </div>
       <p class="block-note">按生育期分批上传，自动识别所属阶段；多次上传累加保留，同日重复上传自动覆盖</p>
     </div>
-    <form class="stage-upload-form" method="post" action="{{ url_for('advice_upload_stage') }}" enctype="multipart/form-data">
-      <div class="field">
-        <label for="u-county">县区</label>
-        <select id="u-county" name="county">
-          {% if city_groups %}
-            {% for city, city_counties in city_groups.items() %}
-            <optgroup label="{{ city }}">
-              {% for c in city_counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
-            </optgroup>
-            {% endfor %}
-          {% else %}
-            {% for c in counties %}<option value="{{ c }}" {{ 'selected' if c == county }}>{{ c }}</option>{% endfor %}
-          {% endif %}
-        </select>
+    {{ upload_form(county, city_groups, counties, year, years) }}
+    {% if not stages_complete %}
+    <p class="stage-hint">尚缺
+      {% for s in stage_defs %}{% if not counts.get(s.key) %}{{ s.name }}{% if not loop.last and stage_defs[loop.index] is defined %}{% if not counts.get(stage_defs[loop.index].key) %}、{% endif %}{% endif %}{% endif %}{% endfor %}
+      的气象记录，补齐后本入口自动收起。
+    </p>
+    {% endif %}
+  </section>
+  {% elif is_history %}
+  <section class="block-lg stage-upload-card is-compact">
+    <div class="block-head" data-reveal>
+      <div>
+        <h2>本期观测</h2>
       </div>
-      <div class="field">
-        <label for="u-year">年份</label>
-        <input id="u-year" name="year" list="year-options" type="number" min="2010" max="{{ years[-1] }}" value="{{ year }}">
+      <p class="block-note">{{ year }} 年为历史完整观测年，系统直接使用内置逐日资料；如需用外部资料覆盖本年，可展开重新上传。</p>
+    </div>
+    <details class="more stage-reupload">
+      <summary>重新上传本年观测</summary>
+      <div class="detail-body">{{ upload_form(county, city_groups, counties, year, years) }}</div>
+    </details>
+  </section>
+  {% endif %}
+
+  {% if staged_days %}
+  <section class="block-lg stage-manage">
+    <div class="block-head" data-reveal>
+      <div>
+        <h2>本期观测管理</h2>
       </div>
-      <div class="field field-file">
-        <label for="u-file">气象文件（CSV / Excel）</label>
-        <input id="u-file" type="file" name="file" accept=".csv,.xlsx,.xls" required>
+      <p class="block-note">已累积 {{ staged_days }} 天{% if counts.get('offseason') %}，其中生育期外 {{ counts.get('offseason') }} 天仅留存、不参与建议{% endif %}</p>
+    </div>
+    <div class="stage-manage-list">
+      {% for s in stage_defs %}
+      <div class="sm-row">
+        <span class="sm-name">{{ s.name }}</span>
+        <span class="sm-period">{{ s.start }} ~ {{ s.end }}</span>
+        <span class="sm-days{{ ' is-zero' if not counts.get(s.key) }}">{{ counts.get(s.key, 0) }} 天</span>
+        {% if counts.get(s.key) %}
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}">清空该阶段</a>
+        {% else %}
+        <span class="sm-wait">待上传</span>
+        {% endif %}
       </div>
-      <button class="btn btn-primary" type="submit">上传并累积</button>
-    </form>
-    <div class="stage-upload-actions">
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year) }}">清空本期观测</a>
+      {% endfor %}
+    </div>
+    <div class="stage-manage-actions">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year) }}">清空全部本期观测</a>
     </div>
   </section>
+  {% endif %}
 
   {% if result %}
+  {% if result.empty_year %}
+  <div class="alert info">
+    <span class="tag">提示</span>
+    <p>{{ year }} 年尚无观测数据，本页不回落历史年。请在上方上传该年各生育期气象观测；上传后按当期条件生成建议，五个生育期齐备后上传入口自动收起。</p>
+  </div>
+  {% endif %}
   {% if result.year_fallback %}
   <div class="alert info">
     <span class="tag">提示</span>
@@ -159,6 +215,9 @@
               <span class="act-pri act-pri--{{ s.top_priority|lower }}">{{ s.top_priority }}·{{ {'P0': '立即', 'P1': '本周', 'P2': '常规'}[s.top_priority] }}</span>
               {% endif %}
               <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
+              {% if s.has_data %}
+              <a class="stage-clear" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}" title="只清空该生育期的观测">清空</a>
+              {% endif %}
             </div>
           </div>
 
