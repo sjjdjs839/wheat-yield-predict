@@ -94,6 +94,20 @@
   </section>
   {% endif %}
 
+  {% if request.args.get('restored') %}
+  <div class="alert info">
+    <span class="tag">已恢复</span>
+    <p>已从清空备份恢复 {{ request.args.get('restored') }} 天观测记录，下方数据已同步刷新。</p>
+  </div>
+  {% endif %}
+  {% if last_reset and last_reset.county == county and last_reset.year == year %}
+  <div class="alert warning stage-undo">
+    <span class="tag">可撤销</span>
+    <p>最近一次清空：{{ last_reset.label }} {{ last_reset.rows }} 天，{{ last_reset.time }}。
+      <a href="{{ url_for('advice_restore_stage', county=county, year=year) }}">撤销并恢复这 {{ last_reset.rows }} 天</a></p>
+  </div>
+  {% endif %}
+
   {% if staged_days %}
   <section class="block-lg stage-manage">
     <div class="block-head" data-reveal>
@@ -109,7 +123,8 @@
         <span class="sm-period">{{ s.start }} ~ {{ s.end }}</span>
         <span class="sm-days{{ ' is-zero' if not counts.get(s.key) }}">{{ counts.get(s.key, 0) }} 天</span>
         {% if counts.get(s.key) %}
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}">清空该阶段</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}"
+           onclick="return confirm('确认清空「{{ s.name }}」已累积的 {{ counts.get(s.key, 0) }} 天观测？\n清空后可在本页「最近一次清空」处一键撤销。')">清空该阶段</a>
         {% else %}
         <span class="sm-wait">待上传</span>
         {% endif %}
@@ -117,7 +132,8 @@
       {% endfor %}
     </div>
     <div class="stage-manage-actions">
-      <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year) }}">清空全部本期观测</a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year) }}"
+         onclick="return confirm('确认清空 {{ year }} 年已累积的全部 {{ staged_days }} 天观测？\n清空后可在本页「最近一次清空」处一键撤销。')">清空全部本期观测</a>
     </div>
   </section>
   {% endif %}
@@ -216,7 +232,9 @@
               {% endif %}
               <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
               {% if s.has_data %}
-              <a class="stage-clear" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}" title="只清空该生育期的观测">清空</a>
+              <a class="stage-clear" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}"
+                 title="只清空该生育期的观测"
+                 onclick="return confirm('确认清空「{{ s.name }}」的 {{ s.stats.days if s.stats else 0 }} 天观测？\n清空后可在本页「最近一次清空」处一键撤销。')">清空</a>
               {% endif %}
             </div>
           </div>

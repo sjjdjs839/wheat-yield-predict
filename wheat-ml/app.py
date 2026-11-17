@@ -1872,7 +1872,8 @@ def advice():
                            stages_complete=stages_complete,
                            is_history=is_history,
                            builtin_max=builtin_max,
-                           stage_defs=stage_store.STAGES)
+                           stage_defs=stage_store.STAGES,
+                           last_reset=stage_store.last_snapshot())
 
 
 @app.route("/advice/upload_stage", methods=["POST"])
@@ -1911,6 +1912,19 @@ def advice_reset_stage():
     else:
         stage_store.reset(county, year)
     return redirect(url_for("advice", county=county, year=year))
+
+
+@app.route("/advice/restore_stage")
+def advice_restore_stage():
+    """撤销最近一次清空：把备份快照写回观测库。"""
+    info = stage_store.undo_last()
+    county = (request.args.get("county") or (info or {}).get("county") or "").strip()
+    year = request.args.get("year", type=int) or (info or {}).get("year")
+    if not info:
+        return redirect(url_for("advice", county=county, year=year,
+                                stage_error="没有可撤销的清空记录。"))
+    return redirect(url_for("advice", county=county, year=year,
+                            restored=info.get("rows", 0)))
 
 
 @app.route("/api/feature_importance")

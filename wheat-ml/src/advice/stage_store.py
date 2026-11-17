@@ -7,8 +7,10 @@
 - 存储链路：MySQL 优先；库不可用、表缺失或写入异常时自动回退本地 CSV。
 """
 
+import json
 import yaml
 import pandas as pd
+from datetime import datetime
 from pathlib import Path
 
 from src.db import repository as repo
@@ -78,6 +80,7 @@ def load(county: str, year: int) -> pd.DataFrame:
 
 def reset(county: str, year: int) -> int:
     """清空某县某年累积观测（MySQL + CSV 双清），返回 MySQL 删除行数。"""
+    _safe_snapshot(county, year, "all")
     n = 0
     if available():
         try:
@@ -138,6 +141,7 @@ def stage_counts(county: str, year: int) -> dict[str, int]:
 
 def reset_stage(county: str, year: int, stage_key: str) -> int:
     """只清空某一生育期的观测，其余阶段保留。"""
+    _safe_snapshot(county, year, stage_key)
     n = 0
     if available():
         try:
@@ -154,3 +158,88 @@ def _csv_reset_stage(county: str, year: int, stage_key: str) -> None:
         return
     keep = ~((df["county"] == county) & (df["year"] == year) & (df["stage_key"] == stage_key))
     df[keep].to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
+
+
+# ------------------------- 清空回收站 -------------------------
+# 清空属于不可逆操作，演示时误点代价高。这里在删除前把待删记录快照一份，
+# 并记录"最近一次清空"，页面上可一键撤销。
+
+RECYCLE_DIR = PROJECT_ROOT / "web" / "uploads" / "_recycle"
+LAST_PATH = RECYCLE_DIR / "last.json"
+SNAP_COLS = ["county", "year", "date", "stage_key"] + list(STAGE_WEATHER)
+
+
+def _stage_label(tag: str) -> str:
+    if tag == "all":
+        return "全部生育期"
+    for st in STAGES:
+        if st["key"] == tag:
+            return st["name"]
+    return tag
+
+
+def _safe_snapshot(county: str, year: int, tag: str):
+    """删除前快照待删记录；无数据时返回 None，不阻断清空。"""
+    try:
+        df = load(county, year)
+    except Exception:
+        return None
+    if df is None or df.empty:
+        return None
+    if tag and tag != "all":
+        df = df[df["stage_key"] == tag]
+        if df.empty:
+            return None
+    keep = [c for c in SNAP_COLS if c in df.columns]
+    snap = df[keep].copy()
+    snap["date"] = pd.to_datetime(snap["date"]).dt.strftime("%Y-%m-%d")
+    RECYCLE_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = RECYCLE_DIR / (county + "_" + str(year) + "_" + (tag or "all") + "_" + ts + ".csv")
+    snap.to_csv(path, index=False, encoding="utf-8-sig")
+    info = {
+        "county": county, "year": int(year), "stage": tag or "all",
+        "label": _stage_label(tag or "all"), "rows": int(len(snap)),
+        "path": str(path), "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    LAST_PATH.write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
+    return info
+
+
+def last_snapshot():
+    """最近一次清空的备份信息；备份文件不在则返回 None。"""
+    try:
+        if not LAST_PATH.exists():
+            return None
+        info = json.loads(LAST_PATH.read_text(encoding="utf-8"))
+        if not Path(info.get("path", "")).exists():
+            return None
+        return info
+    except Exception:
+        return None
+
+
+def undo_last():
+    """把最近一次清空的观测写回；返回备份信息，失败返回 None。"""
+    info = last_snapshot()
+    if not info:
+        return None
+    try:
+        df = pd.read_csv(info["path"])
+        df["date"] = pd.to_datetime(df["date"])
+        df["year"] = pd.to_numeric(df["year"], errors="coerce").astype("Int64")
+        df["stage_key"] = [classify_stage(pd.Timestamp(d).strftime("%m-%d")) for d in df["date"]]
+        for c in STAGE_WEATHER:
+            if c not in df.columns:
+                df[c] = None
+        if available():
+            try:
+                repo.upsert_stage(df)
+            except Exception:
+                _csv_upsert(df)
+        else:
+            _csv_upsert(df)
+        LAST_PATH.unlink(missing_ok=True)
+        return info
+    except Exception:
+        return None
