@@ -201,9 +201,15 @@ def main():
     ap.add_argument("--city", nargs="*", default=None, help="只拉指定城市")
     ap.add_argument("--workers", type=int, default=3, help="并发数（默认 3）")
     ap.add_argument("--list", action="store_true", help="只列出将拉取的县，不发请求")
+    ap.add_argument("--out", type=str, default=None,
+                    help="输出目录（默认 data/raw/weather_recent）")
     ap.add_argument("--retry-failed", action="store_true",
                     help="只重跑上次失败的县，并沿用上次的日期区间")
     args = ap.parse_args()
+
+    global OUT_DIR
+    if args.out:
+        OUT_DIR = Path(args.out).resolve()
 
     counties = load_counties()
     centers = load_centers()
