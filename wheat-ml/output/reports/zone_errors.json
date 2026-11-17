@@ -1,0 +1,37 @@
+{
+  "A 稳产核心区": {
+    "counties": 18,
+    "n": 54,
+    "mae": 13.87,
+    "mape_median": 2.25,
+    "bias": 7.46
+  },
+  "B 高产风险区": {
+    "counties": 37,
+    "n": 111,
+    "mae": 12.74,
+    "mape_median": 2.08,
+    "bias": -0.88
+  },
+  "C 潜力提升区": {
+    "counties": 35,
+    "n": 105,
+    "mae": 13.8,
+    "mape_median": 3.49,
+    "bias": 1.92
+  },
+  "D 脆弱敏感区": {
+    "counties": 20,
+    "n": 60,
+    "mae": 18.31,
+    "mape_median": 4.13,
+    "bias": -12.54
+  },
+  "_all": {
+    "counties": 110,
+    "n": 330,
+    "mae": 14.27,
+    "mape_median": 2.65,
+    "bias": -0.75
+  }
+}

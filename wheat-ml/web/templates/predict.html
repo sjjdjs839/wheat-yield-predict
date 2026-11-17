@@ -62,7 +62,7 @@
           <p class="result-kicker">{{ result.county }} · {{ result.year }} 年</p>
           <div class="result-value">{{ result.pred }}<small>kg/亩</small></div>
           <p class="result-sub">该县多年平均 {{ result.mean_yield }} kg/亩</p>
-          <p class="result-ci">预测波动范围 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩（按测试集 MAE {{ result.mae }} 的 ±0.8 倍估算）</p>
+          <p class="result-ci">误差量级 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩<span class="ci-note">按测试集 MAE {{ result.mae }} 的 ±0.8 倍估算，测试集上约覆盖一半样本；这是误差量级，不是统计置信区间</span></p>
           {% if result.prob_below is not none %}
           <p class="result-ci">
             产量预警概率 <strong>{{ result.prob_below }}%</strong>
@@ -87,7 +87,7 @@
               <span><i class="legend-dot"></i>预测值 {{ result.pred }}</span>
               <span><i class="legend-line"></i>预警线 {{ result.threshold }}</span>
               <span><i class="legend-mean"></i>多年平均 {{ result.mean_yield }}</span>
-              <span><i class="legend-band"></i>波动范围 {{ result.pred_low }}—{{ result.pred_high }}</span>
+              <span><i class="legend-band"></i>误差量级 {{ result.pred_low }}—{{ result.pred_high }}</span>
             </div>
           </div>
         </div>
