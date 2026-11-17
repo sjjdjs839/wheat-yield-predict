@@ -2,7 +2,7 @@
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {% set badges = ['CSV / XLSX / XLS', '单文件 ≤ ' ~ max_size ~ ' MB'] %}
-{{ page_head('数据上传', '上传逐日气象 CSV / Excel，自动识别中英文字段并校验缺失与异常，通过后立即用于分析、预测与农事建议。', badges) }}
+{{ page_head('数据诊断', '上传一份县区级逐日气象，系统先校验字段与异常，再识别其中的灾害过程（霜冻、干热风、高温、暴雨），给出减产量级与当期建议。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">上传失败</span><p>{{ error }}</p></div>
@@ -11,11 +11,11 @@
   {% if report %}
   <div class="upload-feedback {{ 'is-ok' if report.ok else 'is-error' }}" role="status">
     <div>
-      <strong>{{ '校验通过，当前数据集已更新' if report.ok else '校验未通过，请核对问题' }}</strong>
+      <strong>{{ '校验通过，已生成诊断结果' if report.ok else '校验未通过，请核对问题' }}</strong>
       {% if report.ok %}
       <p>{{ report.summary.get('rows', '—') }} 行 · {{ report.summary.get('year_range', '—') }} · {{ report.summary.get('date_range', '—') }}</p>
       {% else %}
-      <p>发现 {{ report.issues|length }} 个问题，下方校验结果里有逐条说明；当前数据不会被替换。</p>
+      <p>发现 {{ report.issues|length }} 个问题，下方校验结果里有逐条说明；本次数据不会进入诊断。</p>
       {% endif %}
     </div>
     <div class="upload-feedback-actions">
@@ -29,10 +29,81 @@
   </div>
   {% endif %}
 
+  {% if diag %}
+  {% if diag.empty %}
+  <div class="alert warning">
+    <span class="tag">未生成诊断</span>
+    <p>{{ diag.error or '未填写地区名称，系统无法定位到具体县区，只做了字段校验。填写地区名称后可生成灾害诊断。' }}</p>
+  </div>
+  {% else %}
+  <section class="block-lg" id="diagnose">
+    <div class="block-head">
+      <div>
+        <h2>本次数据诊断</h2>
+      </div>
+      <p class="block-note">{{ diag.county }} · {{ diag.year }} 年 · 覆盖 {{ diag.days }} 天（{{ diag.month_span }}）</p>
+    </div>
+
+    <div class="alert {{ 'error' if diag.loss and diag.loss.sig else ('warning' if diag.events else 'ok') }}">
+      <span class="tag">结论</span>
+      <p>{{ diag.verdict }}</p>
+    </div>
+
+    {% if diag.events %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>灾害过程</th><th>天数</th><th>发生日期</th><th>产量影响</th></tr></thead>
+        <tbody>
+          {% for e in diag.events %}
+          <tr>
+            <td><strong>{{ e.label }}</strong></td>
+            <td>{{ e.days }} 天</td>
+            <td>{{ e.dates|join('、') }}</td>
+            <td>
+              {% if e.loss_mid is not none %}
+              <strong>{{ '%+.2f'|format(e.loss_mid) }}%</strong><small>（n={{ e.loss_n }}）</small>
+              {% else %}只报暴露强度，不折算{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="chart-note">减产只对通过回归验证的灾种给出；未达显著性的灾种只报天数。判定口径与建模一致，避免夸大。</p>
+    {% endif %}
+
+    {% if diag.stages %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>生育期</th><th>窗口</th><th>本段天数</th><th>命中灾害</th></tr></thead>
+        <tbody>
+          {% for s in diag.stages %}
+          <tr>
+            <td>{{ s.name }}</td>
+            <td>{{ s.period }}</td>
+            <td>{{ s.days }} 天</td>
+            <td>{{ s.events|join('、') if s.events else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <div class="dataset-actions">
+      {% if diag.saved_to_advice %}
+      <a class="btn btn-primary btn-sm" href="{{ advice_url }}">查看农事建议 {{ icon('arrow', 'btn-arrow') }}</a>
+      {% endif %}
+      <a class="btn btn-ghost btn-sm" href="#validation-report">校验详情</a>
+    </div>
+  </section>
+  {% endif %}
+  {% endif %}
+
   {% if not dataset %}
   <div class="alert ok">
     <span class="tag">内置数据集</span>
-    <p>当前未使用上传数据，分析、预测与建议读取项目内置的清洗后数据。上传并通过校验后，全站会自动切换到新数据。</p>
+    <p>当前分析、地图与预测读取项目内置的清洗后数据。上传数据默认只做诊断并写入当期观测，不替换全站数据集；需要替换时在上传时勾选对应选项。</p>
   </div>
   {% endif %}
 
@@ -45,13 +116,13 @@
         </picture>
         <figcaption class="upload-photo-caption">
           <strong>逐日气象数据</strong>
-          <span>校验通过后自动进入分析、预测与生育期建议。</span>
+          <span>校验通过后自动识别灾害过程，并进入生育期建议。</span>
         </figcaption>
       </figure>
       <div class="upload-rules">
         <div class="upload-rule">{{ icon('check') }}<span>字段口径：年份 + 日序（1—366）或完整日期（YYYY-MM-DD），两种不可混用。</span></div>
         <div class="upload-rule">{{ icon('check') }}<span>缺失值请留空，不要填 0；短波辐射若为 W/m² 会自动换算为 MJ/m²/day。</span></div>
-        <div class="upload-rule">{{ icon('check') }}<span>自动识别中英文字段，检查缺失、重复与异常值，校验通过后才替换当前数据集。</span></div>
+        <div class="upload-rule">{{ icon('check') }}<span>自动识别中英文字段，检查缺失、重复与异常值；通过后识别灾害过程并给出减产量级与当期建议。</span></div>
       </div>
     </aside>
 
@@ -73,9 +144,13 @@
               {% for c in counties %}<option value="{{ c }}"></option>{% endfor %}
             </datalist>
           </div>
-          <button class="btn btn-primary" id="upload-submit" type="submit">上传并校验</button>
+          <button class="btn btn-primary" id="upload-submit" type="submit">上传并诊断</button>
         </div>
-        <p class="upload-note">上传新文件并通过校验后，会自动替换当前数据集；恢复内置数据可在下方操作。</p>
+        <label class="upload-rule" style="margin-top:10px">
+          <input type="checkbox" name="use_as_dataset" value="1">
+          <span>同时设为全站数据集（分析 / 地图 / 预测将改用这份数据，单县数据会让全省视图只剩该县）</span>
+        </label>
+        <p class="upload-note">默认只做诊断并把当期观测写入农事建议，不替换全站数据；恢复内置数据可在下方操作。</p>
       </form>
     </div>
   </div>

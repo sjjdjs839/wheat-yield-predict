@@ -30,6 +30,7 @@ from src.data.build_features import build_county, CANONICAL_TO_NASA
 from src.analysis.web_charts import build_web
 from src.advice.agronomy import generate_advice
 from src.advice import stage_store, check_store
+from src.advice.diagnose import diagnose as run_diagnose
 from src.db import repository as repo
 from county_geo_mapping import to_geo_name
 
@@ -548,7 +549,7 @@ def index():
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
-    report, error = None, None
+    report, error, diag = None, None, None
     if request.method == "POST":
         f = request.files.get("file")
         county = (request.form.get("county") or "").strip()
@@ -564,12 +565,34 @@ def upload():
                 f.save(saved)
                 report = validate_file(saved)
                 if report["ok"]:
-                    LATEST.write_text(json.dumps({
-                        "path": str(saved.relative_to(PROJECT_ROOT)),
-                        "filename": f.filename,
-                        "county": county or None,
-                        "summary": report["summary"],
-                    }, ensure_ascii=False), encoding="utf-8")
+                    # 诊断优先：一份原始气象进，出灾害清单 + 减产评估（可选入库出建议）
+                    if county:
+                        try:
+                            df_up, _ = load_weather_file(saved, county, stage_mode=True)
+                            if df_up is not None and not df_up.empty:
+                                up_year = int(df_up["year"].max())
+                                diag = run_diagnose(df_up, county, up_year)
+                                diag["county"] = county
+                                diag["year"] = up_year
+                                # 当期/未来年写入阶段观测库，农事建议页立刻可用；
+                                # 历史年只诊断不写库，避免覆盖内置年份的语义
+                                if up_year > max(BASE_YEARS):
+                                    stage_store.upsert(county, up_year, df_up)
+                                    diag["saved_to_advice"] = True
+                        except Exception as exc:
+                            diag = {"empty": True, "county": county, "year": None, "days": 0,
+                                    "events": [], "stages": [], "loss": None,
+                                    "month_span": "", "verdict": "",
+                                    "error": "诊断未能完成：" + str(exc)[:80]}
+                    if request.form.get("use_as_dataset"):
+                        LATEST.write_text(json.dumps({
+                            "path": str(saved.relative_to(PROJECT_ROOT)),
+                            "filename": f.filename,
+                            "county": county or None,
+                            "summary": report["summary"],
+                        }, ensure_ascii=False), encoding="utf-8")
+                    else:
+                        saved.unlink(missing_ok=True)
                 else:
                     saved.unlink(missing_ok=True)
     meta = None
@@ -590,10 +613,15 @@ def upload():
         analysis_url = url_for("analysis", **params)
         predict_url = url_for("predict", **params)
 
-    return render_template("upload.html", title="数据上传", active="upload",
-                           report=report, error=error, dataset=meta,
+    advice_url = url_for("advice")
+    if diag and diag.get("county"):
+        advice_url = url_for("advice", county=diag.get("county"),
+                             year=diag.get("year") if diag.get("year") else None)
+    return render_template("upload.html", title="数据诊断", active="upload",
+                           report=report, error=error, dataset=meta, diag=diag,
                            counties=ALL_COUNTIES, max_size=CONFIG["upload"]["max_size_mb"],
-                           analysis_url=analysis_url, predict_url=predict_url)
+                           analysis_url=analysis_url, predict_url=predict_url,
+                           advice_url=advice_url)
 
 
 @app.route("/reset_dataset")

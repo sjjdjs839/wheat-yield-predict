@@ -304,9 +304,9 @@ def _check_constraints(df: pd.DataFrame, issues: list, stage_mode: bool = False)
         lo_y, hi_y = UP["year_min"], UP["year_max"]
         out_y = df["year"].notna() & ((df["year"] < lo_y) | (df["year"] > hi_y))
         if int(out_y.sum()):
-            issues.append({"level": "warning", "field": "年份",
-                           "title": f"{int(out_y.sum())} 行年份不在 {lo_y}—{hi_y}",
-                           "detail": "方案要求 2010—2024 年历史气象数据。"})
+            issues.append({"level": "info", "field": "年份",
+                           "title": f"{int(out_y.sum())} 行年份不在 {lo_y}—{hi_y}，按扩展年处理",
+                           "detail": "扩展年数据参与灾害诊断与当期建议，不参与 2010—2024 历史建模。"})
 
     # 8) 闰年 2 月 29 日
     if "date" in df.columns and df["date"].notna().any():
@@ -324,11 +324,12 @@ def _check_constraints(df: pd.DataFrame, issues: list, stage_mode: bool = False)
         counts = df.groupby("year").size()
         thin = counts[counts < UP["min_days_per_year"]]
         if len(thin):
-            issues.append({"level": "warning", "field": "记录完整度",
+            issues.append({"level": "info", "field": "记录完整度",
                            "title": f"{len(thin)} 个年份记录不足 "
-                                    f"{UP['min_days_per_year']} 天",
+                                    f"{UP['min_days_per_year']} 天，按当期数据使用",
                            "detail": "、".join(f"{int(y)}年{int(c)}天"
-                                              for y, c in thin.items())})
+                                              for y, c in thin.items())
+                                     + "；不足整年的数据只做当期诊断与建议，不参与年度特征建模。"})
 
     return df
 
