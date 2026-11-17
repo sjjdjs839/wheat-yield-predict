@@ -143,7 +143,8 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
                     predicted_yield: float | None = None,
                     threshold: float | None = None,
                     today: date | None = None,
-                    dry_ref: dict | None = None) -> dict:
+                    dry_ref: dict | None = None,
+                    frost_ref: dict | None = None) -> dict:
     """
     生成某县某年的生育期建议
     Returns: {"county","year","stages":[...],"yield_note","summary"}
@@ -178,7 +179,7 @@ def generate_advice(weather: pd.DataFrame, county: str, year: int,
         if has_data:
             cards = build_cards(st["key"], stats, climate.get(st["key"], {}),
                                 st["end"], today_md, year, cur_year,
-                                view=st["name"], dry_ref=dry_ref)
+                                view=st["name"], dry_ref=dry_ref, frost_ref=frost_ref)
         stages.append({
             "key": st["key"], "name": st["name"],
             "period": f"{st['start']} ~ {st['end']}",

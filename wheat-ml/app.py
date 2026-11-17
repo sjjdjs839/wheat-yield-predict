@@ -1005,6 +1005,36 @@ def disaster_events_table():
     return _FROST_CACHE["df"]
 
 
+def frost_reference(county: str, year: int):
+    """该县该年的低温画像，供农事决策卡给出可追溯的量化依据。"""
+    ev = disaster_events_table()
+    if ev.empty:
+        return None
+    row = ev[(ev["county"] == county) & (ev["year"] == year)]
+    if row.empty:
+        return None
+    r = row.iloc[0]
+
+    def num(k):
+        v = r.get(k)
+        try:
+            return None if pd.isna(v) else float(v)
+        except Exception:
+            return None
+
+    return {
+        "fz3": num("fz3_0"),
+        "fz3_anom": num("fz3_anom"),
+        "fz4": num("fz4_0"),
+        "tmin4": num("tmin4"),
+        "frost_loss": num("frost_loss"),
+        "frost_low": num("frost_loss_low"),
+        "frost_high": num("frost_loss_high"),
+        "cold3_loss": num("cold3_loss"),
+        "level": r.get("frost_level"),
+    }
+
+
 def _frost_attach(items, year):
     """给风险清单注入晚霜冻字段；表缺失时给空值，页面不会崩。"""
     ev = disaster_events_table()
@@ -1473,7 +1503,7 @@ def predict():
     metrics_lr = read_metrics("lr")
 
     if bundle is None or bundle[0] is None:
-        return render_template("predict.html", title="产量预测", active="predict",
+        return render_template("predict.html", title="情景仿真", active="predict",
                                counties=counties, city_groups=scope_city_groups(scope),
                                county=county, years=years, year=year,
                                threshold=0, threshold_max=None, threshold_note=None,
@@ -1633,7 +1663,7 @@ def predict():
                 },
             }
 
-    return render_template("predict.html", title="产量预测", active="predict",
+    return render_template("predict.html", title="情景仿真", active="predict",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
                            threshold=round(threshold, 1),
@@ -1713,7 +1743,8 @@ def advice():
     stage_df = stage_store.load(county, year)
     if not stage_df.empty:
         result = generate_advice(stage_df, county, year,
-                                 dry_ref=dry_hot_reference(county))
+                                 dry_ref=dry_hot_reference(county),
+                                 frost_ref=frost_reference(county, year))
         result["alert"] = False
         result["feature_note"] = False
         result = _apply_checks(result, county, year)
@@ -1743,7 +1774,8 @@ def advice():
     except Exception:
         pass
     result = generate_advice(data, county, eff_year,
-                             dry_ref=dry_hot_reference(county))
+                             dry_ref=dry_hot_reference(county),
+                             frost_ref=frost_reference(county, eff_year))
     result["alert"] = False
     result["feature_note"] = False
     result["eff_year"] = eff_year
