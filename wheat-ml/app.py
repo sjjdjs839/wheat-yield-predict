@@ -1027,9 +1027,11 @@ def frost_reference(county: str, year: int):
         "fz3_anom": num("fz3_anom"),
         "fz4": num("fz4_0"),
         "tmin4": num("tmin4"),
-        "frost_loss": num("frost_loss"),
-        "frost_low": num("frost_loss_low"),
-        "frost_high": num("frost_loss_high"),
+        "frost_loss": num("total_loss"),
+        "frost_low": num("total_low"),
+        "frost_high": num("total_high"),
+        "frost_own": num("frost_anom_loss"),
+        "year_eff": num("year_effect"),
         "cold3_loss": num("cold3_loss"),
         "level": r.get("frost_level"),
     }
@@ -1041,6 +1043,7 @@ def _frost_attach(items, year):
     empty = {"fz4": None, "fz4_streak": None, "tmin4": None, "frost_level": 0,
              "frost_text": "无记录", "frost_note": "无灾害事件表",
              "frost_loss": None, "frost_low": None, "frost_high": None,
+             "frost_own": None, "year_eff": None, "base4": None,
              "fz3": None, "fz3_anom": None, "cold3_loss": None}
     if ev.empty or "year" not in ev.columns:
         for it in items:
@@ -1060,9 +1063,12 @@ def _frost_attach(items, year):
         it["frost_level"] = lv
         it["frost_text"] = FROST_TEXT[lv]
         it["frost_note"] = FROST_NOTE[lv]
-        it["frost_loss"] = float(r["frost_loss"]) if pd.notna(r["frost_loss"]) else None
-        it["frost_low"] = float(r["frost_loss_low"]) if pd.notna(r["frost_loss_low"]) else None
-        it["frost_high"] = float(r["frost_loss_high"]) if pd.notna(r["frost_loss_high"]) else None
+        it["frost_loss"] = float(r["total_loss"]) if pd.notna(r["total_loss"]) else None
+        it["frost_low"] = float(r["total_low"]) if pd.notna(r["total_low"]) else None
+        it["frost_high"] = float(r["total_high"]) if pd.notna(r["total_high"]) else None
+        it["frost_own"] = float(r["frost_anom_loss"]) if pd.notna(r["frost_anom_loss"]) else None
+        it["year_eff"] = float(r["year_effect"]) if pd.notna(r["year_effect"]) else None
+        it["base4"] = float(r["base4"]) if pd.notna(r["base4"]) else None
         it["fz3"] = int(r["fz3_0"]) if pd.notna(r["fz3_0"]) else None
         it["fz3_anom"] = float(r["fz3_anom"]) if pd.notna(r["fz3_anom"]) else None
         it["cold3_loss"] = float(r["cold3_loss"]) if pd.notna(r["cold3_loss"]) else None

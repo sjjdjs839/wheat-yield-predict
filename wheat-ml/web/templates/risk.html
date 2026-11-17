@@ -37,9 +37,9 @@
   <div class="alert warning risk-focus">
     <span class="tag">重点关注</span>
     <p>
-      <strong>{{ frost_worst.county }}</strong>（{{ frost_worst.city }}）4 月出现 <strong>{{ frost_worst.fz4 }} 天</strong>最低温 ≤0℃{% if frost_worst.tmin4 is not none %}，最低 {{ frost_worst.tmin4 }}℃{% endif %}；按双向固定效应弹性（−1.96%/天）折算，相对无霜冻情景预计影响 <strong>{{ frost_worst.frost_loss }}%</strong>
-      {% if frost_worst.frost_low is not none %}（区间 {{ frost_worst.frost_low }}% ~ {{ frost_worst.frost_high }}%）{% endif %}。
-      {% if frost_n > 1 %}{% set others = items[1:4] %}{% if others %}另有 {% for x in others %}{{ x.county }}（{{ x.fz4 }} 天）{% if not loop.last %}、{% endif %}{% endfor %} 等县区同期受低温影响。{% endif %}{% endif %}
+      <strong>{{ frost_worst.county }}</strong>（{{ frost_worst.city }}）4 月出现 <strong>{{ frost_worst.fz4 }} 天</strong>最低温 ≤0℃{% if frost_worst.tmin4 is not none %}，最低 {{ frost_worst.tmin4 }}℃{% endif %}；按双向固定效应弹性（−1.96%/天）折算，相对该县常年预计影响 <strong>{{ frost_worst.frost_loss }}%</strong>
+      {% if frost_worst.frost_low is not none %}（区间 {{ frost_worst.frost_low }}% ~ {{ frost_worst.frost_high }}%）{% endif %}——其中全省年景 {{ frost_worst.year_eff }}%，本县比常年偏冷再叠加 {{ frost_worst.frost_own }}%。
+      {% set others = (items | rejectattr('county', 'equalto', frost_worst.county) | list)[:3] %}{% if others %}另有 {% for x in others %}{{ x.county }}（{{ x.fz4 }} 天）{% if not loop.last %}、{% endif %}{% endfor %} 同期受低温影响。{% endif %}
     </p>
   </div>
   {% else %}
@@ -121,6 +121,7 @@
               {% if x.fz4 %}
               <span class="rk-days">{{ x.fz4 }}</span> 天
               {% if x.tmin4 is not none %}<small style="display:block;color:#8a8880;font-size:11px">最低 {{ x.tmin4 }}℃</small>{% endif %}
+              {% if x.base4 is not none %}<small style="display:block;color:#a8a69e;font-size:10px">常年 {{ x.base4 }} 天</small>{% endif %}
               {% else %}
               <span style="color:#a8a69e">—</span>
               {% if x.tmin4 is not none %}<small style="display:block;color:#8a8880;font-size:11px">最低 {{ x.tmin4 }}℃ 未破 0℃</small>{% endif %}
@@ -130,9 +131,10 @@
               <span class="chip {{ 'chip--alert' if x.frost_level >= 3 else ('chip--gold' if x.frost_level >= 1 else 'chip--ok') }}"><i class="dot"></i>{{ x.frost_text }}</span>
             </td>
             <td>
-              {% if x.frost_loss is not none and x.frost_loss != 0 %}
+              {% if x.frost_loss is not none and x.frost_loss < -0.05 %}
               <span class="rk-vs rk-down">{{ x.frost_loss }}%</span>
               <small style="display:block;color:#8a8880;font-size:11px">区间 {{ x.frost_low }}% ~ {{ x.frost_high }}%</small>
+              <small style="display:block;color:#a8a69e;font-size:10px">年景 {{ '%+.1f'|format(x.year_eff) }}% · 本县 {{ '%+.1f'|format(x.frost_own) }}%</small>
               {% else %}—{% endif %}
             </td>
             <td>
@@ -172,10 +174,11 @@
   </section>
 
   <p class="chart-note">
-    口径说明：晚霜冻 = 4 月逐日最低温 ≤0℃ 的天数，等级为 0 天无、1 天轻度、2—3 天中度、≥4 天重度。
-    预估影响由双向固定效应面板回归（县 + 年固定效应，按县聚类稳健标准误，2010—2024 共 1635 条观测）估得，
-    4 月低温弹性 −1.96%/天（95%CI −2.55%~−1.38%，p&lt;0.001），3 月低温弹性 −0.57%/天（p&lt;0.001），
-    组内 R² 0.101。5 月干热风在六种口径下均不显著（p&gt;0.2），故只作暴露提示、不折算减产，避免给出没有依据的数字。
+    口径说明：晚霜冻 = 4 月逐日最低温 ≤0℃ 的天数；等级衡量低温过程本身的强度（0 天无、1 天轻度、2—3 天中度、≥4 天重度），与"减产多少"是两件事。
+    预估影响由双向固定效应面板回归折算（县 + 年固定效应，按县聚类稳健标准误，2010—2024 共 1635 条观测；4 月低温弹性 −1.96%/天，95%CI −2.55%~−1.38%，p&lt;0.001；3 月 −0.57%/天），分两级：
+    <strong>① 年效应</strong>＝该年全省单产相对常年的平均偏离，被年份固定效应吸收（如 2018 年 −2.5%、2013 年 −5.1%、2022 年 +4.7%），反映全省共同的气候年景；
+    <strong>② 县距平</strong>＝本县 4 月低温天数减该县常年值再乘弹性，反映本县相对其他县的差异（如林州常年 4 月已有 2.67 天 ≤0℃，2018 年 4 天只比常年多 1.33 天）。
+    只报县距平会漏掉全省年景，只按绝对天数折算则会把该县常年低温当灾害、系统性高估（实测该口径均值 −0.73%，故不采用）。5 月干热风六种口径均不显著（p&gt;0.2），只作暴露提示、不折算减产。
   </p>
 </div>
 {% endblock %}

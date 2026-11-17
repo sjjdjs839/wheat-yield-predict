@@ -137,8 +137,12 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
                 fl = fr.get("frost_loss")
                 if fl is not None and fl < 0:
                     lo, hi = fr.get("frost_low"), fr.get("frost_high")
-                    basis.append(f"按本县弹性折算预计影响 {fl:.2f}%"
-                                 + (f"（区间 {lo:.2f}%~{hi:.2f}%）" if lo is not None and hi is not None else ""))
+                    own, ye = fr.get("frost_own"), fr.get("year_eff")
+                    line = (f"相对该县常年预计影响 {fl:.2f}%"
+                            + (f"（区间 {lo:.2f}%~{hi:.2f}%）" if lo is not None and hi is not None else ""))
+                    if own is not None and ye is not None:
+                        line += f"，其中全省年景 {ye:.2f}%、本县偏冷再叠加 {own:.2f}%"
+                    basis.append(line)
                 ev = ("4 月低温是本项目面板回归中唯一稳定的减产因子（干热风六种口径均不显著）。"
                       "该系数为县域平均弹性，地力、品种与灌溉条件不同的地块实际损失会有差异。")
             else:

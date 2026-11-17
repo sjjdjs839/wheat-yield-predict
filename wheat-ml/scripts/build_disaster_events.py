@@ -100,6 +100,14 @@ def main() -> None:
     ev["fz3_anom"] = (ev["fz3_0"] - ev["base3"]).round(1)
     ev["fz4_anom"] = (ev["fz4_0"] - ev["base4"]).round(2)
 
+    # 年效应：该年全省单产相对常年的平均偏离（双向固定效应中被年份项吸收的部分）
+    # β 只捕捉"同年内县与县的相对差异"；2018 年这种全省普遍偏冷的年份，
+    # 共同影响落在年效应上，只报县距平会漏掉大范围年景的作用。
+    ymean_by_year = df.groupby("year")["y_norm"].mean()
+    grand_mean = df["y_norm"].mean()
+    year_effect = ((ymean_by_year - grand_mean) * 100).round(2)
+    ev["year_effect"] = ev["year"].map(year_effect)
+
     b3, b4 = coef["fz3_0"]["beta"], coef["fz4_0"]["beta"]
     lo3, hi3 = coef["fz3_0"]["ci_low"], coef["fz3_0"]["ci_high"]
     lo4, hi4 = coef["fz4_0"]["ci_low"], coef["fz4_0"]["ci_high"]
@@ -108,18 +116,37 @@ def main() -> None:
     ev["loss_low"] = (min(lo3, hi3) * ev["fz3_anom"] + min(lo4, hi4) * ev["fz4_anom"]) * 100
     ev["loss_high"] = (max(lo3, hi3) * ev["fz3_anom"] + max(lo4, hi4) * ev["fz4_anom"]) * 100
 
-    # 拆开供页面分别展示：晚霜冻按绝对天数（以"4 月无 ≤0℃"为基准），返青期低温按距平
+    # 权威口径：距平折算。within 估计的系数度量的是"相对该县常年"的偏离，
+    # 因此必须用距平天数，不能用绝对天数——否则会把该县常年本就有的低温日算成灾害
+    # （如林州常年 4 月就有 2.67 天 ≤0℃，2018 年 4 天只比常年多 1.33 天）。
+    ev["frost_anom_loss"] = (b4 * ev["fz4_anom"]) * 100
+    ev["frost_anom_low"] = (min(lo4, hi4) * ev["fz4_anom"]) * 100
+    ev["frost_anom_high"] = (max(lo4, hi4) * ev["fz4_anom"]) * 100
+
+    # 反事实口径：若 4 月低温全部消失的潜在增益（相对"无霜冻情景"），
+    # 仅用于"如果这场霜冻没发生"的推演，不能当作灾害损失展示。
     ev["frost_loss"] = (b4 * ev["fz4_0"]) * 100
     ev["frost_loss_low"] = (min(lo4, hi4) * ev["fz4_0"]) * 100
     ev["frost_loss_high"] = (max(lo4, hi4) * ev["fz4_0"]) * 100
     ev["cold3_loss"] = (b3 * ev["fz3_anom"]) * 100
 
+    # 总影响 = 年效应（全省共同年景）+ 县距平（本县相对全省的差异）
+    ev["total_loss"] = ev["year_effect"] + ev["frost_anom_loss"]
+    ev["total_low"] = ev["year_effect"] + ev["frost_anom_low"]
+    ev["total_high"] = ev["year_effect"] + ev["frost_anom_high"]
+
     for c in ["loss_pct", "loss_low", "loss_high",
-              "frost_loss", "frost_loss_low", "frost_loss_high", "cold3_loss"]:
+              "frost_loss", "frost_loss_low", "frost_loss_high", "cold3_loss",
+              "frost_anom_loss", "frost_anom_low", "frost_anom_high",
+              "total_loss", "total_low", "total_high"]:
         ev[c] = ev[c].round(2)
 
     print("\n预估影响分布（%，距平口径，均值应≈0）:")
     print(ev["loss_pct"].describe(percentiles=[.05, .5, .95, .99]).round(2).to_string())
+    print("\n晚霜冻距平折算（%，均值应≈0）:")
+    print(ev["frost_anom_loss"].describe(percentiles=[.05, .5, .95, .99]).round(2).to_string())
+    print("对照：绝对天数口径 frost_loss 均值=%.2f%%（偏高，不可作灾害损失展示）"
+          % ev["frost_loss"].mean())
 
     # 分级：4 月用绝对天数（0 为常态）；3 月用距平
     ev["frost_level"] = ev["fz4_0"].map(
@@ -136,9 +163,13 @@ def main() -> None:
     print("\n已写出：", OUT_CSV)
 
     payload = {"joint": coef,
+               "year_effect": {int(k): float(v) for k, v in year_effect.items()},
                "cuts": {"fz4_0": [0, 1, 3], "fz3_anom": [1, 3, 6], "hd_may": [0, 2, 6]},
-               "note": "loss_pct 为相对该县常年的距平折算；干热风 p=%.3f 不计入减产，仅作暴露提示"
-                       % coef["hd_streak"]["p"]}
+               "note": ("loss_pct / frost_anom_loss 均为相对该县常年的距平折算，"
+                        "与 within 估计口径一致；frost_loss 为反事实口径（4 月低温归零的潜在增益），"
+                        "不是灾害损失；total_loss = 年效应（全省共同年景）+ 县距平，"
+                        "两级分解不可混用；干热风 p=%.3f 不计入减产，仅作暴露提示"
+                        % coef["hd_streak"]["p"])}
     io.open(COEF_JSON, "w", encoding="utf-8").write(json.dumps(payload, ensure_ascii=False, indent=2))
     print("已写出：", COEF_JSON)
 
