@@ -51,14 +51,30 @@
 
 ## 三、路线 B：NASA AppEEARS（不想碰代码就走这条）
 
-1. 注册 Earthdata 账号：`urs.earthdata.nasa.gov`
-2. 打开 `appeears.earthdatacloud.nasa.gov` → **Extract** → **Area Sample**
-3. 上传 `data/raw/henan_county_centers.csv`（157 个县中心点，经纬度列已备好）
-4. 产品选 **MOD13Q1.061**，波段勾 `250m 16 days NDVI` 和 `250m 16 days pixel reliability`
-5. 时间范围 `2010-01-01` ~ `2024-12-31`
-6. 提交 → 排队完成会发邮件 → 下载 CSV
+**先记住一个限制**：AppEEARS 的 **Area 请求（上传县界多边形）只能输出 GeoTIFF / NetCDF 栅格**，不直接给统计值。
+用它上传 158 个县界，你会拿到 158×23×年份数 个栅格文件（两年就是 7000 多个），反而更难处理。
+所以路线 B 必须用 **Point 请求**——每县布 5 个采样点，返回的是 CSV 时序，直接能用。
 
-这条路是"县中心点代表整县"，精度比 A 粗一点，但对生育期尺度够用。
+### 1. 注册
+`urs.earthdata.nasa.gov` 注册（免费、即时通过，不需要机构审批，这点比 GEE 省事）
+
+### 2. 提交点采样
+1. 登录 `appeears.earthdatacloud.nasa.gov` → 右上 **Sign In**
+2. **Extract → Point Samples**
+3. 上传 `data/raw/henan_ndvi_points.csv`（790 个点，列名已按官方要求：`id, category, latitude, longitude`）
+4. 产品选 **MOD13Q1.061**，勾两个图层：
+   - `250m 16 days NDVI`
+   - `250m 16 days pixel reliability`（这列必须勾，我用来滤云）
+5. 时间范围先填 **03-01-2018 ~ 06-10-2018**（先跑一年验证）
+6. 起个名字提交，等状态变 `Done`（通常几小时到一天）
+7. 下载 bundle 里的 CSV，放到 `data/raw/ndvi/`
+
+### 3. 为什么每县 5 个点而不是 1 个
+单点取县城坐标，在山区县会严重失真——县城在河谷，麦田在坡上，海拔差几百米，霜冻强度完全不同。
+5 个点均匀铺开再取均值，才接近"全县平均长势"。点表里 `id` 是 `adcode_序号`，纯 ASCII，拿到后我按 adcode 映射回中文县名，你不用改任何名字。
+
+### 4. 全量怎么跑
+验证通过后再提交 2013 单年、以及 2010–2024 全时段。全时段建议**按年分成 15 个请求**，避免单次请求过大数据量。
 
 ---
 
