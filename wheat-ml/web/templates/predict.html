@@ -2,7 +2,7 @@
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {% set badges = [source] %}
-{{ page_head('产量预测', '按县区与年份输出预测单产；特征截至 5 月 31 日灌浆末期，比收获提前约 1 个月，可直接用于收购、储运与防灾调度。', badges) }}
+{{ page_head('情景仿真', '以树模型为底座做反事实对照：在已知气象与灾害条件下，这个县的单产相对常年处在什么水平。核心影响结论由面板回归给出，这里的数值只作情景参照。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法预测</span><p>{{ error }}</p></div>

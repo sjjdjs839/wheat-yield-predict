@@ -463,6 +463,34 @@ def index():
     except Exception:
         risk_brief = None
 
+    # 首页也按「晚霜冻优先」重排，并算出灾害摘要
+    frost_ctx = {"frost_n": 0, "frost_heavy": 0, "frost_worst": None,
+                 "last_frost": _last_frost(risk_year)}
+    if risk_brief:
+        try:
+            _frost_attach(risk_brief["items"], risk_year)
+            its = risk_brief["items"]
+            its.sort(key=lambda x: (-(x["frost_level"] or 0),
+                                    x["frost_loss"] if x["frost_loss"] is not None else 0,
+                                    -x["days"], x["county"]))
+            risk_brief["top"] = its[:5]
+            frost_ctx["frost_n"] = sum(1 for x in its if (x["frost_level"] or 0) > 0)
+            frost_ctx["frost_heavy"] = sum(1 for x in its if (x["frost_level"] or 0) >= 3)
+            frost_ctx["frost_worst"] = min(
+                [x for x in its if (x["frost_loss"] or 0) < -0.05],
+                key=lambda x: x["frost_loss"], default=None)
+            w = frost_ctx["frost_worst"]
+            if w:
+                rest = [d for d in (risk_brief.get("decision") or []) if d["county"] != w["county"]]
+                risk_brief["decision"] = ([{
+                    "kind": "晚霜冻", "county": w["county"],
+                    "text": "4 月低温 %d 天、最低 %s℃，按弹性预估影响 %s%%" % (
+                        w["fz4"], w["tmin4"], w["frost_loss"]),
+                    "target": "risk", "tone": "alert",
+                }] + rest)[:3]
+        except Exception:
+            pass
+
     # 每年重度县数（只看气象，不跑预测），用于在下拉里标出「干热风重」的年份
     yearly_heavy = _yearly_heavy_counties()
     mm = model_meta()
@@ -496,7 +524,8 @@ def index():
             return render_template("index.html", title=CONFIG["web"]["title"],
                                    active="index", stats=stats, model=mm, db_online=True,
                                    best=best_m, best_label=best_label, risk=risk_brief,
-                                   risk_years=risk_years, yearly_heavy=yearly_heavy)
+                                   risk_years=risk_years, yearly_heavy=yearly_heavy,
+                                   frost=frost_ctx)
         except Exception:
             pass
     df, meta = current_dataset()
@@ -512,7 +541,8 @@ def index():
     return render_template("index.html", title=CONFIG["web"]["title"], active="index",
                            stats=stats, model=mm, db_online=False,
                            best=best_m, best_label=best_label, risk=risk_brief,
-                           risk_years=risk_years, yearly_heavy=yearly_heavy)
+                           risk_years=risk_years, yearly_heavy=yearly_heavy,
+                           frost=frost_ctx)
 
 
 @app.route("/upload", methods=["GET", "POST"])
@@ -961,8 +991,103 @@ def risk_snapshot(year: int) -> dict:
     }
 
 
+_FROST_CACHE: dict = {}
+
+FROST_TEXT = {0: "无", 1: "轻度", 2: "中度", 3: "重度"}
+FROST_NOTE = {0: "4 月未出现 ≤0℃", 1: "4 月 1 天 ≤0℃", 2: "4 月 2—3 天 ≤0℃", 3: "4 月 ≥4 天 ≤0℃"}
+
+
+def disaster_events_table():
+    """县级灾害事件表（scripts/build_disaster_events.py 生成，按县×年一行）。"""
+    if "df" not in _FROST_CACHE:
+        p = Path(__file__).resolve().parent / "data" / "processed" / "disaster_events.csv"
+        _FROST_CACHE["df"] = pd.read_csv(p) if p.exists() else pd.DataFrame()
+    return _FROST_CACHE["df"]
+
+
+def frost_reference(county: str, year: int):
+    """该县该年的低温画像，供农事决策卡给出可追溯的量化依据。"""
+    ev = disaster_events_table()
+    if ev.empty:
+        return None
+    row = ev[(ev["county"] == county) & (ev["year"] == year)]
+    if row.empty:
+        return None
+    r = row.iloc[0]
+
+    def num(k):
+        v = r.get(k)
+        try:
+            return None if pd.isna(v) else float(v)
+        except Exception:
+            return None
+
+    return {
+        "fz3": num("fz3_0"),
+        "fz3_anom": num("fz3_anom"),
+        "fz4": num("fz4_0"),
+        "tmin4": num("tmin4"),
+        "frost_loss": num("frost_loss"),
+        "frost_low": num("frost_loss_low"),
+        "frost_high": num("frost_loss_high"),
+        "cold3_loss": num("cold3_loss"),
+        "level": r.get("frost_level"),
+    }
+
+
+def _frost_attach(items, year):
+    """给风险清单注入晚霜冻字段；表缺失时给空值，页面不会崩。"""
+    ev = disaster_events_table()
+    empty = {"fz4": None, "fz4_streak": None, "tmin4": None, "frost_level": 0,
+             "frost_text": "无记录", "frost_note": "无灾害事件表",
+             "frost_loss": None, "frost_low": None, "frost_high": None,
+             "fz3": None, "fz3_anom": None, "cold3_loss": None}
+    if ev.empty or "year" not in ev.columns:
+        for it in items:
+            it.update(empty)
+        return items
+    sub = ev[ev["year"] == year]
+    m = {r["county"]: r for _, r in sub.iterrows()}
+    for it in items:
+        r = m.get(it["county"])
+        if r is None:
+            it.update(empty)
+            continue
+        lv = int(r["frost_level"]) if pd.notna(r["frost_level"]) else 0
+        it["fz4"] = int(r["fz4_0"]) if pd.notna(r["fz4_0"]) else None
+        it["fz4_streak"] = int(r["fz4_streak"]) if pd.notna(r["fz4_streak"]) else None
+        it["tmin4"] = float(r["tmin4"]) if pd.notna(r["tmin4"]) else None
+        it["frost_level"] = lv
+        it["frost_text"] = FROST_TEXT[lv]
+        it["frost_note"] = FROST_NOTE[lv]
+        it["frost_loss"] = float(r["frost_loss"]) if pd.notna(r["frost_loss"]) else None
+        it["frost_low"] = float(r["frost_loss_low"]) if pd.notna(r["frost_loss_low"]) else None
+        it["frost_high"] = float(r["frost_loss_high"]) if pd.notna(r["frost_loss_high"]) else None
+        it["fz3"] = int(r["fz3_0"]) if pd.notna(r["fz3_0"]) else None
+        it["fz3_anom"] = float(r["fz3_anom"]) if pd.notna(r["fz3_anom"]) else None
+        it["cold3_loss"] = float(r["cold3_loss"]) if pd.notna(r["cold3_loss"]) else None
+    return items
+
+
+def _last_frost(year: int):
+    """该年及之前最近一次出现 4 月 ≤0℃ 的年份，用于空年份引导。"""
+    ev = disaster_events_table()
+    if ev.empty or "year" not in ev.columns:
+        return None
+    past = ev[(ev["fz4_0"] > 0) & (ev["year"] <= year)]
+    if past.empty:
+        return None
+    y = int(past["year"].max())
+    cur = past[past["year"] == y]
+    mx = cur["frost_loss"].min()
+    return {"year": y, "n": int(len(cur)),
+            "max": round(float(mx), 1) if pd.notna(mx) else None,
+            "worst": cur.loc[cur["frost_loss"].idxmin(), "county"]}
+
+
 @app.route("/risk")
 def risk():
+
     years = list(BASE_YEARS)
     year_arg = request.args.get("year", type=int)
     year = year_arg if year_arg in years else years[-1]
@@ -970,17 +1095,30 @@ def risk():
     level_arg = (request.args.get("level") or "").strip()
 
     snap = risk_snapshot(year)
-    items = snap["items"]
+    items = _frost_attach(list(snap["items"]), year)
+    items.sort(key=lambda x: (-(x["frost_level"] or 0),
+                              x["frost_loss"] if x["frost_loss"] is not None else 0,
+                              -x["days"], x["county"]))
+    risk_type = (request.args.get("type") or "").strip()
+    if risk_type == "frost":
+        items = [x for x in items if (x["frost_level"] or 0) > 0]
+    elif risk_type == "dry":
+        items = [x for x in items if x["days"] > 0]
     if city_arg:
         items = [x for x in items if x["city"] == city_arg]
     if level_arg in ("heavy", "light", "none"):
         items = [x for x in items if x["level"] == level_arg]
 
-    return render_template("risk.html", title="风险总览", active="risk",
+    return render_template("risk.html", title="灾害预警", active="risk",
                            years=years, year=year, cities=snap["cities"],
                            city=city_arg, level=level_arg,
                            items=items, summary=snap["summary"], top=snap["top"],
-                           total=len(snap["items"]),
+                           total=len(snap["items"]), risk_type=risk_type,
+                           frost_n=sum(1 for x in items if (x["frost_level"] or 0) > 0),
+                           frost_heavy=sum(1 for x in items if (x["frost_level"] or 0) >= 3),
+                           frost_worst=min([x for x in items if (x["frost_loss"] or 0) < -0.05],
+                                           key=lambda x: x["frost_loss"], default=None),
+                           last_frost=_last_frost(year),
                            ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100)
 
 
@@ -994,6 +1132,7 @@ def export_risk():
     year_arg = request.args.get("year", type=int)
     year = year_arg if year_arg in years else years[-1]
     snap = risk_snapshot(year)
+    _frost_attach(snap["items"], year)
 
     rows = [{
         "区县": x["county"],
@@ -1001,6 +1140,10 @@ def export_risk():
         "干热风天数": x["days"],
         "近15年排位": f"第{x['rank']}/{x['rank_total']}" if x["rank"] else "",
         "干热风等级": x["level_text"],
+        "4月低温天数": x.get("fz4") if x.get("fz4") is not None else "",
+        "4月最低温(℃)": x.get("tmin4") if x.get("tmin4") is not None else "",
+        "晚霜冻等级": x.get("frost_text", ""),
+        "预估影响(%)": x.get("frost_loss") if x.get("frost_loss") is not None else "",
         "预测单产(kg/亩)": x["pred"] if x["pred"] is not None else "",
         "常年单产(kg/亩)": x["mean"],
         "较常年(%)": x["vs_mean"] if x["vs_mean"] is not None else "",
@@ -1360,7 +1503,7 @@ def predict():
     metrics_lr = read_metrics("lr")
 
     if bundle is None or bundle[0] is None:
-        return render_template("predict.html", title="产量预测", active="predict",
+        return render_template("predict.html", title="情景仿真", active="predict",
                                counties=counties, city_groups=scope_city_groups(scope),
                                county=county, years=years, year=year,
                                threshold=0, threshold_max=None, threshold_note=None,
@@ -1520,7 +1663,7 @@ def predict():
                 },
             }
 
-    return render_template("predict.html", title="产量预测", active="predict",
+    return render_template("predict.html", title="情景仿真", active="predict",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
                            threshold=round(threshold, 1),
@@ -1600,7 +1743,8 @@ def advice():
     stage_df = stage_store.load(county, year)
     if not stage_df.empty:
         result = generate_advice(stage_df, county, year,
-                                 dry_ref=dry_hot_reference(county))
+                                 dry_ref=dry_hot_reference(county),
+                                 frost_ref=frost_reference(county, year))
         result["alert"] = False
         result["feature_note"] = False
         result = _apply_checks(result, county, year)
@@ -1630,7 +1774,8 @@ def advice():
     except Exception:
         pass
     result = generate_advice(data, county, eff_year,
-                             dry_ref=dry_hot_reference(county))
+                             dry_ref=dry_hot_reference(county),
+                             frost_ref=frost_reference(county, eff_year))
     result["alert"] = False
     result["feature_note"] = False
     result["eff_year"] = eff_year

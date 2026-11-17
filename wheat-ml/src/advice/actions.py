@@ -69,7 +69,7 @@ def _dry_basis(stats: dict, climate: dict) -> list[str]:
 
 def build_cards(key: str, stats: dict, climate: dict, period_end: str,
                 today_md: str, year, cur_year: int, view: str = "",
-                dry_ref: dict | None = None) -> list[dict]:
+                dry_ref: dict | None = None, frost_ref: dict | None = None) -> list[dict]:
     """按生育期生成决策卡，按优先级排序；无风险时给一张 P2 常规卡。"""
     if not stats:
         return []
@@ -78,6 +78,9 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
     precip = stats.get("累计降水", 0)
     cp = climate.get("precip") or 0
     short = (precip < cp * 0.6) if cp else False
+    fr = frost_ref or {}
+    fz3a = fr.get("fz3_anom")
+    fz4 = fr.get("fz4")
 
     if key == "greening":
         if short:
@@ -91,15 +94,24 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
                  "返青期根系浅，一次浇不透就分两次"],
                 "返青水不足会减少有效分蘖，后期成穗数偏低，且错过难以补回",
                 win))
-        if stats["霜冻日数"] >= 8:
+        if (fz3a is not None and fz3a >= 1.5) or (frost_ref is None and stats["霜冻日数"] >= 8):
+            basis = []
+            if fr:
+                basis.append(f"3 月最低温 ≤0℃ 共 {int(fr.get('fz3') or 0)} 天，"
+                             f"比本县常年多 {fz3a:.1f} 天")
+                basis.append("县级面板回归：3 月低温每多 1 天，单产相对常年下降 0.57%（p<0.001）")
+                if fr.get("cold3_loss") is not None:
+                    basis.append(f"按本县距平折算，预计影响 {fr['cold3_loss']:.1f}%")
+            else:
+                basis.append(f"最低气温低于 0℃ 共 {stats['霜冻日数']} 天")
+                basis.append(f"阶段平均最低温 {stats['平均最低温']}℃")
             cards.append(_card(
-                P0, "防倒春寒伤苗",
-                [f"最低气温低于 0℃ 共 {stats['霜冻日数']} 天",
-                 f"阶段平均最低温 {stats['平均最低温']}℃"],
+                P0, "3 月低温偏多，防倒春寒伤苗",
+                basis,
                 ["寒潮来临前 1—2 天小水补墒提温，别等冻了再浇",
                  "有条件的覆盖秸秆或无纺布，重点护弱苗地块",
                  "寒后 3—5 天查苗，缺苗断垄的及时补种"],
-                "返青至拔节期幼穗正在分化，受冻会造成小穗退化，这部分损失后期无法补救",
+                "返青期分蘖正在形成，低温会减少有效分蘖，后期成穗数补不回来",
                 win))
 
     elif key == "jointing":
@@ -113,14 +125,32 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
                  "弱苗、脱肥地块优先安排"],
                 "拔节期缺水缺肥直接减少小穗数，是决定穗粒数的关键窗口",
                 win))
-        if stats["霜冻日数"] >= 2:
+        if (fz4 is not None and fz4 >= 1) or (frost_ref is None and stats["霜冻日数"] >= 2):
+            basis = []
+            ev = None
+            if fr:
+                t = fr.get("tmin4")
+                basis.append(f"4 月最低温 ≤0℃ 共 {int(fz4)} 天"
+                             + (f"，最低 {t:.1f}℃" if t is not None else ""))
+                basis.append("双向固定效应面板回归：4 月低温每多 1 天，"
+                             "单产相对常年下降 1.96%（95%CI −2.55%~−1.38%，p<0.001）")
+                fl = fr.get("frost_loss")
+                if fl is not None and fl < 0:
+                    lo, hi = fr.get("frost_low"), fr.get("frost_high")
+                    basis.append(f"按本县弹性折算预计影响 {fl:.2f}%"
+                                 + (f"（区间 {lo:.2f}%~{hi:.2f}%）" if lo is not None and hi is not None else ""))
+                ev = ("4 月低温是本项目面板回归中唯一稳定的减产因子（干热风六种口径均不显著）。"
+                      "该系数为县域平均弹性，地力、品种与灌溉条件不同的地块实际损失会有差异。")
+            else:
+                basis.append(f"最低气温低于 0℃ 共 {stats['霜冻日数']} 天")
             cards.append(_card(
-                P0, "防晚霜伤穗",
-                [f"最低气温低于 0℃ 共 {stats['霜冻日数']} 天"],
-                ["关注寒潮预警，寒前浇水提温",
-                 "受冻地块及时补肥促恢复，别急着毁种"],
-                "拔节后幼穗离地面近，晚霜易造成穗部冻伤，直接影响穗粒数",
-                win))
+                P0, "防晚霜冻伤穗",
+                basis,
+                ["盯 4 月寒潮预警，寒前 1—2 天浇水提温，别等冻了再浇",
+                 "受冻地块及时补肥促恢复，别急着毁种",
+                 "霜后 3—5 天剥穗查看幼穗受害程度，分级判断是否补种"],
+                "拔节后幼穗离地面近，4 月霜冻每多 1 天对应约 2% 的单产损失，小穗一旦退化后期无法补救",
+                win, evidence=ev))
         if stats["高温日数"] >= 3:
             cards.append(_card(
                 P2, "高温天保持土壤湿润",
