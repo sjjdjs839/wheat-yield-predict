@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% from "_macros.html" import icon %}
 {% block content %}
 
@@ -10,8 +10,8 @@
     <div class="dash-banner-shade" aria-hidden="true"></div>
     <div class="container dash-banner-inner">
       <div class="dash-head-copy">
-        <h1>小麦气象分析与产量预测工作台</h1>
-        <p class="dash-lead">按县区与年份查询气象、预测单产、查看干热风风险，并按生育期获取田间管理建议。</p>
+        <h1>小麦气象灾害影响分析与预警平台</h1>
+        <p class="dash-lead">按县区与年份查看晚霜冻、干热风实况，量化灾害对单产的冲击幅度，按生育期给出减灾措施。</p>
       </div>
       <div class="dash-status-tags">
         <span class="dash-chip">{{ stats.dataset_text }}</span>
@@ -30,13 +30,18 @@
 </section>
 
 {% if risk %}
-<!-- 当年风险速览：一屏看到全省态势 -->
+<!-- 当年灾害速览：一屏看到全省态势 -->
 <section class="container dash-section">
   <div class="risk-brief">
     <div class="risk-brief-head">
       <div>
-        <h2>{{ risk.year }} 年全省风险与决策提示</h2>
-        <p>{{ risk.summary.count }} 个有产量基准的县区中，{{ risk.summary.heavy + risk.summary.light }} 个受灌浆期干热风影响；本年严重度为近 {{ risk.summary.year_rank_total }} 年第 {{ risk.summary.year_rank }}。</p>
+        <h2>{{ risk.year }} 年全省灾害态势与决策提示</h2>
+        <p>
+          {{ risk.summary.count }} 个有产量基准的县区中，
+          <strong>{{ frost.frost_n }}</strong> 个出现 4 月低温（晚霜冻）{{
+            '，最重 ' ~ frost.frost_worst.county ~ ' 预估影响 ' ~ frost.frost_worst.frost_loss ~ '%' if frost.frost_worst else ''
+          }}；{{ risk.summary.heavy + risk.summary.light }} 个出现灌浆期干热风（仅作暴露提示）。
+        </p>
       </div>
       <div class="risk-head-actions">
         <form class="risk-year-form" method="get" action="{{ url_for('index') }}">
@@ -47,15 +52,21 @@
             {% endfor %}
           </select>
         </form>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('risk') }}?year={{ risk.year }}">查看县级风险清单 {{ icon('arrow') }}</a>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('risk') }}?year={{ risk.year }}">查看县级灾害清单 {{ icon('arrow') }}</a>
       </div>
     </div>
     <dl class="risk-brief-stats">
-      <div><dt>重度干热风</dt><dd class="is-alert">{{ risk.summary.heavy }}<span>县</span></dd></div>
-      <div><dt>轻度</dt><dd>{{ risk.summary.light }}<span>县</span></dd></div>
-      <div><dt>未受影响</dt><dd>{{ risk.summary.none }}<span>县</span></dd></div>
-      <div><dt>最高天数</dt><dd>{{ risk.summary.max_days }}<span>天 · {{ risk.summary.max_county }}</span></dd></div>
+      <div><dt>出现晚霜冻</dt><dd class="is-alert">{{ frost.frost_n }}<span>县</span></dd></div>
+      <div><dt>中度以上</dt><dd>{{ frost.frost_heavy }}<span>县</span></dd></div>
+      <div><dt>最大预估影响</dt><dd>{% if frost.frost_worst %}{{ frost.frost_worst.frost_loss }}<span>% · {{ frost.frost_worst.county }}</span>{% else %}—<span>本年无霜冻</span>{% endif %}</dd></div>
+      <div><dt>出现干热风</dt><dd>{{ risk.summary.heavy + risk.summary.light }}<span>县 · {{ risk.summary.max_days }} 天最高</span></dd></div>
     </dl>
+    {% if frost.frost_n == 0 and frost.last_frost %}
+    <div class="alert risk-focus" style="margin:0 0 4px">
+      <span class="tag">本年无晚霜冻</span>
+      <p>最近一次发生在 <a href="{{ url_for('index') }}?year={{ frost.last_frost.year }}"><strong>{{ frost.last_frost.year }} 年</strong></a>：{{ frost.last_frost.n }} 个县受影响，最重 {{ frost.last_frost.worst }}{% if frost.last_frost.max is not none %}（预估 {{ frost.last_frost.max }}%）{% endif %}。点年份切换查看。</p>
+    </div>
+    {% endif %}
     {% if risk.decision %}
     <div class="dash-decision">
       <p class="dd-title">当期该盯的 {{ risk.decision|length }} 件事</p>
@@ -65,6 +76,8 @@
         {% set href = url_for('predict', county=d.county, year=risk.year) %}
         {% elif d.target == 'advice' %}
         {% set href = url_for('advice', county=d.county, year=risk.year) %}
+        {% elif d.target == 'risk' %}
+        {% set href = url_for('risk', year=risk.year) %}
         {% else %}
         {% set href = url_for('dry_hot') %}
         {% endif %}
@@ -80,15 +93,40 @@
     {% endif %}
     <div class="risk-brief-top">
       <span>重点关注</span>
-      {% for x in risk.top[:4] %}<a href="{{ url_for('risk') }}">{{ x.county }} {{ x.days }} 天</a>{% endfor %}
+      {% for x in risk.top[:4] %}
+      <a href="{{ url_for('risk') }}?year={{ risk.year }}">{{ x.county }}{% if x.fz4 %} 霜冻 {{ x.fz4 }} 天{% else %} 干热风 {{ x.days }} 天{% endif %}</a>
+      {% endfor %}
     </div>
   </div>
 </section>
 {% endif %}
 
+<!-- 影响评估结论条 -->
+<section class="container dash-section">
+  <div class="alert">
+    <span class="tag">当前结论</span>
+    <p>
+      基于 2010—2024 年 110 个县、1635 条县级观测的双向固定效应面板回归：
+      <strong>4 月低温每多 1 天，单产相对常年下降 1.96%</strong>（95%CI −2.55%~−1.38%，p&lt;0.001）；
+      3 月低温每多 1 天下降 0.57%（p&lt;0.001）；
+      5 月干热风在六种口径下均不显著（p&gt;0.2），故只报暴露强度、不折算减产。
+      县域尺度气象对单产年际波动的组内解释力为 10.1%，其余受灌溉、品种与田间管理影响。
+    </p>
+  </div>
+</section>
+
 <!-- 功能入口 -->
 <section class="container dash-section">
   <div class="dash-grid">
+    <a class="dash-card" href="{{ url_for('risk') }}">
+      <span class="dash-card-icon">{{ icon('alert') }}</span>
+      <div class="dash-card-body">
+        <h3>灾害预警</h3>
+        <p>晚霜冻为主、干热风为辅，逐县给等级、最低温与预估影响区间。</p>
+      </div>
+      <span class="dash-card-link">查看清单 {{ icon('arrow') }}</span>
+    </a>
+
     <a class="dash-card" href="{{ url_for('analysis') }}">
       <span class="dash-card-icon">{{ icon('chart') }}</span>
       <div class="dash-card-body">
@@ -96,15 +134,6 @@
         <p>温度、降水、风速、湿度等逐年气象图表，可按县区与年份筛选。</p>
       </div>
       <span class="dash-card-link">进入分析 {{ icon('arrow') }}</span>
-    </a>
-
-    <a class="dash-card" href="{{ url_for('predict') }}">
-      <span class="dash-card-icon">{{ icon('ruler') }}</span>
-      <div class="dash-card-body">
-        <h3>产量预测</h3>
-        <p>选择县区与年份，查看预测单产、多年对比与预警线判断。</p>
-      </div>
-      <span class="dash-card-link">开始预测 {{ icon('arrow') }}</span>
     </a>
 
     <a class="dash-card" href="{{ url_for('map_view') }}">
@@ -116,22 +145,22 @@
       <span class="dash-card-link">打开地图 {{ icon('arrow') }}</span>
     </a>
 
-    <a class="dash-card" href="{{ url_for('dry_hot') }}">
-      <span class="dash-card-icon">{{ icon('alert') }}</span>
-      <div class="dash-card-body">
-        <h3>干热风预警</h3>
-        <p>查看各区县灌浆期干热风天数、等级与应对方向。</p>
-      </div>
-      <span class="dash-card-link">查看预警 {{ icon('arrow') }}</span>
-    </a>
-
     <a class="dash-card" href="{{ url_for('advice') }}">
       <span class="dash-card-icon">{{ icon('leaf') }}</span>
       <div class="dash-card-body">
-        <h3>农事建议</h3>
-        <p>按返青、拔节、抽穗、灌浆、成熟五个生育期查看管理建议。</p>
+        <h3>农事决策</h3>
+        <p>按五个生育期给出减灾措施，3—4 月窗口含防倒春寒专项。</p>
       </div>
       <span class="dash-card-link">查看建议 {{ icon('arrow') }}</span>
+    </a>
+
+    <a class="dash-card" href="{{ url_for('predict') }}">
+      <span class="dash-card-icon">{{ icon('ruler') }}</span>
+      <div class="dash-card-body">
+        <h3>情景仿真</h3>
+        <p>以树模型为底座做反事实对照：若无这场灾害，单产大概是什么水平。</p>
+      </div>
+      <span class="dash-card-link">进入仿真 {{ icon('arrow') }}</span>
     </a>
 
     <a class="dash-card dash-card--upload" href="{{ url_for('upload') }}">
@@ -149,17 +178,21 @@
 {% if model %}
 {% set b = best if best else model.metrics_rf %}
 <details class="panel dash-model">
-  <summary>模型说明：训练口径与精度指标</summary>
+  <summary>模型与口径说明</summary>
   <div class="detail-body">
+    <dl class="model-metrics">
+      <div><dt>影响模型</dt><dd>双向固定效应面板</dd></div>
+      <div><dt>面板观测</dt><dd>1,635<small>条 · 110 县</small></dd></div>
+      <div><dt>4 月低温弹性</dt><dd>−1.96<small>%/天 · p&lt;0.001</small></dd></div>
+      <div><dt>组内 R²</dt><dd>0.101</dd></div>
+    </dl>
     <dl class="model-metrics">
       <div><dt>训练年份</dt><dd>{{ model.train_years[0] }}—{{ model.train_years[-1] }}</dd></div>
       <div><dt>测试年份</dt><dd>{{ model.test_years|join('、') }}</dd></div>
-      <div><dt>训练 / 测试样本</dt><dd>{{ "{:,}".format(b.n_train) }} / {{ "{:,}".format(b.n_test) }}</dd></div>
-      <div><dt>{{ best_label }} R²</dt><dd>{{ b.r2 }}</dd></div>
+      <div><dt>仿真底座 R²</dt><dd>{{ best_label }} {{ b.r2 }}</dd></div>
       <div><dt>MAE</dt><dd>{{ b.mae }}<small>kg/亩</small></dd></div>
-      <div><dt>RMSE</dt><dd>{{ b.rmse }}<small>kg/亩</small></dd></div>
     </dl>
-    <p class="model-foot">融合权重 随机森林 50% + LightGBM 30% + 线性回归 20%；共 {{ model.features|length }} 项特征，按年份划分训练 / 测试集。{% if not model.reliable %}当前使用演示产量标签，指标仅用于跑通链路，不作准确率结论。{% endif %}</p>
+    <p class="model-foot">上层结论来自面板回归（系数、p 值、置信区间），树模型仅作反事实仿真的底座，其 R² 不用于衡量灾害影响大小。融合权重 随机森林 50% + LightGBM 30% + 线性回归 20%，共 {{ model.features|length }} 项特征。{% if not model.reliable %}当前使用演示产量标签，指标仅用于跑通链路。{% endif %}</p>
   </div>
 </details>
 {% endif %}

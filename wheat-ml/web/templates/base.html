@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ '豫麦智测 · ' ~ title if title else '豫麦智测 · 河南省小麦气象分析与产量预测' }}</title>
-<meta name="description" content="河南省小麦气象数据分析与产量预测系统：交互式气象分析、产量地图、干热风预警、机器学习产量预测、产量预警与生育期农事建议。">
+<meta name="description" content="河南省小麦气象灾害影响分析与预警系统：晚霜冻与干热风预警、气象影响量化、产量地图、生育期农事决策建议。">
 <meta name="theme-color" content="#10271A">
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 <script>document.documentElement.classList.add('js');</script>
@@ -69,7 +69,7 @@
       <a href="{{ url_for('analysis') }}" class="{{ 'is-active' if active == 'analysis' }}" {% if active == 'analysis' %}aria-current="page"{% endif %}>气象分析</a>
       <a href="{{ url_for('map_view') }}" class="{{ 'is-active' if active == 'map' }}" {% if active == 'map' %}aria-current="page"{% endif %}>产量地图</a>
       <a href="{{ url_for('dry_hot') }}" class="{{ 'is-active' if active == 'dry_hot' }}" {% if active == 'dry_hot' %}aria-current="page"{% endif %}>干热风预警</a>
-      <a href="{{ url_for('risk') }}" class="{{ 'is-active' if active == 'risk' }}" {% if active == 'risk' %}aria-current="page"{% endif %}>风险总览</a>
+      <a href="{{ url_for('risk') }}" class="{{ 'is-active' if active == 'risk' }}" {% if active == 'risk' %}aria-current="page"{% endif %}>灾害预警</a>
       <a href="{{ url_for('predict') }}" class="{{ 'is-active' if active == 'predict' }}" {% if active == 'predict' %}aria-current="page"{% endif %}>产量预测</a>
     </nav>
 
@@ -103,7 +103,7 @@
       <a href="{{ url_for('analysis') }}">气象分析</a>
       <a href="{{ url_for('map_view') }}">产量地图</a>
       <a href="{{ url_for('dry_hot') }}">干热风预警</a>
-      <a href="{{ url_for('risk') }}">风险总览</a>
+      <a href="{{ url_for('risk') }}">灾害预警</a>
       <a href="{{ url_for('predict') }}">产量预测</a>
       <a href="{{ url_for('advice') }}">农事建议</a>
       <a href="{{ url_for('upload') }}">数据上传</a>

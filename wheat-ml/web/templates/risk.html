@@ -1,44 +1,64 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{% set badges = [year ~ ' 年', summary.count ~ ' 个县区', '近 ' ~ summary.year_rank_total ~ ' 年第 ' ~ summary.year_rank ~ ' 重'] %}
-{{ page_head('风险总览', '按年份汇总全省各县灌浆期干热风风险与单产偏离，可按地市与等级筛选，并导出县级风险清单。', badges) }}
+{% set badges = [year ~ ' 年', summary.count ~ ' 个县区', (frost_n|string) ~ ' 个县出现晚霜冻'] %}
+{{ page_head('灾害预警', '先看晚霜冻，再看干热风。4 月低温是当前数据里可验证的最强减产因子（每多 1 天约 −2.0%，统计显著）；干热风只报暴露强度，不给减产数字。', badges) }}
 
 <div class="container page-content">
   <div class="dh-summary">
     <div class="dh-card is-alert">
-      <span class="dh-label">重度干热风县区</span>
-      <strong>{{ summary.heavy }}</strong>
-      <small>≥ 3 天 · 占 {{ summary.count }} 县区的 {{ ((summary.heavy / summary.count * 100)|round(0)|int) if summary.count else 0 }}%</small>
+      <span class="dh-label">出现晚霜冻县区</span>
+      <strong>{{ frost_n }}</strong>
+      <small>4 月最低温 ≤0℃ · 占 {{ summary.count }} 县区的 {{ ((frost_n / summary.count * 100)|round(0)|int) if summary.count else 0 }}%</small>
     </div>
     <div class="dh-card">
-      <span class="dh-label">轻度干热风县区</span>
-      <strong>{{ summary.light }}</strong>
-      <small>1—2 天</small>
+      <span class="dh-label">中度以上晚霜冻</span>
+      <strong>{{ frost_heavy }}</strong>
+      <small>4 月 ≥2 天 ≤0℃</small>
     </div>
     <div class="dh-card">
-      <span class="dh-label">未出现干热风</span>
-      <strong>{{ summary.none }}</strong>
-      <small>0 天</small>
+      <span class="dh-label">最大预估影响</span>
+      {% if frost_worst and frost_worst.frost_loss is not none %}
+      <strong>{{ frost_worst.frost_loss }}<small style="font-size:12px"> %</small></strong>
+      <small>{{ frost_worst.county }} · 4 月 {{ frost_worst.fz4 }} 天</small>
+      {% else %}
+      <strong>—</strong>
+      <small>本年未出现晚霜冻</small>
+      {% endif %}
     </div>
     <div class="dh-card">
-      <span class="dh-label">全省预测单产均值</span>
-      <strong>{{ summary.avg_pred if summary.avg_pred else '—' }}<small style="font-size:12px"> kg/亩</small></strong>
-      <small>{{ year }} 年融合模型预测</small>
+      <span class="dh-label">出现干热风县区</span>
+      <strong>{{ summary.count - summary.none }}</strong>
+      <small>仅作暴露提示，不折算减产</small>
     </div>
   </div>
 
-  {% if top %}
+  {% if frost_worst and frost_worst.frost_loss is not none %}
   <div class="alert warning risk-focus">
     <span class="tag">重点关注</span>
     <p>
-      {% for x in top[:3] %}<strong>{{ x.county }}</strong>（{{ x.days }} 天{% if x.rank %} · 近 {{ x.rank_total }} 年第 {{ x.rank }} 高{% endif %}）{% if not loop.last %}、{% endif %}{% endfor %}
-      {% if summary.alerts == 0 %}；本年各县预测单产均未跌破预警线，产量预警未触发。{% else %}；其中 {{ summary.alerts }} 个县区预测单产低于预警线。{% endif %}
+      <strong>{{ frost_worst.county }}</strong>（{{ frost_worst.city }}）4 月出现 <strong>{{ frost_worst.fz4 }} 天</strong>最低温 ≤0℃{% if frost_worst.tmin4 is not none %}，最低 {{ frost_worst.tmin4 }}℃{% endif %}；按双向固定效应弹性（−1.96%/天）折算，相对无霜冻情景预计影响 <strong>{{ frost_worst.frost_loss }}%</strong>
+      {% if frost_worst.frost_low is not none %}（区间 {{ frost_worst.frost_low }}% ~ {{ frost_worst.frost_high }}%）{% endif %}。
+      {% if frost_n > 1 %}{% set others = items[1:4] %}{% if others %}另有 {% for x in others %}{{ x.county }}（{{ x.fz4 }} 天）{% if not loop.last %}、{% endif %}{% endfor %} 等县区同期受低温影响。{% endif %}{% endif %}
+    </p>
+  </div>
+  {% else %}
+  <div class="alert risk-focus">
+    <span class="tag">本年无晚霜冻</span>
+    <p>
+      {{ year }} 年全省未出现 4 月最低温 ≤0℃ 的晚霜冻事件，预警不触发。
+      {% if last_frost %}
+      最近一次发生在 <strong><a href="{{ url_for('risk', year=last_frost.year) }}">{{ last_frost.year }} 年</a></strong>——
+      <strong>{{ last_frost.n }}</strong> 个县受影响，最严重 <strong>{{ last_frost.worst }}</strong>{% if last_frost.max is not none %}（预估影响 {{ last_frost.max }}%）{% endif %}。
+      点年份可直接跳到那一年的清单。
+      {% else %}
+      记录期内全省从未出现 4 月最低温 ≤0℃。
+      {% endif %}
     </p>
   </div>
   {% endif %}
 
-  <form class="filter-panel" method="get" aria-label="风险筛选">
+  <form class="filter-panel" method="get" aria-label="灾害筛选">
     <div class="field">
       <label for="r-year">年份</label>
       <select id="r-year" name="year">
@@ -53,25 +73,24 @@
       </select>
     </div>
     <div class="field">
-      <label for="r-level">风险等级</label>
-      <select id="r-level" name="level">
-        <option value="">全部等级</option>
-        <option value="heavy" {{ 'selected' if level == 'heavy' }}>重度（≥ 3 天）</option>
-        <option value="light" {{ 'selected' if level == 'light' }}>轻度（1—2 天）</option>
-        <option value="none" {{ 'selected' if level == 'none' }}>无（0 天）</option>
+      <label for="r-type">灾害类型</label>
+      <select id="r-type" name="type">
+        <option value="">全部</option>
+        <option value="frost" {{ 'selected' if risk_type == 'frost' }}>出现晚霜冻</option>
+        <option value="dry" {{ 'selected' if risk_type == 'dry' }}>出现干热风</option>
       </select>
     </div>
     <button class="btn btn-primary" type="submit">应用筛选</button>
     <a class="filter-reset" href="{{ url_for('risk') }}">重置</a>
   </form>
-  <p class="filter-hint">清单按干热风天数从高到低排列，仅覆盖有产量标签的 {{ summary.count }} 个县区；无产量基准的县区只参与气象统计，不计入风险清单。</p>
+  <p class="filter-hint">清单按晚霜冻等级、预估影响降序排列，仅覆盖有产量基准的 {{ summary.count }} 个县区；预估影响为距平折算，用于排序与研判，不替代实地灾情核定。</p>
 
   <section class="block-lg">
     <div class="block-head">
       <div>
-        <h2>{{ year }} 年县级风险清单</h2>
+        <h2>{{ year }} 年县级灾害清单</h2>
       </div>
-      <p class="block-note">当前显示 {{ items|length }} 个县区{% if city %} · {{ city }}{% endif %}{% if level %} · {{ {'heavy':'重度','light':'轻度','none':'无'}[level] }}{% endif %}</p>
+      <p class="block-note">当前显示 {{ items|length }} 个县区{% if city %} · {{ city }}{% endif %}{% if risk_type == 'frost' %} · 有晚霜冻{% elif risk_type == 'dry' %} · 有干热风{% endif %}</p>
     </div>
 
     <div class="risk-actions">
@@ -84,35 +103,59 @@
           <tr>
             <th>县区</th>
             <th>地市</th>
-            <th>干热风天数</th>
-            <th>近 15 年排位</th>
-            <th>等级</th>
-            <th>预测单产</th>
-            <th>常年单产</th>
-            <th>较常年</th>
-            <th>产量预警</th>
+            <th>4 月低温</th>
+            <th>晚霜冻等级</th>
+            <th>预估影响</th>
+            <th>3 月低温</th>
+            <th>干热风</th>
+            <th>单产对照</th>
             <th>历史同强度年</th>
           </tr>
         </thead>
         <tbody>
           {% for x in items %}
-          <tr class="rk-row is-{{ x.level }}">
+          <tr class="rk-row is-{{ 'heavy' if x.frost_level >= 3 else ('light' if x.frost_level >= 1 else 'none') }}">
             <td><strong>{{ x.county }}</strong></td>
             <td>{{ x.city }}</td>
+            <td>
+              {% if x.fz4 %}
+              <span class="rk-days">{{ x.fz4 }}</span> 天
+              {% if x.tmin4 is not none %}<small style="display:block;color:#8a8880;font-size:11px">最低 {{ x.tmin4 }}℃</small>{% endif %}
+              {% else %}
+              <span style="color:#a8a69e">—</span>
+              {% if x.tmin4 is not none %}<small style="display:block;color:#8a8880;font-size:11px">最低 {{ x.tmin4 }}℃ 未破 0℃</small>{% endif %}
+              {% endif %}
+            </td>
+            <td>
+              <span class="chip {{ 'chip--alert' if x.frost_level >= 3 else ('chip--gold' if x.frost_level >= 1 else 'chip--ok') }}"><i class="dot"></i>{{ x.frost_text }}</span>
+            </td>
+            <td>
+              {% if x.frost_loss is not none and x.frost_loss != 0 %}
+              <span class="rk-vs rk-down">{{ x.frost_loss }}%</span>
+              <small style="display:block;color:#8a8880;font-size:11px">区间 {{ x.frost_low }}% ~ {{ x.frost_high }}%</small>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if x.fz3 is not none %}
+              {{ x.fz3 }} 天
+              {% if x.fz3_anom is not none %}<small style="display:block;color:#8a8880;font-size:11px">距平 {{ '%+.1f'|format(x.fz3_anom) }} 天</small>{% endif %}
+              {% else %}—{% endif %}
+            </td>
             <td><span class="rk-days">{{ x.days }}</span> 天</td>
-            <td>{% if x.rank %}第 {{ x.rank }} / {{ x.rank_total }}{% else %}—{% endif %}</td>
-            <td><span class="chip {{ 'chip--alert' if x.level == 'heavy' else ('chip--gold' if x.level == 'light' else 'chip--ok') }}"><i class="dot"></i>{{ x.level_text }}</span></td>
-            <td>{{ x.pred if x.pred is not none else '—' }}</td>
-            <td>{{ x.mean }}</td>
-            <td>{% if x.vs_mean is not none %}<span class="rk-vs {{ 'rk-down' if x.vs_mean < 0 else 'rk-up' }}">{{ '+' if x.vs_mean > 0 }}{{ x.vs_mean }}%</span>{% else %}—{% endif %}</td>
-            <td>{% if x.alert %}<span class="chip chip--alert"><i class="dot"></i>触发</span>{% else %}<span class="chip chip--ok"><i class="dot"></i>未触发</span>{% endif %}</td>
+            <td>
+              {% if x.actual is not none %}
+              实测 {{ x.actual }}
+              {% elif x.pred is not none %}
+              预测 {{ x.pred }}
+              {% else %}—{% endif %}
+              {% if x.vs_mean is not none %}<small style="display:block;color:#8a8880;font-size:11px">较常年 {{ '%+.1f'|format(x.vs_mean) }}%</small>{% endif %}
+            </td>
             <td class="rk-same">
               {% if x.same_mean is not none %}
               <span class="rk-same-main">{{ x.same_n }} 年 · 单产 {{ '+' if x.same_mean > 0 }}{{ x.same_mean }}%</span>
-              <small class="rk-same-sub">区间 {{ x.same_low }}%—{{ x.same_high }}% · {{ x.same_years|join('、') }}</small>
+              <small class="rk-same-sub">区间 {{ x.same_low }}%—{{ x.same_high }}%</small>
               {% elif x.same_n %}
               <span class="rk-same-main is-weak">{{ x.same_n }} 年（样本少）</span>
-              <small class="rk-same-sub">{{ x.same_years|join('、') }}</small>
               {% else %}
               <span class="rk-same-main is-weak">无同类年份</span>
               {% endif %}
@@ -120,7 +163,7 @@
           </tr>
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="10" class="rk-empty">当前筛选条件下没有县区。</td></tr>
+          <tr><td colspan="9" class="rk-empty">当前筛选条件下没有县区。</td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -129,8 +172,10 @@
   </section>
 
   <p class="chart-note">
-    口径说明：干热风天数按县区逐日气象统计（灌浆期高温低湿日）；等级为 0 天无、1—2 天轻度、≥ 3 天重度；
-    「近 15 年排位」为该县当年天数在其自有历史年份中的降序名次；产量预警按「预测单产低于常年单产的 {{ (ratio * 100)|round(0)|int }}%」判定，属经验阈值，不替代实地灾情评估。
+    口径说明：晚霜冻 = 4 月逐日最低温 ≤0℃ 的天数，等级为 0 天无、1 天轻度、2—3 天中度、≥4 天重度。
+    预估影响由双向固定效应面板回归（县 + 年固定效应，按县聚类稳健标准误，2010—2024 共 1635 条观测）估得，
+    4 月低温弹性 −1.96%/天（95%CI −2.55%~−1.38%，p&lt;0.001），3 月低温弹性 −0.57%/天（p&lt;0.001），
+    组内 R² 0.101。5 月干热风在六种口径下均不显著（p&gt;0.2），故只作暴露提示、不折算减产，避免给出没有依据的数字。
   </p>
 </div>
 {% endblock %}
