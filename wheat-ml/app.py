@@ -1816,8 +1816,7 @@ def advice():
     else:
         counties = ALL_COUNTIES
         county_arg = request.args.get("county")
-        county = county_arg if county_arg in counties else counties
-
+        county = county_arg if county_arg in counties else counties[0]
     today_year = datetime.now().year
     years = sorted(set(BASE_YEARS + [today_year - 1, today_year, today_year + 1]))
     year_arg = request.args.get("year", type=int)
