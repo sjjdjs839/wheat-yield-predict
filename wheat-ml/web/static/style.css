@@ -1555,3 +1555,15 @@ main{overflow-x:clip}
 .stage.is-compact .stage-card { padding: 13px 18px 15px; }
 .stage.is-compact .stage-body { display: none; }
 .stage.is-compact .stage-head { margin-bottom: 0; }
+
+.zone-hint {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #7a4a12;
+  background: #fdf5e6;
+  border-left: 3px solid #d99a3c;
+  border-radius: 4px;
+}
+.zone-hint svg { vertical-align: -2px; margin-right: 4px; }

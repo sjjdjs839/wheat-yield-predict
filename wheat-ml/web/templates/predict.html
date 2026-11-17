@@ -69,6 +69,9 @@
             <span class="ci-note">300 棵决策树中预测值低于预警线的比例；树间区间 {{ result.tree_low }}—{{ result.tree_high }} kg/亩，反映模型不确定性，非统计置信区间。</span>
           </p>
           {% endif %}
+          {% if zone_hint %}
+          <p class="zone-hint">{{ icon('alert') }}该县属{{ zone_hint.zone }}：模型在此类县上系统性偏低约 {{ zone_hint.bias }} kg/亩（该象限 MAE {{ zone_hint.mae }}），预测值宜作下限参考，请结合实地核查。</p>
+          {% endif %}
           <span class="status-pill {{ 'is-alert' if result.alert else 'is-ok' }}">
             {{ '产量预警：预测单产低于预警线' if result.alert else '产量正常：预测单产不低于预警线' }}
           </span>

@@ -1571,6 +1571,32 @@ def api_simulate():
     }
 
 
+_ZONE_CACHE: dict = {}
+
+
+def county_zone_hint(county: str):
+    """按分象限误差给出该县的已知局限提示。
+
+    仅 D（脆弱敏感）象限需要提示：模型在该类县上系统性偏低，预测值宜作下限参考。
+    数据来源 output/reports/zone_errors.json（scripts/verify_zone_errors.py 生成）。
+    """
+    if not _ZONE_CACHE:
+        payload = {}
+        try:
+            import json as _json
+            payload = _json.loads(
+                (REPORTS_DIR / "zone_errors.json").read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        _ZONE_CACHE["map"] = payload.get("_county_zone", {})
+        _ZONE_CACHE["d"] = payload.get("D 脆弱敏感区")
+    zone = _ZONE_CACHE["map"].get(county)
+    d = _ZONE_CACHE["d"]
+    if zone != "D 脆弱敏感区" or not d:
+        return None
+    return {"zone": zone, "bias": d["bias"], "mae": d["mae"]}
+
+
 @app.route("/predict")
 def predict():
     scope = uploaded_scope()
@@ -1608,6 +1634,7 @@ def predict():
                                metrics=metrics, metrics_lgbm=metrics_lgbm, metrics_lr=metrics_lr,
                                reliable=False, result=None, history=[], trend_chart=None,
                                feature_chart=None, feature_count=len(FEATS),
+                               zone_hint=county_zone_hint(county),
                                source=data_meta["source"],
                                error="尚未训练模型，请先运行 python -m src.models.train_model")
 
@@ -1770,6 +1797,7 @@ def predict():
                            reliable=bool(mm and mm.get("reliable")),
                            result=result, history=history, trend_chart=trend_chart,
                            feature_chart=feature_chart, feature_count=len(FEATS),
+                           zone_hint=county_zone_hint(county),
                            error=error, source=data_meta["source"])
 
 
