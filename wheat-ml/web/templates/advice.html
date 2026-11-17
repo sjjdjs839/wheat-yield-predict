@@ -64,6 +64,15 @@
   </form>
 
   {% if upload_needed %}
+  {% if staged_days %}
+  <details class="more stage-fold">
+    <summary>补充其他生育期的气象观测 · 已累积 {{ staged_days }} 天</summary>
+    <div class="detail-body">
+      {{ upload_form(county, city_groups, counties, year, years) }}
+      <p class="stage-hint">按生育期分批上传，自动识别所属阶段；多次上传累加保留，同日重复上传自动覆盖。五段齐备后本入口自动收起。</p>
+    </div>
+  </details>
+  {% else %}
   <section class="block-lg stage-upload-card">
     <div class="block-head" data-reveal>
       <div>
@@ -79,6 +88,7 @@
     </p>
     {% endif %}
   </section>
+  {% endif %}
   {% elif is_history %}
   <section class="block-lg stage-upload-card is-compact">
     <div class="block-head" data-reveal>
@@ -109,13 +119,9 @@
   {% endif %}
 
   {% if staged_days %}
-  <section class="block-lg stage-manage">
-    <div class="block-head" data-reveal>
-      <div>
-        <h2>本期观测管理</h2>
-      </div>
-      <p class="block-note">已累积 {{ staged_days }} 天{% if counts.get('offseason') %}，其中生育期外 {{ counts.get('offseason') }} 天仅留存、不参与建议{% endif %}</p>
-    </div>
+  <details class="more stage-fold stage-manage">
+    <summary>本期观测管理 · 已累积 {{ staged_days }} 天{% if counts.get('offseason') %}（含生育期外 {{ counts.get('offseason') }} 天）{% endif %}</summary>
+    <div class="detail-body">
     <div class="stage-manage-list">
       {% for s in stage_defs %}
       <div class="sm-row">
@@ -135,7 +141,8 @@
       <a class="btn btn-ghost btn-sm" href="{{ url_for('advice_reset_stage', county=county, year=year) }}"
          onclick="return confirm('确认清空 {{ year }} 年已累积的全部 {{ staged_days }} 天观测？\n清空后可在本页「最近一次清空」处一键撤销。')">清空全部本期观测</a>
     </div>
-  </section>
+    </div>
+  </details>
   {% endif %}
 
   {% if result %}
@@ -216,7 +223,7 @@
 
     <div class="timeline">
       {% for s in result.stages %}
-      <div class="stage{{ ' is-empty' if not s.has_data }}">
+      <div class="stage{{ ' is-compact' if not s.has_data }}">
         <div class="stage-rail">
           <span class="stage-node">{{ '%02d'|format(loop.index) }}</span>
         </div>
@@ -230,7 +237,11 @@
               {% if s.top_priority %}
               <span class="act-pri act-pri--{{ s.top_priority|lower }}">{{ s.top_priority }}·{{ {'P0': '立即', 'P1': '本周', 'P2': '常规'}[s.top_priority] }}</span>
               {% endif %}
+              {% if s.has_data %}
               <span class="stage-days">{{ s.stats.days if s.stats else 0 }} 天记录</span>
+              {% else %}
+              <span class="stage-days is-zero">暂无记录</span>
+              {% endif %}
               {% if s.has_data %}
               <a class="stage-clear" href="{{ url_for('advice_reset_stage', county=county, year=year, stage=s.key) }}"
                  title="只清空该生育期的观测"
@@ -316,8 +327,6 @@
               </details>
               {% endif %}
             </div>
-            {% else %}
-            <div class="stage-empty">该阶段暂无气象记录，可在上方上传本期观测数据。</div>
             {% endif %}
           </div>
         </article>

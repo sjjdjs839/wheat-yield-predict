@@ -1525,3 +1525,33 @@ main{overflow-x:clip}
   border: 1px solid #ddd7c9; border-radius: 6px; padding: .08rem .48rem;
 }
 .stage-head-right .stage-clear:hover { color: #2f4f3e; border-color: #2f4f3e; }
+
+/* 农事建议页：折叠操作区、压缩空阶段 */
+.stage-fold { margin: 0 0 16px; }
+.stage-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 13px 18px;
+  font-weight: 600;
+  color: #2c4032;
+  background: #fff;
+  border: 1px solid #e6e2d6;
+  border-radius: 12px;
+  position: relative;
+}
+.stage-fold > summary::-webkit-details-marker { display: none; }
+.stage-fold > summary::after {
+  content: "＋";
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: .45;
+  font-weight: 400;
+}
+.stage-fold[open] > summary::after { content: "－"; }
+.stage-fold .detail-body { padding: 14px 4px 0; }
+
+.stage.is-compact .stage-card { padding: 13px 18px 15px; }
+.stage.is-compact .stage-body { display: none; }
+.stage.is-compact .stage-head { margin-bottom: 0; }
