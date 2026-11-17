@@ -41,7 +41,7 @@ python run.py                        # 加 --no-browser 则不弹浏览器
 
 - 有 MySQL：走库表（更快，`python -m scripts.init_database` 可导入）
 - 没有 MySQL：自动回退 CSV，功能完整，只是少了库查询的便利
-- 没有模型/清洗数据：启动脚本自动重建，指标可复现（R² 0.9430 / 0.9431 / 0.8957）
+- 没有模型/清洗数据：启动脚本自动重建，指标可复现（R² 0.9499 / 0.9552 / 0.9174，对应 RF / LGBM / LR，真源为 `wheat-ml/output/reports/metrics_*.json`）
 
 常见问题：
 
