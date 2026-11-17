@@ -169,7 +169,9 @@
         if (info) {
           var countLabel = metric === 'yield'
             ? ' 个有产量标签的区县'
-            : ' 个有生育期降水记录的区县';
+            : (metric === 'disaster'
+              ? ' 个有产量基准的区县（减产幅度已剔除全省年景）'
+              : ' 个有生育期降水记录的区县');
           info.textContent = year + ' 年共显示 ' + (data.count || 0) + countLabel +
             '；指标：' + METRIC_LABEL[metric] + '。';
         }

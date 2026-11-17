@@ -118,7 +118,7 @@
 {% if active in ['analysis', 'predict'] %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 {% endif %}
-{% if active == 'map' %}
+{% if active in ['map', 'risk'] %}
 <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
 {% endif %}
 <script src="{{ url_for('static', filename='app.js') }}"></script>

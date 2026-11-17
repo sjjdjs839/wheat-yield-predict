@@ -189,7 +189,7 @@
       <p><strong>≥5 天：</strong>平均 −7.8%（区间 −3.4% ~ −12.1%），置信区间不跨 0，是唯一统计上站得住的重灾档。</p>
     </div>
     <script>
-      (function () {
+      document.addEventListener('DOMContentLoaded', function () {
         var wrap = document.getElementById('doseChart');
         if (!wrap || typeof echarts === 'undefined') return;
         var B = {{ dose.fz4.bands|tojson }};
@@ -246,7 +246,7 @@
           }]
         });
         window.addEventListener('resize', function () { chart.resize(); });
-      })();
+      });
     </script>
   </section>
   {% endif %}
