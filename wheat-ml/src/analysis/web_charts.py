@@ -347,6 +347,20 @@ def stage_windows(df, year=None):
     d["md"] = d["date"].dt.strftime("%m-%d")
     d = d.sort_values("date")
 
+    # 档位必须按「全年 4 月累计天数」判定：同一场低温会被切进拔节期与抽穗扬花期，
+    # 若按单期天数各判一次档，2 天 + 6 天会被读成两次损失。
+    m_all = d["date"].dt.month
+    apr_cold_total = int(((m_all == 4) & (d["t2m_min"] <= 0)).sum()) if has_tmin else 0
+    mar_cold_total = int(((m_all == 3) & (d["t2m_min"] <= 0)).sum()) if has_tmin else 0
+    if apr_cold_total >= 5:
+        band_loss, band_txt = -7.75, "≥5 天档（n=12）"
+    elif apr_cold_total >= 3:
+        band_loss, band_txt = -2.58, "3—4 天档（n=27）"
+    elif apr_cold_total >= 1:
+        band_loss, band_txt = 0.0, "0—2 天档"
+    else:
+        band_loss, band_txt = 0.0, ""
+
     rows = []
     for st in _stages():
         seg = d[(d["md"] >= st["start"]) & (d["md"] <= st["end"])]
@@ -370,15 +384,16 @@ def stage_windows(df, year=None):
             hot_may = int(((months == 5) & (seg["t2m_max"] >= 35) & (seg["rh"] <= 40)).sum())
 
         note, tone = "无灾害窗口", "none"
-        loss = cold_apr * 1.96 + cold_mar * 0.57
+        # 行内只报该期事实天数；档位与折算统一在下方口径条按「全年累计」给出，
+        # 避免同一场低温跨两个生育期被重复折算。
         bits = []
         if cold_apr > 0:
             bits.append(f"4 月低温 {cold_apr} 天")
         if cold_mar > 0:
-            bits.append(f"3 月低温 {cold_mar} 天")
+            bits.append(f"3 月低温 {cold_mar} 天（分档 p>0.05，不折算）")
         if bits:
-            note = "、".join(bits) + f" ≈ −{loss:.1f}%"
-            tone = "alert" if cold_apr > 0 else "warn"
+            note = "；".join(bits)
+            tone = "alert" if (cold_apr > 0 and band_loss < 0) else "warn"
         elif cold > 0:
             note = f"≤0℃ {cold} 天（非 3—4 月，不折算）"
             tone = "warn"
@@ -399,21 +414,27 @@ def stage_windows(df, year=None):
     # 全省/全县四月口径（不受生育期切段影响，用于与回归口径核对）
     apr = d[d["date"].dt.month == 4]
     may = d[d["date"].dt.month == 5]
-    apr_cold = int((apr["t2m_min"] <= 0).sum()) if (len(apr) and has_tmin) else 0
+    apr_cold = apr_cold_total
     may_hot = 0
     if len(may) and has_tmax and has_rh:
         may_hot = int(((may["t2m_max"] >= 35) & (may["rh"] <= 40)).sum())
 
+    bl = abs(band_loss)
     parts = []
     if apr_cold > 0:
-        parts.append(f"4 月低温 {apr_cold} 天，按面板回归 −1.96%/天折算约 −{apr_cold * 1.96:.1f}%")
+        tail = f"，折算约 −{bl:.1f}%" if bl else "，实测无显著损失"
+        parts.append(f"4 月低温 {apr_cold} 天（全年累计），落在 {band_txt}{tail}")
     else:
         parts.append("4 月未出现 ≤0℃ 低温日，晚霜冻判据未触发")
+    if apr_cold > 0:
+        parts.append("分档为剔除县年固定效应后的组均值，线性弹性 −1.96%/天 是控制其他因子后的边际斜率，两者口径不同，此处取实测分档")
+    if mar_cold_total > 0:
+        parts.append(f"3 月低温 {mar_cold_total} 天，分档 p>0.05 且非单调（0—2 天 −0.7%、3—5 天 +0.4%），只报天数不折算")
     if may_hot > 0:
         parts.append(f"5 月干热风 {may_hot} 天，六种口径均不显著，只报暴露强度、不折算减产")
     else:
         parts.append("5 月未出现干热风日")
-    parts.append("折算值仅供研判，实际减产还受灌溉、品种与田间管理影响")
+    parts.append("折算值仅供研判；实际减产还受灌溉、品种、田间管理，以及本系统未覆盖的灾害（如成熟期连阴雨）影响")
 
     return {
         "year": int(year) if year else None,
