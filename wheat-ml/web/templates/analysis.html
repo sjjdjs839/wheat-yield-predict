@@ -49,22 +49,22 @@
 
   {% if evaluation %}
   {% set current = evaluation.rows|selectattr('year', 'equalto', evaluation.year)|list %}
-  <section class="insight-panel" data-reveal>
-    <div class="insight-grid">
-      <div class="insight-main">
-        <p class="insight-text">{{ evaluation.text }}</p>
-        {% if evaluation.rows %}
-        <a class="insight-link" href="#year-detail">查看 {{ evaluation.rows|length }} 年指标明细 {{ icon('arrow') }}</a>
-        {% endif %}
-      </div>
-      {% if current %}
-      <dl class="insight-metrics">
-        <div class="insight-metric"><dt>平均气温</dt><dd><strong>{{ current[0]['平均气温'] }}</strong><span>℃</span></dd></div>
-        <div class="insight-metric"><dt>年降水量</dt><dd><strong>{{ current[0]['年降水量'] }}</strong><span>mm</span></dd></div>
-        <div class="insight-metric"><dt>高温日数</dt><dd><strong>{{ current[0]['高温日数'] }}</strong><span>天</span></dd></div>
-        <div class="insight-metric"><dt>霜冻日数</dt><dd><strong>{{ current[0]['霜冻日数'] }}</strong><span>天</span></dd></div>
-      </dl>
-      {% endif %}
+  <section class="kpi-strip" data-reveal>
+    {% if current %}
+    <dl class="kpi-strip-grid">
+      <div><dt>平均气温</dt><dd>{{ current[0]['平均气温'] }}<span>℃</span></dd></div>
+      <div><dt>年降水量</dt><dd>{{ current[0]['年降水量'] }}<span>mm</span></dd></div>
+      <div><dt>高温日数</dt><dd>{{ current[0]['高温日数'] }}<span>天</span></dd></div>
+      <div><dt>霜冻日数</dt><dd>{{ current[0]['霜冻日数'] }}<span>天</span></dd></div>
+    </dl>
+    {% endif %}
+    <div class="kpi-strip-bar">
+      <span class="kpi-strip-year">{{ evaluation.year }} 年</span>
+      <details class="kpi-strip-more">
+        <summary>综合评估（相对 15 年同期）</summary>
+        <p>{{ evaluation.text }}</p>
+      </details>
+      {% if evaluation.rows %}<a class="kpi-strip-link" href="#year-detail">{{ evaluation.rows|length }} 年明细 {{ icon("arrow") }}</a>{% endif %}
     </div>
   </section>
   {% if evaluation.rows %}

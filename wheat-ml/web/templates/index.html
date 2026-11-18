@@ -2,21 +2,16 @@
 {% from "_macros.html" import icon %}
 {% block content %}
 
-<!-- 工作台头部：麦田横幅 + 数据状态 -->
+<!-- 工作台头部：紧凑页头（无横幅图） -->
 <section class="dash-head">
-  <div class="dash-banner">
-    <div class="dash-banner-media" role="img" aria-label="麦田背景"
-         style="background-image:url('{{ url_for('static', filename='assets/field/field-band.webp') }}')"></div>
-    <div class="dash-banner-shade" aria-hidden="true"></div>
-    <div class="container dash-banner-inner">
-      <div class="dash-head-copy">
-        <h1>小麦气象灾害影响分析与预警平台</h1>
-        <p class="dash-lead">按县区与年份查看晚霜冻、干热风实况，量化灾害对单产的冲击幅度，按生育期给出减灾措施。</p>
-      </div>
-      <div class="dash-status-tags">
-        <span class="dash-chip">{{ stats.dataset_text }}</span>
-        <span class="dash-chip">{{ stats.label_text }}</span>
-      </div>
+  <div class="container wk-head">
+    <div>
+      <h1>小麦气象灾害影响分析与预警平台</h1>
+      <p class="wk-sub">按县区与年份查看晚霜冻、干热风实况，量化灾害对单产的冲击幅度，按生育期给出减灾措施。</p>
+    </div>
+    <div class="wk-src">
+      <span class="dash-chip">{{ stats.dataset_text }}</span>
+      <span class="dash-chip">{{ stats.label_text }}</span>
     </div>
   </div>
   <div class="container">
@@ -116,63 +111,16 @@
   </div>
 </section>
 
-<!-- 功能入口 -->
+<!-- 功能入口：一行紧凑条，不占首屏 -->
 <section class="container dash-section">
-  <div class="dash-grid">
-    <a class="dash-card" href="{{ url_for('risk') }}">
-      <span class="dash-card-icon">{{ icon('alert') }}</span>
-      <div class="dash-card-body">
-        <h3>灾害预警</h3>
-        <p>晚霜冻为主、干热风为辅，逐县给等级、最低温与预估影响区间。</p>
-      </div>
-      <span class="dash-card-link">查看清单 {{ icon('arrow') }}</span>
-    </a>
-
-    <a class="dash-card" href="{{ url_for('analysis') }}">
-      <span class="dash-card-icon">{{ icon('chart') }}</span>
-      <div class="dash-card-body">
-        <h3>气象分析</h3>
-        <p>温度、降水、风速、湿度等逐年气象图表，可按县区与年份筛选。</p>
-      </div>
-      <span class="dash-card-link">进入分析 {{ icon('arrow') }}</span>
-    </a>
-
-    <a class="dash-card" href="{{ url_for('map_view') }}">
-      <span class="dash-card-icon">{{ icon('map') }}</span>
-      <div class="dash-card-body">
-        <h3>产量地图</h3>
-        <p>查看县级单产与生育期降水的空间分布，定位高产与低产县区。</p>
-      </div>
-      <span class="dash-card-link">打开地图 {{ icon('arrow') }}</span>
-    </a>
-
-    <a class="dash-card" href="{{ url_for('advice') }}">
-      <span class="dash-card-icon">{{ icon('leaf') }}</span>
-      <div class="dash-card-body">
-        <h3>农事决策</h3>
-        <p>按五个生育期给出减灾措施，3—4 月窗口含防倒春寒专项。</p>
-      </div>
-      <span class="dash-card-link">查看建议 {{ icon('arrow') }}</span>
-    </a>
-
-    <a class="dash-card" href="{{ url_for('predict') }}">
-      <span class="dash-card-icon">{{ icon('ruler') }}</span>
-      <div class="dash-card-body">
-        <h3>情景仿真</h3>
-        <p>以树模型为底座做反事实对照：若无这场灾害，单产大概是什么水平。</p>
-      </div>
-      <span class="dash-card-link">进入仿真 {{ icon('arrow') }}</span>
-    </a>
-
-    <a class="dash-card dash-card--upload" href="{{ url_for('upload') }}">
-      <span class="dash-card-icon">{{ icon('upload') }}</span>
-      <div class="dash-card-body">
-        <h3>上传数据</h3>
-        <p>上传逐日气象 CSV / Excel，自动完成字段识别与缺失、异常校验。</p>
-      </div>
-      <span class="dash-card-link">上传文件 {{ icon('arrow') }}</span>
-    </a>
-  </div>
+  <nav class="wk-bar">
+    <a href="{{ url_for('risk') }}"><b>灾害预警</b><em>逐县等级 · 最低温</em></a>
+    <a href="{{ url_for('analysis') }}"><b>气象分析</b><em>逐日要素曲线</em></a>
+    <a href="{{ url_for('map_view') }}"><b>产量地图</b><em>县级空间分布</em></a>
+    <a href="{{ url_for('advice') }}"><b>农事决策</b><em>五生育期作业卡</em></a>
+    <a href="{{ url_for('predict') }}"><b>情景仿真</b><em>可追溯折减</em></a>
+    <a href="{{ url_for('upload') }}"><b>上传数据</b><em>校验后入库</em></a>
+  </nav>
 </section>
 
 <!-- 模型说明：训练口径与精度指标（默认折叠，不占主界面） -->

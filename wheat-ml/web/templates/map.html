@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('灾害风险地图', '按年份查看 4 月低温造成的县级减产空间分布；颜色越深减产越重，已剔除全省共同年景，只反映县与县之间的差异。', [year ~ ' 年', '县级单元']) }}
+{{ page_head('灾害风险地图', '按年份查看 4 月低温造成的县级减产空间分布；颜色越深减产越重，已剔除全省共同年景，只反映县与县之间的差异。', ['县级单元', '县距平口径']) }}
 <div class="container page-content map-page">
   <div class="map-toolbar-panel">
     <div class="filter-panel map-filter">

@@ -63,22 +63,10 @@
     <p class="chart-note">干热风天数按县区逐日气象统计（日最高温 ≥35℃ 且相对湿度 ≤40%）；等级按天数划分暴露强度，不等同于减产幅度——县域尺度上气象与单产的统计关联较弱，实际损失需结合实地灾情评估。</p>
   </section>
 
-  <section class="dh-levels">
-    <article class="dh-level">
-      <span class="chip chip--ok"><i class="dot"></i>无</span>
-      <strong>0 天</strong>
-      <p>未出现干热风日，正常关注灌浆期水分供应。</p>
-    </article>
-    <article class="dh-level">
-      <span class="chip chip--gold"><i class="dot"></i>轻度</span>
-      <strong>1—2 天</strong>
-      <p>灌浆期叶片可能提前衰老，建议查墒情、叶面补肥，盯住土壤水分。</p>
-    </article>
-    <article class="dh-level is-alert">
-      <span class="chip chip--alert"><i class="dot"></i>重度</span>
-      <strong>≥ 3 天</strong>
-      <p>青枯逼熟风险明显，需提前安排灌溉与防灾措施。</p>
-    </article>
+  <section class="dh-legend" aria-label="等级说明">
+    <span><span class="chip chip--ok"><i class="dot"></i>无</span> 0 天 · 正常关注灌浆期水分</span>
+    <span><span class="chip chip--gold"><i class="dot"></i>轻度</span> 1—2 天 · 查墒情、叶面补肥</span>
+    <span><span class="chip chip--alert"><i class="dot"></i>重度</span> ≥3 天 · 优先安排降温补水</span>
   </section>
 </div>
 {% endblock %}

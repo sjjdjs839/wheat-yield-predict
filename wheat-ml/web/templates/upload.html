@@ -109,20 +109,15 @@
 
   <div class="upload-layout">
     <aside class="upload-aside">
-      <figure class="upload-photo">
-        <picture>
-          <source srcset="{{ url_for('static', filename='assets/field/wheat-closeup.webp') }}" type="image/webp">
-          <img src="{{ url_for('static', filename='assets/field/wheat-closeup.jpg') }}" alt="晨光中带露珠的麦穗特写" loading="lazy">
-        </picture>
-        <figcaption class="upload-photo-caption">
-          <strong>逐日气象数据</strong>
-          <span>校验通过后自动识别灾害过程，并进入生育期建议。</span>
-        </figcaption>
-      </figure>
-      <div class="upload-rules">
-        <div class="upload-rule">{{ icon('check') }}<span>字段口径：年份 + 日序（1—366）或完整日期（YYYY-MM-DD），两种不可混用。</span></div>
-        <div class="upload-rule">{{ icon('check') }}<span>缺失值请留空，不要填 0；短波辐射若为 W/m² 会自动换算为 MJ/m²/day。</span></div>
-        <div class="upload-rule">{{ icon('check') }}<span>自动识别中英文字段，检查缺失、重复与异常值；通过后识别灾害过程并给出减产量级与当期建议。</span></div>
+      <div class="up-spec">
+        <h3>字段与校验口径</h3>
+        <dl class="up-spec-list">
+          <div><dt>时间字段</dt><dd>年份 + 日序（1—366），或完整日期（YYYY-MM-DD）；两种不可混用</dd></div>
+          <div><dt>缺失值</dt><dd>留空，不要填 0；短波辐射若为 W/m² 自动换算为 MJ/m²/day</dd></div>
+          <div><dt>自动识别</dt><dd>中英文字段名与单位；检查缺失、重复、越界异常值，逐条给行号</dd></div>
+          <div><dt>通过之后</dt><dd>识别灾害过程 → 折算减产量级 → 写入当期观测，供农事建议取数</dd></div>
+          <div><dt>不影响全站</dt><dd>默认只做诊断，不替换分析与预测读取的内置数据集</dd></div>
+        </dl>
       </div>
     </aside>
 

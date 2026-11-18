@@ -1589,3 +1589,61 @@ main{overflow-x:clip}
   .bd-table td:first-child{width:auto}
   .bd-table .bd-note{display:none}
 }
+
+
+/* ===== 后台式紧凑页头 + 入口条（替代 hero 横幅与功能大卡） ===== */
+.wk-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;padding:20px 0 14px;border-bottom:1px solid var(--line)}
+.wk-head h1{font-size:21px;font-weight:600;letter-spacing:-.01em;color:var(--ink-900);line-height:1.3}
+.wk-sub{margin-top:5px;max-width:620px;font-size:12.5px;line-height:1.6;color:var(--ink-500)}
+.wk-src{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.wk-bar{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.wk-bar a{display:flex;flex-direction:column;gap:3px;padding:11px 14px;background:var(--paper);text-decoration:none;transition:background .15s}
+.wk-bar a:hover{background:var(--rice-50)}
+.wk-bar b{font-size:13.5px;font-weight:600;color:var(--ink-900)}
+.wk-bar em{font-style:normal;font-size:11.5px;line-height:1.4;color:var(--ink-500)}
+@media (max-width:1100px){.wk-bar{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.wk-bar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ===== KPI 条（替代叙述式横幅，注意勿与既有 .stat-strip 混用） ===== */
+.kpi-strip{border:1px solid var(--line);border-radius:12px;background:var(--paper);overflow:hidden;margin:0 0 18px}
+.kpi-strip-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);margin:0}
+.kpi-strip-grid > div{background:var(--paper);padding:13px 16px;min-width:0}
+.kpi-strip-grid dt{font-size:11px;color:var(--ink-500);letter-spacing:.04em}
+.kpi-strip-grid dd{margin-top:4px;font-family:var(--font-num);font-size:20px;font-weight:600;color:var(--ink-900)}
+.kpi-strip-grid dd span{font-family:var(--font-sans);font-size:11.5px;font-weight:400;color:var(--ink-500);margin-left:3px}
+.kpi-strip-bar{display:flex;align-items:center;gap:18px;padding:9px 16px;border-top:1px solid var(--line);background:var(--rice-50);flex-wrap:wrap}
+.kpi-strip-year{font-size:12px;font-weight:600;color:var(--forest-700);white-space:nowrap}
+.kpi-strip-more{flex:1;min-width:220px;font-size:12px;line-height:1.6;color:var(--ink-600)}
+.kpi-strip-more summary{cursor:pointer;color:var(--ink-700);list-style:none}
+.kpi-strip-more summary::-webkit-details-marker{display:none}
+.kpi-strip-more summary::before{content:"\25B8  ";color:var(--forest-700)}
+.kpi-strip-more[open] summary::before{content:"\25BE  "}
+.kpi-strip-more p{margin-top:6px;color:var(--ink-600)}
+.kpi-strip-link{font-size:12px;color:var(--forest-700);text-decoration:none;white-space:nowrap}
+.kpi-strip-link:hover{text-decoration:underline}
+@media (max-width:760px){.kpi-strip-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ===== 干热风等级图例（替代三张大卡） ===== */
+.dh-legend{display:flex;flex-wrap:wrap;align-items:center;gap:26px;padding:12px 2px 0;font-size:12px;line-height:1.6;color:var(--ink-600)}
+.dh-legend > span{display:inline-flex;align-items:center;gap:7px}
+.dh-legend .chip{margin:0}
+
+/* ===== 空态生育期：压成紧凑行，不占首屏 ===== */
+.stage.is-compact{grid-template-columns:30px minmax(0,1fr);gap:8px}
+.stage.is-compact .stage-node{width:22px;height:22px;font-size:10px}
+.stage.is-compact .stage-card{padding:10px 16px}
+.stage.is-compact .stage-card h2{font-size:15px;display:inline}
+.stage.is-compact .stage-period{display:inline;margin:0 0 0 9px;font-size:11.5px;color:var(--ink-500)}
+.stage.is-compact .stage-body{display:none}
+.stage.is-compact .stage-head{padding:0}
+.stage.is-compact .stage-rail::before{bottom:-16px}
+
+/* ===== 上传页字段口径块 ===== */
+.up-spec{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:16px 18px;margin-top:2px}
+.up-spec h3{font-size:14px;font-weight:600;color:var(--ink-900);margin:0 0 12px}
+.up-spec-list{margin:0;display:grid;gap:10px}
+.up-spec-list > div{display:grid;grid-template-columns:74px minmax(0,1fr);gap:10px;padding-bottom:10px;border-bottom:1px dashed var(--line)}
+.up-spec-list > div:last-child{border-bottom:0;padding-bottom:0}
+.up-spec-list dt{font-size:11.5px;color:var(--ink-500);white-space:nowrap}
+.up-spec-list dd{margin:0;font-size:12.5px;line-height:1.6;color:var(--ink-700)}
+@media (max-width:520px){.up-spec-list > div{grid-template-columns:1fr;gap:3px}}
