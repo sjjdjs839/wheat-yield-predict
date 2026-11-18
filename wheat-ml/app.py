@@ -247,11 +247,30 @@ def load_models():
 
 
 def county_mean_yield(stats: dict, county: str) -> tuple[float, bool]:
-    """返回 (用于还原的县均值单产, 是否命中该县)"""
+    """返回 (用于还原的县均值单产, 是否命中该县)。
+
+    取训练期 county_prior（2010—2021），与模型训练口径一致，避免把测试年
+    实际产量带进特征。与年鉴全期均值相差约 3.6 kg/亩（最大 13.8）。
+    """
     if county in stats:
-        return float(stats[county]["mean_yield"]), True
+        return county_prior_of(stats, county, float(stats[county]["mean_yield"])), True
     vals = [v["mean_yield"] for v in stats.values()]
     return float(np.median(vals)), False
+
+
+def county_prior_of(stats: dict, county: str, fallback: float) -> float:
+    """模型用的县均单产，取训练期口径（county_stats 的 features.county_prior）。
+
+    训练时 county_prior 只用 2010—2021 的县均值，预测若改用全期 mean_yield，
+    既与训练分布不一致，也会把 2022—2024 的实际产量带进特征（信息泄露）。
+    """
+    v = stats.get(county) if stats else None
+    if not v:
+        return float(fallback)
+    f = v.get("features") or {}
+    if "county_prior" in f:
+        return float(f["county_prior"])
+    return float(v.get("mean_yield", fallback))
 
 
 def _attach_prior(feat: pd.DataFrame, stats: dict) -> pd.DataFrame:
@@ -262,7 +281,7 @@ def _attach_prior(feat: pd.DataFrame, stats: dict) -> pd.DataFrame:
     global_mean = float(np.median(vals)) if vals else 0.0
     feat = feat.copy()
     feat["county_prior"] = feat["county"].map(
-        lambda c: float(stats[c]["mean_yield"]) if stats and c in stats else global_mean
+        lambda c: county_prior_of(stats, c, global_mean)
     )
     return feat
 
@@ -279,13 +298,13 @@ def batch_predict(feat: pd.DataFrame, bundle, mean_yield) -> list:
         p_rf = rf.predict(X)
         p_lgbm = lgbm.predict(X) if lgbm is not None else p_rf
         p_lr = lr.predict(X) if lr is not None else p_rf
-        fused = 0.5 * p_rf + 0.3 * p_lgbm + 0.2 * p_lr
+        fused = 0.2 * p_rf + 0.6 * p_lgbm + 0.2 * p_lr
         vals = [v["mean_yield"] for v in stats.values()] if stats else []
         global_mean = float(np.median(vals)) if vals else mean_yield
         out = []
         for i, (_, r) in enumerate(feat.iterrows()):
             cy = r["county"]
-            m = float(stats[cy]["mean_yield"]) if stats and cy in stats else global_mean
+            m = county_prior_of(stats, cy, global_mean)
             out.append(float(fused[i]) * m)
         return out
     except Exception:
@@ -1548,7 +1567,7 @@ def api_simulate():
         pred_rf = clamp(float(rf.predict(X_data)[0]), base_rf)
         pred_lgbm = clamp(float(lgbm.predict(X_data)[0]), base_lgbm) if lgbm is not None else pred_rf
         pred_lr = clamp(float(lr.predict(X_data)[0]), base_lr) if lr is not None else pred_rf
-        fused = 0.5 * pred_rf + 0.3 * pred_lgbm + 0.2 * pred_lr
+        fused = 0.2 * pred_rf + 0.6 * pred_lgbm + 0.2 * pred_lr
         return max(mean_yield * 0.5, min(mean_yield * 1.5, fused * mean_yield))
 
     pred = ensemble_predict(X_arr)
@@ -1674,7 +1693,7 @@ def predict():
         pred_lr = float(lr.predict(X)[0]) * mean_yield if lr is not None else pred_rf
         pred_lgbm = float(lgbm.predict(X)[0]) * mean_yield if lgbm is not None else pred_rf
         # 多模型加权平均
-        pred = 0.5 * pred_rf + 0.3 * pred_lgbm + 0.2 * pred_lr
+        pred = 0.2 * pred_rf + 0.6 * pred_lgbm + 0.2 * pred_lr
 
         labels, is_real = load_yield_labels()
         actual = None

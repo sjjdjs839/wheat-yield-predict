@@ -61,7 +61,7 @@
         <div class="result-summary">
           <p class="result-kicker">{{ result.county }} · {{ result.year }} 年</p>
           <div class="result-value">{{ result.pred }}<small>kg/亩</small></div>
-          <p class="result-sub">该县多年平均 {{ result.mean_yield }} kg/亩</p>
+          <p class="result-sub">该县 2010—2021 平均 {{ result.mean_yield }} kg/亩</p>
           <p class="result-ci">误差量级 <strong>{{ result.pred_low }}</strong> — <strong>{{ result.pred_high }}</strong> kg/亩<span class="ci-note">按测试集 MAE {{ result.mae }} 的 ±0.8 倍估算，测试集上约覆盖一半样本；这是误差量级，不是统计置信区间</span></p>
           {% if result.prob_below is not none %}
           <p class="result-ci">
@@ -70,7 +70,7 @@
           </p>
           {% endif %}
           {% if zone_hint %}
-          <p class="zone-hint">{{ icon('alert') }}该县属{{ zone_hint.zone }}：模型在此类县上系统性偏低约 {{ zone_hint.bias }} kg/亩（该象限 MAE {{ zone_hint.mae }}），预测值宜作下限参考，请结合实地核查。</p>
+          <p class="zone-hint">{{ icon('alert') }}该县属{{ zone_hint.zone }}：模型在此类县上系统性偏低约 {{ zone_hint.bias }} kg/亩（该象限 MAE {{ zone_hint.mae }}），单县单年偏差可能明显大于象限平均；预测值宜作下限参考，请结合实地核查。</p>
           {% endif %}
           <span class="status-pill {{ 'is-alert' if result.alert else 'is-ok' }}">
             {{ '产量预警：预测单产低于预警线' if result.alert else '产量正常：预测单产不低于预警线' }}
@@ -89,7 +89,7 @@
             <div class="ruler-legend">
               <span><i class="legend-dot"></i>预测值 {{ result.pred }}</span>
               <span><i class="legend-line"></i>预警线 {{ result.threshold }}</span>
-              <span><i class="legend-mean"></i>多年平均 {{ result.mean_yield }}</span>
+              <span><i class="legend-mean"></i>2010—2021 均值 {{ result.mean_yield }}</span>
               <span><i class="legend-band"></i>误差量级 {{ result.pred_low }}—{{ result.pred_high }}</span>
             </div>
           </div>
