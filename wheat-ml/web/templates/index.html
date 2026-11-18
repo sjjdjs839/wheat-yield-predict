@@ -193,7 +193,7 @@
       <div><dt>仿真底座 R²</dt><dd>{{ best_label }} {{ b.r2 }}</dd></div>
       <div><dt>MAE</dt><dd>{{ b.mae }}<small>kg/亩</small></dd></div>
     </dl>
-    <p class="model-foot">上层结论来自面板回归（系数、p 值、置信区间），树模型仅作反事实仿真的底座，其 R² 不用于衡量灾害影响大小。融合权重 随机森林 50% + LightGBM 30% + 线性回归 20%，共 {{ model.features|length }} 项特征。{% if not model.reliable %}当前使用演示产量标签，指标仅用于跑通链路。{% endif %}</p>
+    <p class="model-foot">上层结论来自面板回归（系数、p 值、置信区间），树模型仅作反事实仿真的底座，其 R² 不用于衡量灾害影响大小。融合权重 LightGBM 60% + 随机森林 20% + 线性回归 20%，共 {{ model.features|length }} 项特征。{% if not model.reliable %}当前使用演示产量标签，指标仅用于跑通链路。{% endif %}</p>
   </div>
 </details>
 {% endif %}

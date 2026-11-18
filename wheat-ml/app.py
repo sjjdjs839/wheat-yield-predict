@@ -1809,7 +1809,7 @@ def predict():
         preds_rf = rf.predict(X_all) * mean_yield
         preds_lr = lr.predict(X_all) * mean_yield if lr is not None else preds_rf
         preds_lgbm = lgbm.predict(X_all) * mean_yield if lgbm is not None else preds_rf
-        preds_all = 0.5 * preds_rf + 0.3 * preds_lgbm + 0.2 * preds_lr
+        preds_all = 0.2 * preds_rf + 0.6 * preds_lgbm + 0.2 * preds_lr
         for i, r in feats.reset_index(drop=True).iterrows():
             y_ = int(r["year"])
             act = api.get((county, y_))

@@ -83,18 +83,9 @@ python run.py                        # 加 --no-browser 则不弹浏览器
 │  ├─ 项目介绍_指导老师版.md
 │  ├─ 项目技术讲解_答辩用.md
 │  ├─ 项目交付检查清单.md
-│  ├─ 前端优化说明.md
-│  ├─ reports/                   # 数据质检报告 / chk_all.pdf / chk_all.xlsx
-│  └─ qa/                        # 七页四档视口验收截图
-└─ archive/                      # 历史版本与一次性脚本，不参与运行
-   ├─ pre_reorg_20261111/        # 整理前代码与文档备份
-   ├─ old_full_project_20261109/
-   ├─ old_frontend_copy_20261110/
-   ├─ backup_旧前端_20261110/
-   ├─ root_scripts_oneoff/
-   ├─ root_scripts_superseded/
-   ├─ legacy_tests/
-   └─ uploads_old/
+│  ├─ 模型卡.md
+│  ├─ reports/                   # 数据质检报告（旧系统导出件已归档）
+└─ wheat-ml/                      # 全部代码（见下）
 ```
 
 ## 数据说明
@@ -124,8 +115,8 @@ python run.py                        # 加 --no-browser 则不弹浏览器
 - 数据检查：`tools/checks/`（对齐、泄露、异常值、区县清单、映射）。
 - 模型实验：`tools/model/`（原始 vs 归一化、模型对比、RF 调参）。
 - 前端移植与验收：`wheat-ml/前端移植说明.md`。
-- 验收截图：`docs/qa/`；整理前代码备份：`archive/pre_reorg_20261111/`。
+- 模型卡：`docs/模型卡.md`；分年指标：`wheat-ml/output/reports/metrics_lgbm_by_year.json`。
 
 ## 归档说明
 
-`archive/` 中的旧完整项目、旧前端副本、一次性 `add_*.py`、旧 DB/清洗脚本仅用于回溯，不参与运行，也不要作为当前交付物。确认不再需要旧模型或旧数据后，可再整体删除 `archive/` 以节省空间。
+本机根目录下的 `archive/` 存放旧完整项目、旧前端副本、一次性脚本与旧导出件，仅用于回溯。该目录已被 `.gitignore` 与打包脚本排除，**既不入库、也不进交付包**，`docs/qa/`（改造前验收截图）同样已归入 `docs/archive/` 一并排除。交付包内的文档以 `docs/` 下四份 md 与 `wheat-ml/docs/` 下说明书为准。

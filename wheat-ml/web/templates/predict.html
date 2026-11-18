@@ -66,7 +66,7 @@
           {% if result.prob_below is not none %}
           <p class="result-ci">
             产量预警概率 <strong>{{ result.prob_below }}%</strong>
-            <span class="ci-note">300 棵决策树中预测值低于预警线的比例；树间区间 {{ result.tree_low }}—{{ result.tree_high }} kg/亩，反映模型不确定性，非统计置信区间。</span>
+            <span class="ci-note">500 棵决策树中预测值低于预警线的比例；树间区间 {{ result.tree_low }}—{{ result.tree_high }} kg/亩，反映模型不确定性，非统计置信区间。</span>
           </p>
           {% endif %}
           {% if zone_hint %}
@@ -180,7 +180,7 @@
         <summary>模型说明：融合口径与精度指标</summary>
         <div class="detail-body">
           <dl class="stat-list">
-            <div><dt>融合权重</dt><dd>随机森林 50% · LightGBM 30% · 线性回归 20%</dd></div>
+            <div><dt>融合权重</dt><dd>LightGBM 60% · 随机森林 20% · 线性回归 20%</dd></div>
             <div><dt>本县本年各模型输出</dt><dd>{{ result.pred_rf }} / {{ result.pred_lgbm }} / {{ result.pred_lr }} kg/亩</dd></div>
             {% if metrics %}
             <div><dt>随机森林 R²</dt><dd>{{ metrics.r2 }}</dd></div>
