@@ -1593,6 +1593,73 @@ def api_simulate():
 _ZONE_CACHE: dict = {}
 
 
+def county_year_breakdown(county: str, year: int):
+    """该县该年的产量归因拆解，数据全部取自 disaster_events 表（按县×年一行）。
+
+    单位一律为百分数（%）。返回 None 表示该县该年无灾害事件记录。
+    注意：合计（total_loss）为面板合计口径，各分项是单灾种单独估计，不能相加；
+    年景项（year_effect）由当年数据估出，只能解释已发生年份，不能外推。
+    """
+    ev = disaster_events_table()
+    if ev.empty or "year" not in ev.columns or "county" not in ev.columns:
+        return None
+    r = ev[(ev["county"] == county) & (ev["year"] == year)]
+    if r.empty:
+        return None
+    row = r.iloc[0]
+
+    def _f(k, nd=2):
+        try:
+            v = row.get(k)
+            if v is None or pd.isna(v):
+                return None
+            return round(float(v), nd)
+        except Exception:
+            return None
+
+    d = {
+        "year": int(year),
+        "fz4": _f("fz4_0", 0),
+        "fz4_streak": _f("fz4_streak", 0),
+        "tmin4": _f("tmin4", 1),
+        "frost_loss": _f("frost_loss"),
+        "frost_low": _f("frost_loss_low"),
+        "frost_high": _f("frost_loss_high"),
+        "fz3": _f("fz3_0", 0),
+        "cold3_loss": _f("cold3_loss"),
+        "hd_may": _f("hd_may", 0),
+        "hd_streak": _f("hd_streak", 0),
+        "hd_level": int(row["hd_level"]) if pd.notna(row.get("hd_level")) else 0,
+        "year_effect": _f("year_effect"),
+        "total_loss": _f("total_loss"),
+        "total_low": _f("total_low"),
+        "total_high": _f("total_high"),
+    }
+    dose = _dose_payload()
+    bands = []
+    if isinstance(dose, dict):
+        for b in (dose.get("fz4") or {}).get("bands", []):
+            bands.append({"edge": b.get("edge"), "dev_pct": b.get("dev_pct"),
+                          "n": b.get("n"), "se_pct": b.get("se_pct")})
+    d["dose_bands"] = bands
+
+    # 回归系数（每多一天的边际影响，%），用于按天数直接算折减。
+    # 注意：表内 frost_loss / cold3_loss 是"归零后的潜在增益"的反事实口径，
+    # 不是灾害损失，页面不得直接当作损失展示。
+    p = Path(__file__).resolve().parent / "output" / "reports" / "disaster_coefficients.json"
+    d["fz4_beta"] = -1.96
+    d["fz3_beta"] = -0.57
+    d["hd_p"] = 0.205
+    try:
+        co = json.loads(p.read_text(encoding="utf-8")).get("joint", {})
+        d["fz4_beta"] = round(co.get("fz4_0", {}).get("beta", -0.01963) * 100, 2)
+        d["fz3_beta"] = round(co.get("fz3_0", {}).get("beta", -0.00567) * 100, 2)
+        d["hd_p"] = round(co.get("hd_streak", {}).get("p", 0.20527), 3)
+    except Exception:
+        pass
+    return d
+
+
 def county_zone_hint(county: str):
     """按分象限误差给出该县的已知局限提示。
 
@@ -1654,6 +1721,7 @@ def predict():
                                reliable=False, result=None, history=[], trend_chart=None,
                                feature_chart=None, feature_count=len(FEATS),
                                zone_hint=county_zone_hint(county),
+                               breakdown=county_year_breakdown(county, year),
                                source=data_meta["source"],
                                error="尚未训练模型，请先运行 python -m src.models.train_model")
 
@@ -1817,6 +1885,7 @@ def predict():
                            result=result, history=history, trend_chart=trend_chart,
                            feature_chart=feature_chart, feature_count=len(FEATS),
                            zone_hint=county_zone_hint(county),
+                           breakdown=county_year_breakdown(county, year),
                            error=error, source=data_meta["source"])
 
 

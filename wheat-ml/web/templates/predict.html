@@ -103,6 +103,52 @@
         <div class="metric"><span>该年实测单产</span><strong>{{ result.actual if result.actual is not none else '—' }}{% if result.actual is not none %}<small>kg/亩</small>{% endif %}</strong></div>
       </div>
 
+      {% if breakdown and result %}
+      {% set fz4_pct = breakdown.fz4_beta * breakdown.fz4 %}
+      {% set fz3_pct = breakdown.fz3_beta * breakdown.fz3 %}
+      {% set tot_pct = fz4_pct + fz3_pct %}
+      <div class="bd-panel">
+        <div class="contrib-head">
+          <h3>这个数里，能追溯的部分</h3>
+          <p class="block-note">上面是树模型用 19 维特征的参照；下面只列回归验证过、能按天数单独折算的灾种。没验证的只记暴露，不折算。</p>
+        </div>
+        <table class="bd-table">
+          <tbody>
+            <tr><td>县基线（2010—2021 平均）</td><td class="bd-num">{{ result.mean_yield }} kg/亩</td><td class="bd-note">训练期县均值</td></tr>
+            <tr>
+              <td>4 月 ≤0℃ {{ breakdown.fz4 }} 天 → 折减</td>
+              <td class="bd-num {{ 'bd-down' if fz4_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(fz4_pct) }}%（{{ (result.mean_yield * fz4_pct / 100)|round(1) }} kg/亩）</td>
+              <td class="bd-note">每多 1 天 −{{ '%.2f'|format(breakdown.fz4_beta|abs) }}%，p=0.000，n=1635</td>
+            </tr>
+            <tr>
+              <td>3 月 ≤0℃ {{ breakdown.fz3 }} 天 → 折减</td>
+              <td class="bd-num {{ 'bd-down' if fz3_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(fz3_pct) }}%（{{ (result.mean_yield * fz3_pct / 100)|round(1) }} kg/亩）</td>
+              <td class="bd-note">每多 1 天 −{{ '%.2f'|format(breakdown.fz3_beta|abs) }}%，p=0.000</td>
+            </tr>
+            <tr>
+              <td>5 月干热风 {{ breakdown.hd_streak }} 天</td>
+              <td class="bd-num bd-mute">仅暴露</td>
+              <td class="bd-note">三套判据 p&gt;0.2，不折算</td>
+            </tr>
+            <tr class="bd-total">
+              <td>可追溯折减合计</td>
+              <td class="bd-num {{ 'bd-down' if tot_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(tot_pct) }}%（{{ (result.mean_yield * tot_pct / 100)|round(1) }} kg/亩）</td>
+              <td class="bd-note">仅灾害项，不含年景</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="bd-foot">合计只叠加上面已验证的灾种；品种趋势与其他气象由树模型吸收，无单独可追溯项。年景项（全省共同年景）由当年数据估出，只解释已发生年份，不列入此表。</p>
+        <div class="bd-sim">
+          <span class="bd-sim-title">若霜冻天数变大（依据剂量分档）：</span>
+          {% for b in breakdown.dose_bands %}
+            {% if b.n and b.n >= 27 and b.dev_pct is not none %}
+            <span class="bd-chip {{ 'is-bad' if b.dev_pct < -1 else '' }}">{{ b.edge }}：{{ '%+.2f'|format(b.dev_pct) }}%（{{ (result.mean_yield * b.dev_pct / 100)|round(1) }} kg/亩，n={{ b.n }}）</span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       {% if result.contrib and result.contrib.available %}
       <div class="contrib-panel">
         <div class="contrib-head">
