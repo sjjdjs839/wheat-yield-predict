@@ -60,11 +60,27 @@ python -m scripts.init_database     # CSV 成果导入 MySQL
 
 ## 数据库（MySQL，可选）
 
-项目默认使用 CSV 数据链路，不依赖 MySQL；数据库未启动时页面功能不受影响。
+**不装 MySQL 也能跑通全部功能**：连接失败或表为空时，系统自动回退内置 CSV，页面行为一致。
 
-如本机已有 MySQL 8，可在 `data/mysql/mysql-8.0.24-winx64` 放置安装目录，并通过 `scripts/mysql_server.ps1` 启动；当前仓库不内置 MySQL 二进制。
+| 你想用的是 | 怎么配 | 端口 |
+|---|---|---|
+| 系统已安装的 MySQL 8 | `config.yaml → database` 保持默认 | 3306 |
+| 仓库里的 `scripts/mysql_server.ps1`（需自行把 mysql-8.0.24-winx64 放进 `data/mysql/`） | 把 `database.port` 改成 3307，或设 `WHEAT_DB_PORT=3307` | **3307** |
+| 不想用数据库 | `enabled: false`，或设 `WHEAT_DB_ENABLED=0` | — |
 
-- 连接配置：[config.yaml](config/config.yaml) 的 `database` 段，默认 `127.0.0.1:3306`、库名 `wheat_ml`
+连接参数优先级：**环境变量 > config.yaml**，换机器部署不必改文件。
+
+| 环境变量 | 作用 | 示例 |
+|---|---|---|
+| `WHEAT_DB_ENABLED` | 是否启用数据库 | `0` = 关闭，全程走 CSV |
+| `WHEAT_DB_HOST` | 主机 | `127.0.0.1` |
+| `WHEAT_DB_PORT` | 端口 | `3306` 或 `3307` |
+| `WHEAT_DB_USER` | 用户名 | `root` |
+| `WHEAT_DB_PASSWORD` | 密码 | 你自己的密码 |
+| `WHEAT_DB_NAME` | 库名 | `wheat_ml` |
+
+> ⚠️ 仓库内 `config.yaml` 的 `password` 是开发机上的值，换机器请改掉，或设 `WHEAT_DB_PASSWORD`。
+> 没配好也不会报错崩掉——系统会自动回退 CSV，只是少了一层库查询。
 
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts\mysql_server.ps1 start   # 启动
@@ -127,7 +143,7 @@ powershell -ExecutionPolicy Bypass -File scripts\mysql_server.ps1 stop    # 停�
 | 目标变量 | `yield_norm = 单产 ÷ 县域多年均值`，预测后还原真实单产再算指标 |
 | 划分方式 | **按年份划分**（`config.yaml → model.split.test_years`，默认 2022—2024），禁止随机拆分 |
 | 特征 | 按生育阶段汇总：阶段均温、累计降水、累计辐射、高温日数、霜冻日数、干热风日数等 18 个气象因子 + 1 个县域常年单产先验，共 19 维 |
-| 模型 | 多模型融合：随机森林 50% + LightGBM 30% + 线性回归 20% |
+| 模型 | 多模型融合：**LightGBM 60% + 随机森林 20% + 线性回归 20%**（权重写在 `app.py` 的融合式，三模型单测见 `output/reports/metrics_*.json`） |
 | 指标 | R² / RMSE / MAE，仅在具备真实产量标签的测试年份上计算 |
 | 预测窗口 | 3—5 月（截至 5 月 31 日灌浆末期），比收获提前约 1 个月；6 月成熟期数据不计入 —— 实测纳入后精度反而下降，详见 `前端移植说明.md` 第 11 节 |
 

@@ -1324,7 +1324,7 @@ main{overflow-x:clip}
 .dash-card-link{margin-top:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--forest-700)}
 .dash-card-link .icon{width:15px;height:15px}
 .dash-card--upload .dash-card-icon{background:rgba(185,130,46,.12);color:var(--wheat-700)}
-.dash-model{margin:26px 0 40px}
+.dash-model{margin:0 0 40px}
 .dash-model .model-metrics{grid-template-columns:repeat(3,minmax(0,1fr));border-color:var(--line);background:var(--line);margin-top:0}
 .dash-model .model-metrics div{background:var(--rice-50)}
 .dash-model .model-metrics dt{color:var(--ink-500)}
