@@ -1655,3 +1655,55 @@ main{overflow-x:clip}
 .map-dist-grid dd{margin-top:3px;font-family:var(--font-num);font-size:16px;font-weight:600;color:var(--ink-900);line-height:1.25}
 .map-dist-grid dd span{display:block;margin-top:2px;font-family:var(--font-sans);font-size:10.5px;font-weight:400;color:var(--ink-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .map-dist-empty{margin:10px 0 0;font-size:12px;color:var(--ink-500)}
+
+
+/* ============ 首页页头实景带（复用 assets/field/aerial-farmland.jpg） ============
+   航拍地块当底图，压深墨绿渐变，保证标题与 KPI 可读；
+   下方数据区仍为米黄+白卡，形成「深色页头 / 浅色工作区」的层级。 */
+.page-index .dash-head{
+  position:relative;
+  padding:40px 0 28px;
+  background-image:
+    linear-gradient(100deg, rgba(12,32,20,.97) 0%, rgba(12,32,20,.92) 34%, rgba(16,39,26,.58) 66%, rgba(12,32,20,.40) 100%),
+    url("assets/field/aerial-farmland.jpg");
+  background-size:auto, cover;
+  background-position:center, center 38%;
+  background-repeat:no-repeat;
+  border-bottom:1px solid rgba(255,255,255,.12);
+}
+.page-index .dash-head::after{
+  content:"";
+  position:absolute; left:0; right:0; bottom:0; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(210,162,76,.55), transparent);
+}
+.page-index .wk-head{
+  border-bottom:0;
+  padding:6px 0 18px;
+}
+.page-index .wk-head h1{
+  color:var(--paper);
+  font-size:26px;
+  letter-spacing:-.02em;
+}
+.page-index .wk-sub{ color:rgba(255,253,247,.66); }
+.page-index .dash-chip{
+  background:rgba(255,253,247,.10);
+  color:rgba(255,253,247,.88);
+  border-color:rgba(255,253,247,.22);
+  backdrop-filter:blur(4px);
+}
+.page-index .dash-stats{
+  margin-top:20px;
+  background:rgba(255,253,247,.10);
+  border:1px solid rgba(255,253,247,.16);
+  backdrop-filter:blur(8px);
+}
+.page-index .dash-stats div{ background:transparent; }
+.page-index .dash-stats dt{ color:rgba(255,253,247,.62); }
+.page-index .dash-stats dd{ color:var(--paper); }
+.page-index .dash-stats dd span{ color:rgba(255,253,247,.58); }
+
+@media (max-width:720px){
+  .page-index .dash-head{ padding:22px 0 16px; }
+  .page-index .wk-head h1{ font-size:19px; }
+}
