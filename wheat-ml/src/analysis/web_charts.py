@@ -304,6 +304,126 @@ def _evaluation(df, year):
     return {"year": result.get("year"), "text": result.get("text", ""), "rows": rows}
 
 
+# ---------------- 生育期灾害窗口（分析页主题化） ----------------
+import yaml as _yaml
+from pathlib import Path as _Path
+
+_CFG = _Path(__file__).resolve().parents[2] / "config" / "config.yaml"
+_STAGES_CACHE = None
+
+
+def _stages():
+    global _STAGES_CACHE
+    if _STAGES_CACHE is None:
+        with open(_CFG, encoding="utf-8") as f:
+            _STAGES_CACHE = _yaml.safe_load(f).get("growth_stages", [])
+    return _STAGES_CACHE
+
+
+def stage_windows(df, year=None):
+    """把气象落到五段生育期，并标注灾害窗口。
+
+    判据与面板回归口径一致（不另造阈值）：
+      4 月低温 t2m_min<=0  → 每多 1 天 -1.96%/天（p<0.001）
+      3 月低温 t2m_min<=0  → 每多 1 天 -0.57%/天（p<0.001）
+      5 月干热风 t2m_max>=35 且 rh<=40 → 六种口径均不显著，只报暴露强度
+    """
+    # 生育期窗口必须落到单一年份；"全部年份"下不显示，避免把 15 年混在一起统计
+    if not year:
+        return None
+    if df is None or len(df) == 0 or "date" not in df.columns:
+        return None
+    d = df.copy()
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"])
+    if year:
+        d = d[d["date"].dt.year == int(year)]
+    if d.empty:
+        return None
+
+    has_tmin = "t2m_min" in d.columns
+    has_tmax = "t2m_max" in d.columns
+    has_rh = "rh" in d.columns
+    d["md"] = d["date"].dt.strftime("%m-%d")
+    d = d.sort_values("date")
+
+    rows = []
+    for st in _stages():
+        seg = d[(d["md"] >= st["start"]) & (d["md"] <= st["end"])]
+        if seg.empty:
+            rows.append({"name": st["name"], "range": f'{st["start"]}~{st["end"]}',
+                         "days": 0, "tavg": "—", "precip": "—", "cold": "—",
+                         "hot": "—", "cold_mar": "—", "cold_apr": "—", "hot_may": "—",
+                         "note": "该期无记录", "tone": "none"})
+            continue
+
+        tavg = round(float(seg["t2m"].mean()), 1) if "t2m" in seg.columns else "—"
+        precip = round(float(seg["precip"].sum()), 1) if "precip" in seg.columns else "—"
+        cold = int((seg["t2m_min"] <= 0).sum()) if has_tmin else 0
+        hot_plain = int((seg["t2m_max"] >= 35).sum()) if has_tmax else 0
+
+        months = seg["date"].dt.month
+        cold_apr = int(((months == 4) & (seg["t2m_min"] <= 0)).sum()) if has_tmin else 0
+        cold_mar = int(((months == 3) & (seg["t2m_min"] <= 0)).sum()) if has_tmin else 0
+        hot_may = 0
+        if has_tmax and has_rh:
+            hot_may = int(((months == 5) & (seg["t2m_max"] >= 35) & (seg["rh"] <= 40)).sum())
+
+        note, tone = "无灾害窗口", "none"
+        loss = cold_apr * 1.96 + cold_mar * 0.57
+        bits = []
+        if cold_apr > 0:
+            bits.append(f"4 月低温 {cold_apr} 天")
+        if cold_mar > 0:
+            bits.append(f"3 月低温 {cold_mar} 天")
+        if bits:
+            note = "、".join(bits) + f" ≈ −{loss:.1f}%"
+            tone = "alert" if cold_apr > 0 else "warn"
+        elif cold > 0:
+            note = f"≤0℃ {cold} 天（非 3—4 月，不折算）"
+            tone = "warn"
+        if hot_may > 0:
+            extra = f"干热风 {hot_may} 天（仅提示）"
+            note = extra if tone == "none" else note + "；" + extra
+            if tone == "none":
+                tone = "warn"
+
+        rows.append({
+            "name": st["name"], "range": f'{st["start"]}~{st["end"]}',
+            "days": int(len(seg)), "tavg": tavg, "precip": precip,
+            "cold": cold, "hot": hot_plain,
+            "cold_mar": cold_mar, "cold_apr": cold_apr, "hot_may": hot_may,
+            "note": note, "tone": tone,
+        })
+
+    # 全省/全县四月口径（不受生育期切段影响，用于与回归口径核对）
+    apr = d[d["date"].dt.month == 4]
+    may = d[d["date"].dt.month == 5]
+    apr_cold = int((apr["t2m_min"] <= 0).sum()) if (len(apr) and has_tmin) else 0
+    may_hot = 0
+    if len(may) and has_tmax and has_rh:
+        may_hot = int(((may["t2m_max"] >= 35) & (may["rh"] <= 40)).sum())
+
+    parts = []
+    if apr_cold > 0:
+        parts.append(f"4 月低温 {apr_cold} 天，按面板回归 −1.96%/天折算约 −{apr_cold * 1.96:.1f}%")
+    else:
+        parts.append("4 月未出现 ≤0℃ 低温日，晚霜冻判据未触发")
+    if may_hot > 0:
+        parts.append(f"5 月干热风 {may_hot} 天，六种口径均不显著，只报暴露强度、不折算减产")
+    else:
+        parts.append("5 月未出现干热风日")
+    parts.append("折算值仅供研判，实际减产还受灌溉、品种与田间管理影响")
+
+    return {
+        "year": int(year) if year else None,
+        "rows": rows,
+        "summary": "；".join(parts),
+        "apr_cold": apr_cold,
+        "may_hot": may_hot,
+    }
+
+
 def build_web(df, year=None, month_from=None, month_to=None):
     """分析页一次性构建全部图表数据"""
     return {
@@ -317,5 +437,6 @@ def build_web(df, year=None, month_from=None, month_to=None):
             annual_overview_chart(df, year),
         ],
         "evaluation": _evaluation(df, year),
+        "stage_windows": stage_windows(df, year),
         "years": sorted(int(y) for y in df["year"].dropna().unique()) if "year" in df else [],
     }

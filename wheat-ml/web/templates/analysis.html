@@ -2,7 +2,7 @@
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {% set badges = [source] + ([county] if county else []) + (['全部年份'] if not year else [year|string ~ ' 年']) %}
-{{ page_head('气象分析', '按县区、年份与月份区间查看温度、降水、风速、辐射与湿度图表，并给出当年气象条件综合评估。', badges) }}
+{{ page_head('气象分析', '按县区、年份与月份区间查看气象要素，并按五段生育期标注晚霜冻与干热风窗口，直接对应到减产弹性。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法分析</span><p>{{ error }}</p></div>
@@ -54,8 +54,8 @@
     <dl class="kpi-strip-grid">
       <div><dt>平均气温</dt><dd>{{ current[0]['平均气温'] }}<span>℃</span></dd></div>
       <div><dt>年降水量</dt><dd>{{ current[0]['年降水量'] }}<span>mm</span></dd></div>
-      <div><dt>高温日数</dt><dd>{{ current[0]['高温日数'] }}<span>天</span></dd></div>
-      <div><dt>霜冻日数</dt><dd>{{ current[0]['霜冻日数'] }}<span>天</span></dd></div>
+      <div><dt>全年高温日</dt><dd>{{ current[0]['高温日数'] }}<span>天</span></dd></div>
+      <div><dt>全年霜冻日</dt><dd>{{ current[0]['霜冻日数'] }}<span>天</span></dd></div>
     </dl>
     {% endif %}
     <div class="kpi-strip-bar">
@@ -95,6 +95,51 @@
     </div>
   </details>
   {% endif %}
+  {% endif %}
+
+  {% if stage_windows %}
+  <section class="block stg-block" data-reveal>
+    <div class="block-head">
+      <div>
+        <h2>生育期灾害窗口</h2>
+        <p class="block-sub">同一场低温，落在越冬期和抽穗扬花期后果完全不同。这里按五段生育期重算，并按月份套用回归弹性，不另造阈值。</p>
+      </div>
+      <span class="stg-year">{{ stage_windows.year }} 年</span>
+    </div>
+    <div class="table-wrap">
+      <table class="stg-table">
+        <thead>
+          <tr>
+            <th>生育期</th>
+            <th>起止（月-日）</th>
+            <th>天数</th>
+            <th>均温 ℃</th>
+            <th>降水 mm</th>
+            <th>3 月 ≤0℃</th>
+            <th>4 月 ≤0℃</th>
+            <th>5 月干热风</th>
+            <th>灾害判定</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in stage_windows.rows %}
+          <tr class="stg-{{ r.tone }}">
+            <td><b>{{ r.name }}</b></td>
+            <td class="mono">{{ r.range }}</td>
+            <td>{{ r.days }}</td>
+            <td>{{ r.tavg }}</td>
+            <td>{{ r.precip }}</td>
+            <td>{{ r.cold_mar }}</td>
+            <td>{{ r.cold_apr }}</td>
+            <td>{{ r.hot_may }}</td>
+            <td class="stg-note">{{ r.note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="stg-summary"><span class="stg-tag">折算口径</span>{{ stage_windows.summary }}</p>
+  </section>
   {% endif %}
 
   <section class="block-lg">

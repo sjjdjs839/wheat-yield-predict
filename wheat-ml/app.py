@@ -701,6 +701,7 @@ def analysis():
                            county=county, years=years, year=year,
                            month_from=month_from, month_to=month_to,
                            charts=result["charts"], evaluation=result["evaluation"],
+                           stage_windows=result.get("stage_windows"),
                            source=meta["source"], error=error)
 
 
