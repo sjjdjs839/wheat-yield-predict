@@ -36,6 +36,12 @@
 
     <aside class="map-side">
       <div class="map-side-block">
+        <h2>本年县级分布</h2>
+        <dl class="map-dist-grid" id="mapDist" aria-live="polite">
+          <div><dt>加载中</dt><dd>—</dd></div>
+        </dl>
+      </div>
+      <div class="map-side-block">
         <h2>当前指标最突出的 5 个县区</h2>
         <ol class="map-rank" id="mapTop" aria-live="polite">
           <li class="map-rank-empty">加载中…</li>
@@ -103,6 +109,49 @@
       return '<li><span class="rank-index">' + String(index + 1).padStart(2, '0') + '</span>' +
         '<span class="rank-name">' + item.county + '</span>' +
         '<strong>' + item.value.toFixed(1) + '</strong></li>';
+    }).join('');
+  }
+
+  var DIST_UNIT = { yield: ' kg/亩', rainfall: ' mm', disaster: '%', frostdays: ' 天' };
+  var DIST_FIX = { yield: 0, rainfall: 0, disaster: 1, frostdays: 0 };
+
+  function medianOf(sorted) {
+    var n = sorted.length;
+    if (!n) return null;
+    return n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  }
+
+  function renderDist(items, metric) {
+    var el = byId('mapDist');
+    if (!el) return;
+    var nums = items.filter(function (x) { return typeof x.value === 'number'; });
+    if (!nums.length) {
+      el.innerHTML = '<p class="map-dist-empty">该年没有可比数据。</p>';
+      return;
+    }
+    var vals = nums.map(function (x) { return x.value; }).sort(function (a, b) { return a - b; });
+    var med = medianOf(vals);
+    var maxItem = nums.slice().sort(function (a, b) { return b.value - a.value; })[0];
+    var minItem = nums.slice().sort(function (a, b) { return a.value - b.value; })[0];
+    var fix = DIST_FIX[metric];
+    var unit = DIST_UNIT[metric];
+    function fmt(v) { return fix ? v.toFixed(1) : Math.round(v); }
+    var cells = [];
+    cells.push(['有效县', nums.length + '<span>个</span>']);
+    if (metric === 'disaster') {
+      var hit = nums.filter(function (x) { return x.value > 0.05; }).length;
+      cells.push(['减产区县', hit + '<span>个 · ' + Math.round(hit / nums.length * 100) + '%</span>']);
+    } else if (metric === 'frostdays') {
+      var frostHit = nums.filter(function (x) { return x.value > 0; }).length;
+      cells.push(['有霜冻县', frostHit + '<span>个 · ' + Math.round(frostHit / nums.length * 100) + '%</span>']);
+    } else {
+      cells.push(['最低', fmt(minItem.value) + '<span>' + unit + ' · ' + minItem.county + '</span>']);
+    }
+    cells.push(['中位', fmt(med) + '<span>' + unit + '</span>']);
+    var maxSuffix = (metric === 'disaster' && maxItem.value <= 0.05) ? '' : (' · ' + maxItem.county);
+    cells.push(['最高', fmt(maxItem.value) + '<span>' + unit + maxSuffix + '</span>']);
+    el.innerHTML = cells.map(function (c) {
+      return '<div><dt>' + c[0] + '</dt><dd>' + c[1] + '</dd></div>';
     }).join('');
   }
 
@@ -201,6 +250,7 @@
           }
         }
         renderRank(items, metric);
+        renderDist(items, metric);
       })
       .catch(function () {
         showFallback('地图数据加载失败，请刷新页面重试。');
