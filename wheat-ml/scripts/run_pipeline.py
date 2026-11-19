@@ -42,7 +42,7 @@ def main():
         ("导出模型",       "src.models.export_model",   "export"),
     ]
 
-    print("🌾 河南省小麦气象数据分析与产量预测系统 —— 全流程")
+    print("🌾 河南省小麦气象灾害影响分析与智能预警平台 —— 全流程")
     print(f"项目根目录: {PROJECT_ROOT}")
 
     results = [(name, run_step(name, mod, fn)) for name, mod, fn in steps]
