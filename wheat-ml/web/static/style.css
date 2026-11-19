@@ -1804,3 +1804,6 @@ main{overflow-x:clip}
 /* 折叠内的追溯表：去掉卡片外观，避免抢视觉重心 */
 .bd-flat{padding:0;margin:0;border:none;background:none}
 .bd-flat .contrib-head{margin-bottom:2px}
+
+/* 无霜冻年：首格跨两列，避免一排「0 县」占位 */
+.risk-brief-stats .span2{grid-column:span 2}

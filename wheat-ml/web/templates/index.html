@@ -51,10 +51,16 @@
       </div>
     </div>
     <dl class="risk-brief-stats">
+      {% if frost.frost_n == 0 %}
+      <div class="span2"><dt>晚霜冻</dt><dd style="font-size:16px">本年无<span>最近一次 {{ frost.last_frost.year if frost.last_frost else '—' }} 年</span></dd></div>
+      <div><dt>出现干热风</dt><dd>{{ risk.summary.heavy + risk.summary.light }}<span>县</span></dd></div>
+      <div><dt>干热风最高</dt><dd>{{ risk.summary.max_days }}<span>天</span></dd></div>
+      {% else %}
       <div><dt>出现晚霜冻</dt><dd class="is-alert">{{ frost.frost_n }}<span>县</span></dd></div>
       <div><dt>中度以上</dt><dd>{{ frost.frost_heavy }}<span>县</span></dd></div>
-      <div><dt>最大预估影响</dt><dd>{% if frost.frost_worst %}{{ frost.frost_worst.frost_loss }}<span>% · {{ frost.frost_worst.county }}</span>{% else %}—<span>本年无霜冻</span>{% endif %}</dd></div>
+      <div><dt>最大预估影响</dt><dd>{{ frost.frost_worst.frost_loss }}<span>% · {{ frost.frost_worst.county }}</span></dd></div>
       <div><dt>出现干热风</dt><dd>{{ risk.summary.heavy + risk.summary.light }}<span>县 · {{ risk.summary.max_days }} 天最高</span></dd></div>
+      {% endif %}
     </dl>
     {% if frost.frost_n == 0 and frost.last_frost %}
     <div class="alert risk-focus" style="margin:0 0 4px">
