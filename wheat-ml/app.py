@@ -18,7 +18,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-from flask import (Flask, render_template, request, redirect, url_for)
+from flask import (Flask, render_template, request, redirect, url_for, Response)
 
 from src.data.validate import validate_file, load_weather_file
 from src.data.build_features import build_county, CANONICAL_TO_NASA
@@ -608,6 +608,23 @@ def index():
                            frost=frost_ctx)
 
 
+@app.route("/upload/template")
+def upload_template():
+    """下载字段模板：只给表头和两天示例，值域与单位都对得上"""
+    header = ("日期,最高温(℃),最低温(℃),平均温(℃),日降水量(mm),"
+              "2m风速(m/s),相对湿度(%),地表短波辐射(MJ/m2/day),露点温度(℃)")
+    sample = [
+        "2026-05-01,26.40,12.10,19.00,0.00,2.80,52.00,18.60,7.40",
+        "2026-05-02,27.90,13.50,20.40,0.00,3.20,48.00,19.80,8.10",
+    ]
+    body = "\r\n".join([header] + sample) + "\r\n"
+    name = "气象数据模板_逐日县级.csv"
+    from urllib.parse import quote
+    disp = "attachment; filename=weather_template.csv; filename*=UTF-8''%s" % quote(name)
+    return Response(body, mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": disp})
+
+
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     report, error, diag = None, None, None
@@ -724,12 +741,16 @@ def analysis():
         county = county_arg if county_arg in counties else scope["default_county"]
         if county == "未标注":
             data = scope["df"]
+            years = (scope["years"] or list(BASE_YEARS))
         else:
-            sub = scope["df"][scope["df"]["county"] == county]
-            # 上传只覆盖部分县，选别的县时回退内置数据集，不能给空表
-            data = sub if not sub.empty else dataset_for_county(county)[0]
+            # 上传的是当年观测，得和内置历史接上才能看趋势、做跨年对比；
+            # 只取上传那一份会把该县十几年历史整段顶掉。
+            data, data_meta = dataset_for_county(county)
+            if not data.empty and "year" in data.columns:
+                years = sorted(set(BASE_YEARS + [int(y) for y in data["year"].unique().tolist()]))
+            else:
+                years = list(BASE_YEARS)
         meta = scope["meta"]
-        years = (scope["years"] or list(BASE_YEARS)) if county in up_counties else sorted(set(BASE_YEARS + [int(y) for y in data["year"].unique().tolist()]) if not data.empty and "year" in data.columns else list(BASE_YEARS))
         default_year = years[-1]
     else:
         counties = ALL_COUNTIES

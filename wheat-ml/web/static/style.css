@@ -1976,3 +1976,12 @@ body{background:var(--rice-100)}
   border:1px solid rgba(180,71,47,.28);border-radius:3px;padding:0 4px;margin-left:5px;
   vertical-align:middle}
 .field-hint{margin:5px 0 0;font-size:12px;line-height:1.5;color:var(--ink-600)}
+
+
+/* 上传页字段说明里的内联链接 */
+.spec-link {
+  color: var(--forest-700);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+}

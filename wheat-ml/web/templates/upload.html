@@ -126,7 +126,10 @@
       <div class="up-spec">
         <h3>字段与校验口径</h3>
         <dl class="up-spec-list">
+          <div><dt>必需字段</dt><dd>日期（或年份 + 日序）、最高温、最低温、平均温、日降水量</dd></div>
+          <div><dt>选填字段</dt><dd>2m 风速、相对湿度、地表短波辐射、露点温度；缺辐射时气象分析的辐射卡不出图，其余照常</dd></div>
           <div><dt>时间字段</dt><dd>年份 + 日序（1—366），或完整日期（YYYY-MM-DD）；两种不可混用</dd></div>
+          <div><dt>模板下载</dt><dd><a class="spec-link" href="{{ url_for('upload_template') }}">下载逐日气象模板（CSV）</a>，按列填好后上传</dd></div>
           <div><dt>缺失值</dt><dd>留空，不要填 0；短波辐射若为 W/m² 自动换算为 MJ/m²/day</dd></div>
           <div><dt>自动识别</dt><dd>中英文字段名与单位；检查缺失、重复、越界异常值，逐条给行号</dd></div>
           <div><dt>通过之后</dt><dd>识别灾害过程 → 折算减产量级 → 写入当期观测，并将全站切到该县</dd></div>
