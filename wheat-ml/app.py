@@ -1564,15 +1564,37 @@ def api_simulate():
     def clamp(value, base):
         return max(base * 0.7, min(base * 1.3, value))
 
+    # 线性回归在 19 维高度共线特征下系数病态（gdd / gdd_34 / gdd_56 互相解释），
+    # 基准点上各分量靠巨值相互抵消才成立。特征只要偏离基准 0.02，输出就会放大到
+    # 1e8 量级并被 clamp 夹到 ±30% 边界，表现为"拖一格预测就固定偏高/偏低 6%"。
+    # 情景模拟本来就是"相对基准扰动"的场景，因此把 LR 冻结为基准点常数：
+    # rf / lgbm 正常响应滑块，LR 只保留它对基准的固定贡献，融合结果仍与主预测一致。
+    lr_const = 0.2 * clamp(float(lr.predict(baseline_X)[0]), base_lr) if lr is not None else 0.0
+
     def ensemble_predict(X_data):
         pred_rf = clamp(float(rf.predict(X_data)[0]), base_rf)
         pred_lgbm = clamp(float(lgbm.predict(X_data)[0]), base_lgbm) if lgbm is not None else pred_rf
-        pred_lr = clamp(float(lr.predict(X_data)[0]), base_lr) if lr is not None else pred_rf
-        fused = 0.2 * pred_rf + 0.6 * pred_lgbm + 0.2 * pred_lr
+        fused = 0.2 * pred_rf + 0.6 * pred_lgbm + lr_const
         return max(mean_yield * 0.5, min(mean_yield * 1.5, fused * mean_yield))
 
     pred = ensemble_predict(X_arr)
     baseline = ensemble_predict(baseline_X)
+
+    base_feat = {
+        "gdd": round(float(row["gdd"].iloc[0]), 0) if "gdd" in row else 1800,
+        "season_precip": round(float(row["season_precip"].iloc[0]), 0) if "season_precip" in row else 400,
+        "hot_days": round(float(row["hot_days"].iloc[0]), 0) if "hot_days" in row else 5,
+        "cold_days": round(float(row["cold_days"].iloc[0]), 0) if "cold_days" in row else 10,
+    }
+
+    def _slide_range(base, pad):
+        """滑块区间：基准值 ± max(30%, pad)，保证基准点居中且拖动空间够演示。
+
+        必须由后端给出而不是模板写死——河南生育期积温实际只有 242—793 ℃·d，
+        若滑块硬编码 1000 起，基准值会被浏览器夹到边界，重置后请求值并非基准值。
+        """
+        span = max(base * 0.3, pad)
+        return {"min": max(0, round(base - span)), "max": round(base + span), "step": 1}
 
     return {
         "county": county,
@@ -1582,11 +1604,12 @@ def api_simulate():
         "change": round((pred - baseline) / baseline * 100, 1),
         "mean_yield": round(mean_yield, 1),
         "adjustments": adjustments,
-        "base_features": {
-            "gdd": round(float(row["gdd"].iloc[0]), 0) if "gdd" in row else 1800,
-            "season_precip": round(float(row["season_precip"].iloc[0]), 0) if "season_precip" in row else 400,
-            "hot_days": round(float(row["hot_days"].iloc[0]), 0) if "hot_days" in row else 5,
-            "cold_days": round(float(row["cold_days"].iloc[0]), 0) if "cold_days" in row else 10,
+        "base_features": base_feat,
+        "feature_ranges": {
+            "gdd": _slide_range(base_feat["gdd"], 150),
+            "season_precip": _slide_range(base_feat["season_precip"], 40),
+            "hot_days": _slide_range(base_feat["hot_days"], 8),
+            "cold_days": _slide_range(base_feat["cold_days"], 10),
         }
     }
 

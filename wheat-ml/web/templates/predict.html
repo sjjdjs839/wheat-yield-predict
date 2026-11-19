@@ -291,22 +291,22 @@
         <h2>情景因子</h2>
         <div class="sim-slider">
           <label for="gdd">生育期积温（℃·d）<span id="gddVal">—</span></label>
-          <input type="range" id="gdd" min="1000" max="2500" step="10">
+          <input type="range" id="gdd" min="200" max="900" step="1">
         </div>
         <div class="sim-slider">
           <label for="season_precip">生育期降水（mm）<span id="season_precipVal">—</span></label>
-          <input type="range" id="season_precip" min="50" max="800" step="10">
+          <input type="range" id="season_precip" min="30" max="550" step="1">
         </div>
         <div class="sim-slider">
           <label for="hot_days">极端高温天数（天）<span id="hot_daysVal">—</span></label>
-          <input type="range" id="hot_days" min="0" max="30" step="1">
+          <input type="range" id="hot_days" min="0" max="15" step="1">
         </div>
         <div class="sim-slider">
           <label for="cold_days">极端低温天数（天）<span id="cold_daysVal">—</span></label>
-          <input type="range" id="cold_days" min="0" max="50" step="1">
+          <input type="range" id="cold_days" min="0" max="35" step="1">
         </div>
         <button class="btn btn-ghost btn-sm" id="sim-reset" type="button">重置为基准值</button>
-        <p class="control-hint">模拟基于当前县区与年份的生育期特征；极端输入会按各模型基准值 ±30% 截断，避免外推失真，结果仅用于趋势判断。</p>
+        <p class="control-hint">模拟基于当前县区与年份的生育期特征，极端输入按各模型基准值 ±30% 截断。县域尺度上单因子的边际影响很小（模型九成由该县常年基线决定），拖动后的变化多在 ±0.5% 内——要看灾害的实际代价，请用上方「这个数，能追溯的部分」里的剂量分档。</p>
       </div>
       <div class="sim-result" data-reveal>
         <p class="result-kicker">模拟预测单产</p>
@@ -370,8 +370,22 @@
 
   function setSlider(id, value) {
     var slider = byId(id);
-    if (slider) slider.value = value;
-    setText(id + 'Val', value);
+    if (!slider) { setText(id + 'Val', value); return; }
+    slider.value = value;
+    // 回写浏览器吸附后的真实值：range 会按 min/max/step 夹取，
+    // 若范围容不下基准值，标签会显示一个滑块根本无法取到的数。
+    setText(id + 'Val', slider.value);
+  }
+
+  function applyRanges(ranges) {
+    if (!ranges) return;
+    ['gdd', 'season_precip', 'hot_days', 'cold_days'].forEach(function (id) {
+      var slider = byId(id), r = ranges[id];
+      if (!slider || !r) return;
+      if (r.min != null) slider.min = String(r.min);
+      if (r.max != null) slider.max = String(r.max);
+      if (r.step != null) slider.step = String(r.step);
+    });
   }
 
   function applyBaseline(features) {
@@ -393,6 +407,7 @@
       setText('simBaseline', data.baseline);
       setText('simResult', data.predicted);
       setText('simChange', '基准');
+      applyRanges(data.feature_ranges);
       applyBaseline(data.base_features || {});
       setText('simAdvice', '拖动左侧滑块，查看关键气象因子变化对预测单产的影响。');
     } catch (error) {
@@ -451,8 +466,16 @@
   if (reset) {
     reset.addEventListener('click', function () {
       if (!baselineData) return;
+      if (timer) window.clearTimeout(timer);
+      applyRanges(baselineData.feature_ranges);
       applyBaseline(baselineData.base_features || {});
-      runSim();
+      setText('simResult', baselineData.baseline);
+      var ch = byId('simChange');
+      if (ch) {
+        ch.textContent = '基准';
+        ch.classList.remove('is-up', 'is-down');
+      }
+      setText('simAdvice', '拖动左侧滑块，查看关键气象因子变化对预测单产的影响。');
     });
   }
 
