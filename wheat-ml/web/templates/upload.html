@@ -146,13 +146,20 @@
         </label>
 
         <div class="upload-row">
-          <div class="field">
+          <div class="field county-field">
             <label for="county-input">所属县区 <em class="req-mark">必填</em></label>
+            <input type="search" id="county-filter" class="county-filter"
+                   placeholder="输入关键字筛选，如 内黄 / 安阳" autocomplete="off"
+                   aria-label="筛选县区">
             <select id="county-input" name="county" required>
-              <option value="">请选择县区</option>
-              {% for c in counties %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
+              <option value="">请选择县区（共 {{ counties|length }} 个，可先在上方输入筛选）</option>
+              {% for city, items in county_groups.items() %}
+              <optgroup label="{{ city }}">
+                {% for c in items.values() %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
+              </optgroup>
+              {% endfor %}
             </select>
-            <p class="field-hint">数据会挂到这个县名下，决定全站切到哪一页。</p>
+            <p class="field-hint">先输关键字缩小范围，再在下拉里选；数据会挂到这个县名下，决定全站切到哪一页。</p>
           </div>
           <button class="btn btn-primary" id="upload-submit" type="submit">上传并诊断</button>
         </div>
@@ -258,4 +265,45 @@
   </section>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var filter = document.getElementById('county-filter');
+  var sel = document.getElementById('county-input');
+  if (!filter || !sel) return;
+  var groups = Array.prototype.slice.call(sel.querySelectorAll('optgroup'));
+
+  function apply() {
+    var q = filter.value.trim();
+    var keepTotal = 0;
+    groups.forEach(function (g) {
+      var keep = 0;
+      Array.prototype.forEach.call(g.children, function (o) {
+        var hit = !q || o.textContent.indexOf(q) >= 0 || g.label.indexOf(q) >= 0;
+        o.hidden = !hit;
+        o.disabled = !hit;
+        if (hit) keep++;
+      });
+      g.hidden = keep === 0;
+      keepTotal += keep;
+    });
+    // 只剩一个匹配时直接选中，省一次点击
+    var first = sel.querySelector('option[value]:not([hidden]):not([disabled])');
+    var visible = Array.prototype.filter.call(sel.querySelectorAll('option'),
+      function (o) { return !o.hidden && !o.disabled && o.value; });
+    sel.options[0].textContent = !q
+      ? '请选择县区（共 ' + keepTotal + ' 个，可先在上方输入筛选）'
+      : (keepTotal ? '匹配 ' + keepTotal + ' 个县区' : '没有匹配的县区');
+    if (keepTotal === 1 && visible.length === 1) {
+      sel.value = visible[0].value;
+    }
+  }
+  filter.addEventListener('input', apply);
+  filter.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); apply(); sel.focus(); }
+  });
+})();
+</script>
 {% endblock %}

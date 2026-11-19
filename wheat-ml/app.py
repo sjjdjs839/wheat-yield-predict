@@ -700,7 +700,8 @@ def upload():
 
     return render_template("upload.html", title="数据诊断", active="upload",
                            report=report, error=error, dataset=meta, diag=diag,
-                           counties=ALL_COUNTIES, form_county=county,
+                           counties=ALL_COUNTIES, county_groups=CONFIG["counties"],
+                           form_county=county,
                            max_size=CONFIG["upload"]["max_size_mb"],
                            analysis_url=analysis_url, predict_url=predict_url,
                            advice_url=advice_url)
