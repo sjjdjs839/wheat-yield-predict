@@ -103,15 +103,42 @@
 {% endif %}
 
 
-<!-- 功能入口：一行紧凑条，不占首屏 -->
+<!-- 工作区：主要任务入口（卡片式，首屏可见） -->
 <section class="container dash-section">
-  <nav class="wk-bar">
-    <a href="{{ url_for('risk') }}"><b>灾害预警</b><em>逐县等级 · 最低温</em></a>
-    <a href="{{ url_for('analysis') }}"><b>气象分析</b><em>逐日要素曲线</em></a>
-    <a href="{{ url_for('map_view') }}"><b>产量地图</b><em>县级空间分布</em></a>
-    <a href="{{ url_for('advice') }}"><b>农事决策</b><em>五生育期作业卡</em></a>
-    <a href="{{ url_for('predict') }}"><b>情景仿真</b><em>可追溯折减</em></a>
-    <a href="{{ url_for('upload') }}"><b>上传数据</b><em>校验后入库</em></a>
+  <div class="wk-sec">
+    <h2>工作区</h2>
+  </div>
+  <nav class="wk-grid">
+    <a href="{{ url_for('risk') }}">
+      <span class="wk-ico">{{ icon('alert') }}</span>
+      <span class="wk-txt"><b>灾害预警</b><em>逐县等级 · 最低温</em></span>
+      <span class="wk-go">{{ icon('arrow') }}</span>
+    </a>
+    <a href="{{ url_for('analysis') }}">
+      <span class="wk-ico">{{ icon('chart') }}</span>
+      <span class="wk-txt"><b>气象分析</b><em>逐日要素曲线 · 生育期</em></span>
+      <span class="wk-go">{{ icon('arrow') }}</span>
+    </a>
+    <a href="{{ url_for('map_view') }}">
+      <span class="wk-ico">{{ icon('map') }}</span>
+      <span class="wk-txt"><b>产量地图</b><em>县级空间分布</em></span>
+      <span class="wk-go">{{ icon('arrow') }}</span>
+    </a>
+    <a href="{{ url_for('advice') }}">
+      <span class="wk-ico">{{ icon('leaf') }}</span>
+      <span class="wk-txt"><b>农事决策</b><em>五生育期作业卡</em></span>
+      <span class="wk-go">{{ icon('arrow') }}</span>
+    </a>
+    <a href="{{ url_for('predict') }}">
+      <span class="wk-ico">{{ icon('target') }}</span>
+      <span class="wk-txt"><b>情景仿真</b><em>产量测算 · 可追溯折减</em></span>
+      <span class="wk-go">{{ icon('arrow') }}</span>
+    </a>
+    <a href="{{ url_for('upload') }}">
+      <span class="wk-ico">{{ icon('upload') }}</span>
+      <span class="wk-txt"><b>上传数据</b><em>校验后入库</em></span>
+      <span class="wk-go">{{ icon('arrow') }}</span>
+    </a>
   </nav>
 </section>
 
