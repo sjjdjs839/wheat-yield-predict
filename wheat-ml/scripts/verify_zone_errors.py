@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""分象限误差：按县均单产 × 干热风暴露做中位数切分，比较各象限的预测误差。
+"""分象限看误差。县均单产和干热风暴露各按中位数切一刀，四象限比一比谁的误差大。
 
-用法：在 wheat-ml 目录下执行
     python -m scripts.verify_zone_errors
-输出：output/reports/zone_errors.json
+结果在 output/reports/zone_errors.json
 """
 from __future__ import annotations
 

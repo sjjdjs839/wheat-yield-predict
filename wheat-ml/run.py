@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """豫麦智测启动器。
 
-前台运行 Flask（前端页面与后端接口同一进程），服务就绪后自动打开
-系统默认浏览器。关闭控制台窗口会终止本进程，服务随即停止。
+Flask 前台跑，页面和接口同一个进程。等服务真起来了再开浏览器，
+不然会白屏等半天。关掉控制台窗口就等于关服务。
 
-用法：
-    python run.py                 # 启动并自动打开浏览器
-    python run.py --no-browser    # 只启动服务，不打开浏览器
+    python run.py                 开服务 + 自动开浏览器
+    python run.py --no-browser    只开服务
 """
 
 from __future__ import annotations

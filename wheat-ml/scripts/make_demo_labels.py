@@ -1,14 +1,12 @@
-"""
-生成演示用产量标签（仅在真实产量缺失时使用）
-==============================================
-用途：在 data/raw/county_yield.csv 到位前，用可复现的合成标签跑通
-「特征 → 训练 → 预测 → 预警 → 农事建议」全链路。
+"""造演示用的产量标签。只在真实产量还没到位时用。
 
-注意：合成标签不代表任何真实产量，界面与指标必须标注「演示数据」，
-      R² / MAE / RMSE 不构成准确率结论。真实产量到位后请直接覆盖
-      data/raw/county_yield.csv 并重新训练。
+在 data/raw/county_yield.csv 准备好之前，先拿可复现的合成标签把
+特征→训练→预测→预警→农事建议整条链路跑通。
 
-用法：python -m scripts.make_demo_labels
+注意这是假的：不代表任何真实产量，界面上和指标里都要标「演示数据」，
+R²/MAE/RMSE 不能当准确率说。真产量一到，直接覆盖 county_yield.csv 重训。
+
+    python -m scripts.make_demo_labels
 """
 
 import yaml

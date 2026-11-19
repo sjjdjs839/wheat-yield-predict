@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""干热风判据敏感性：三种阈值口径 × 双向固定效应。
+"""干热风判据敏感性：三套阈值口径各跑一遍双向固定效应，看结论跟着阈值怎么变。
 
-用法：在 wheat-ml 目录下执行
+在 wheat-ml 目录下：
     python -m scripts.dryhot_sensitivity
-输出：output/reports/dryhot_sensitivity.json
+结果写到 output/reports/dryhot_sensitivity.json
 """
 from __future__ import annotations
 

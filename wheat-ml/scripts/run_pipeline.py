@@ -1,12 +1,8 @@
-"""
-一键跑全流程脚本
-==================
-顺序：数据清洗 → 特征工程 → 模型训练 → 导出浏览器端模型 → 启动 Web 应用
+"""一键跑全流程。清洗 → 特征 → 训练 → 导出浏览器端模型 → 起 Web。
 
-用法:
-  cd wheat-ml
-  python -m scripts.run_pipeline          # 只跑数据处理与训练
-  python -m scripts.run_pipeline --serve  # 跑完后直接启动 Web 应用
+    cd wheat-ml
+    python -m scripts.run_pipeline         只跑数据处理和训练
+    python -m scripts.run_pipeline --serve 跑完顺手把 Web 也起起来
 """
 
 import sys

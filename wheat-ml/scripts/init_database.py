@@ -1,18 +1,13 @@
-"""
-MySQL 建库建表与全量导入
-==========================
-将 CSV 链路的成果写入项目内 MySQL（默认 127.0.0.1:3306 / wheat_ml）：
-  counties      县（市、区）及所属市
-  weather_daily 逐日气象（8 参数）
-  feature_table 年度生育期特征
-  yield_labels  分县分年产量标签（真实优先，其次演示）
+"""建库建表，把 CSV 那套成果全量灌进 MySQL（默认 127.0.0.1:3306 / wheat_ml）。
 
-导入采用分批 executemany 批量写入，不依赖 LOAD DATA LOCAL INFILE，
-因此无需开启 local_infile，也不受 secure_file_priv 目录限制。
+四个表：counties 县和所属市；weather_daily 逐日气象八参数；feature_table
+年度生育期特征；yield_labels 分县分年产量（真实优先，没有才用演示值）。
 
-用法：
-  cd wheat-ml
-  python -m scripts.init_database
+写入走分批 executemany，不用 LOAD DATA LOCAL INFILE。这样就不必去开
+local_infile，也不吃 secure_file_priv 那个目录限制。
+
+    cd wheat-ml
+    python -m scripts.init_database
 """
 
 import sys

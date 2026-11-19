@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-按 3—5 月新口径重算消融与滚动验证，替换旧（3—6 月）报告。
-输出：output/reports/feature_ablation.json、rolling_validation.json
+"""按 3—5 月的新窗口重算消融和滚动验证，把旧的 3—6 月报告换掉。
+
+输出 output/reports/feature_ablation.json 和 rolling_validation.json
 """
 import json
 import sys
@@ -88,7 +88,7 @@ for k, v in out["groups"].items():
     print(f"  {k:22} 绝对 R²={v['metrics']['r2']:.4f} MAE={v['metrics']['mae']:6.2f}"
           + (f" | 偏离 R²={dev['r2']:.4f} MAE={dev['mae']*100:.1f}%" if dev else ""))
 
-# ---------------- 滚动验证 ----------------
+# --- 滚动验证 ---
 roll = {"window": out["window"], "folds": {}}
 cols_full = WEATHER + ["year_index", "prior"]
 for test_year in (2020, 2021, 2022):

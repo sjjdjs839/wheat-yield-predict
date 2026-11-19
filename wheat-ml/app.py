@@ -1,15 +1,10 @@
-﻿"""
-河南省小麦气象灾害影响分析与智能预警平台 · Web 应用
-==================================================
-页面路由：
-  /upload    数据上传与校验
-  /analysis  气象数据分析（七类图表 + 综合评估）
-  /map       产量地图（县级空间分布）
-  /dry_hot   干热风预警
-  /predict   小麦产量预测与预警
-  /advice    农事建议
+﻿"""河南省小麦气象灾害影响分析与智能预警平台 · Web 应用。
 
-运行：python app.py  （或 python -m flask --app app run）
+六个页面都从这里出：/upload 传数据校验，/analysis 气象分析，/map 县级产量
+分布，/dry_hot 干热风，/predict 产量测算，/advice 农事建议。另外还有几个
+导出（Excel / PDF）和给前端喂数的接口。
+
+跑起来：python app.py，或者 python -m flask --app app run
 """
 
 import json
@@ -88,7 +83,7 @@ def inject_footer():
     }}
 
 
-# ---------------------------------------------------------------- 数据访问
+# ---- 数据访问 ----
 def _canonical(df: pd.DataFrame) -> pd.DataFrame:
     """统一为标准小写字段名，并补 month_day"""
     rename = {k: v for k, v in NASA_TO_CANON.items() if k in df.columns}
@@ -481,7 +476,7 @@ def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
         return {"available": False, "positive": [], "negative": []}
 
 
-# ---------------------------------------------------------------- 路由
+# --- 路由 ---
 _YEARLY_HEAVY_CACHE: dict = {}
 
 
@@ -687,12 +682,19 @@ def reset_dataset():
 def analysis():
     scope = uploaded_scope()
     if scope:
-        counties = scope["counties"]
+        up_counties = scope["counties"]
+        # 上传只覆盖部分县，其余县名也放行（走内置数据集），否则传别的县会被悄悄替换
+        counties = sorted(set(list(up_counties) + list(ALL_COUNTIES)))
         county_arg = request.args.get("county")
         county = county_arg if county_arg in counties else scope["default_county"]
-        data = scope["df"] if county == "未标注" else scope["df"][scope["df"]["county"] == county]
+        if county == "未标注":
+            data = scope["df"]
+        else:
+            sub = scope["df"][scope["df"]["county"] == county]
+            # 上传只覆盖部分县，选别的县时回退内置数据集，不能给空表
+            data = sub if not sub.empty else dataset_for_county(county)[0]
         meta = scope["meta"]
-        years = scope["years"] or list(BASE_YEARS)
+        years = (scope["years"] or list(BASE_YEARS)) if county in up_counties else sorted(set(BASE_YEARS + [int(y) for y in data["year"].unique().tolist()]) if not data.empty and "year" in data.columns else list(BASE_YEARS))
         default_year = years[-1]
     else:
         counties = ALL_COUNTIES
@@ -857,7 +859,7 @@ def dry_hot():
                            years=years, year=year, data=data, stats=stats, city_map=city_map)
 
 
-# ---------------------------------------------------------------- 风险总览
+# ---- 风险总览 ----
 def _risk_feature_table() -> pd.DataFrame:
     """风险总览数据源：MySQL 特征表优先，回退内置 feature_table.csv。"""
     feat = None
@@ -1753,7 +1755,9 @@ def county_zone_hint(county: str):
 def predict():
     scope = uploaded_scope()
     if scope:
-        counties = scope["counties"]
+        up_counties = scope["counties"]
+        # 上传只覆盖部分县，其余县名也放行（走内置数据集），否则传别的县会被悄悄替换
+        counties = sorted(set(list(up_counties) + list(ALL_COUNTIES)))
         county_arg = request.args.get("county")
         county = county_arg if county_arg in counties else scope["default_county"]
     else:
@@ -1764,8 +1768,8 @@ def predict():
     bundle = load_models()
     mm = model_meta()
     data, data_meta = dataset_for_county(county)
-    if scope:
-        years = scope["years"] or list(BASE_YEARS)
+    if scope and county in up_counties:
+        years = sorted(set(list(scope["years"] or []) + list(BASE_YEARS)))
     elif not data.empty and "year" in data.columns:
         years = sorted(set(BASE_YEARS + [int(y) for y in data["year"].unique().tolist()]))
     else:
@@ -1778,7 +1782,7 @@ def predict():
     metrics_lr = read_metrics("lr")
 
     if bundle is None or bundle[0] is None:
-        return render_template("predict.html", title="情景仿真", active="predict",
+        return render_template("predict.html", title="产量测算", active="predict",
                                counties=counties, city_groups=scope_city_groups(scope),
                                county=county, years=years, year=year,
                                threshold=0, threshold_max=None, threshold_note=None,
@@ -1841,7 +1845,7 @@ def predict():
         pred_low = round(pred - 0.8 * interval_mae, 1)
         pred_high = round(pred + 0.8 * interval_mae, 1)
 
-        # 概率化预警：随机森林 300 棵树的预测分布。
+        # 概率化预警：随机森林 500 棵树的预测分布。
         # 这是模型内部不确定性（决策树离散度），不是统计置信区间，页面上有明确标注。
         prob_below, tree_low, tree_high = None, None, None
         try:
@@ -1940,7 +1944,7 @@ def predict():
                 },
             }
 
-    return render_template("predict.html", title="情景仿真", active="predict",
+    return render_template("predict.html", title="产量测算", active="predict",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
                            threshold=round(threshold, 1),
@@ -2020,7 +2024,9 @@ def advice_check():
 def advice():
     scope = uploaded_scope()
     if scope:
-        counties = scope["counties"]
+        up_counties = scope["counties"]
+        # 上传只覆盖部分县，其余县名也放行（走内置数据集），否则传别的县会被悄悄替换
+        counties = sorted(set(list(up_counties) + list(ALL_COUNTIES)))
         county_arg = request.args.get("county")
         county = county_arg if county_arg in counties else scope["default_county"]
     else:

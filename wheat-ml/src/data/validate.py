@@ -1,17 +1,15 @@
-"""
-数据上传与校验模块（对齐项目方案 2.1 / 第三章）
-=================================================
-职责：
-  1. 读取 CSV / Excel（自动识别 UTF-8 / GBK 编码，兼容 NASA POWER 注释头）
-  2. 中英文字段名自动映射到标准字段
-  3. 检查缺失值、重复记录、异常值（最高温<最低温、湿度超范围等）
-  4. 校验「日」字段口径：YYYY-MM-DD 或年内日序，不可混用
-  5. 校验短波辐射单位（W/m² → MJ/m²/day 自动提示换算）
-  6. 输出结构化校验报告 + 清洗后的长表，供分析与建模使用
+"""上传数据的校验。
 
-对外接口：
-  validate_file(path) -> dict     # {"ok":bool, "issues":[...], "preview":[...], ...}
-  load_weather_file(path) -> (df, report)   # 已清洗的 DataFrame + 校验报告
+CSV 和 Excel 都收，UTF-8 和 GBK 自动识别，NASA POWER 那种带注释头的也能读。
+中英文字段名自动映射成标准字段。
+
+查这几样：缺失值、重复记录、异常值（最高温比最低温还低、湿度越界之类）；
+「日」字段是 YYYY-MM-DD 还是年内日序，两种不能混着用；短波辐射要是 W/m²
+会提示换算成 MJ/m²/day。
+
+对外就两个口子：
+  validate_file(path) -> dict              {"ok", "issues", "preview", ...}
+  load_weather_file(path) -> (df, report)  洗好的 DataFrame + 报告
 """
 
 import re

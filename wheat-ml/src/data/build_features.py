@@ -1,10 +1,10 @@
-﻿"""
-特征工程模块（对齐任务书步骤 6 + 表 4 的 20 个特征）
-====================================================
-输入：data/processed/weather_clean.csv（clean.py 产出）
-      data/raw/county_yield.csv（产量标签，可能尚未交付）
-输出：data/processed/feature_table.csv
-      行为「县 × 年」，列为 20 特征 + wheat_yield（若产量已交付）
+﻿"""特征工程。
+
+读 data/processed/weather_clean.csv（clean.py 产的），有产量标签就顺带读
+data/raw/county_yield.csv。
+
+出 data/processed/feature_table.csv：一行一个「县 × 年」，前面是生育期气象
+特征，末尾挂 wheat_yield（产量还没到位就没这一列）。
 """
 
 import yaml

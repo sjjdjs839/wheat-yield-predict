@@ -1,10 +1,8 @@
-"""
-模型导出模块
-==============
-把训练好的随机森林转成 JSON 树结构，供 HTML 大屏在浏览器端直接推理。
-这样答辩现场不需要起服务、不需要联网。
+"""把训练好的随机森林导成 JSON 树，给 HTML 大屏在浏览器端直接推理用。
 
-输出: output/dashboard/model.json
+这么做的意思是答辩现场不用起服务、不用连网，双击打开就能算。
+
+落到 output/dashboard/model.json
 """
 
 import json

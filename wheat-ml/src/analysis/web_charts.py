@@ -1,8 +1,7 @@
-"""
-Web 交互图表数据（Chart.js）
-============================
-把分析页需要的序列整理成可直接 JSON 序列化的结构，前端用 Chart.js 渲染。
-原 weather_charts.py 的 matplotlib 输出保留，用于离线大屏与图片导出。
+"""分析页交互图的数据。前端用 Chart.js。
+
+这里只负责把序列整理成能直接 json 化的结构，渲染交给前端。
+matplotlib 那套（weather_charts.py）留着，离线大屏和导图片还用得上。
 """
 
 from __future__ import annotations
@@ -304,7 +303,7 @@ def _evaluation(df, year):
     return {"year": result.get("year"), "text": result.get("text", ""), "rows": rows}
 
 
-# ---------------- 生育期灾害窗口（分析页主题化） ----------------
+# ---- 生育期灾害窗口 ----
 import yaml as _yaml
 from pathlib import Path as _Path
 

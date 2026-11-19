@@ -1,21 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
-从 NASA POWER 拉取当期（或指定区间）逐日气象，输出可直接在「上传数据」页上传的 CSV。
+"""从 NASA POWER 拉当期逐日气象，直接出「上传数据」页能吃的 CSV。
 
-用法：
-    python -m scripts.fetch_recent                       # 全部县，最近 14 天（截至前天）
-    python -m scripts.fetch_recent --days 20             # 最近 20 天
-    python -m scripts.fetch_recent --county 内黄县 义马市  # 只拉指定县
-    python -m scripts.fetch_recent --start 20240501 --end 20240520   # 指定区间（演示灌浆期用）
-    python -m scripts.fetch_recent --list                # 只列出将拉取的县
+拉多少天、拉哪个县、拉哪段区间都能指定：
+    python -m scripts.fetch_recent                                   全部县，最近 14 天
+    python -m scripts.fetch_recent --days 20                         最近 20 天
+    python -m scripts.fetch_recent --county 内黄县 义马市              只拉这几个
+    python -m scripts.fetch_recent --start 20240501 --end 20240520   指定区间（演示灌浆期用）
+    python -m scripts.fetch_recent --list                            先看会拉哪些，不真跑
 
-输出：
-    data/raw/weather_recent/<城市>/<县>.csv     与 data/raw/weather 同结构（中文表头）
-    data/raw/weather_recent/_fetch_meta.json    本次拉取记录（时间、区间、成败）
+落到：
+    data/raw/weather_recent/<城市>/<县>.csv    结构和 data/raw/weather 一致（中文表头）
+    data/raw/weather_recent/_fetch_meta.json   这次拉了啥、成没成
 
-说明：
-    NASA POWER 是公开的县级格点再分析产品，日尺度，近实时延迟约 1—2 天。
-    参数与项目原始数据完全一致，因此拉取结果可直接替换原始文件或走上传通道。
+NASA POWER 是公开的县级格点再分析，日尺度，延迟 1—2 天。参数跟项目原始数据
+是同一套，所以拉回来可以直接替换原始文件，也可以走上传通道。
 """
 from __future__ import annotations
 

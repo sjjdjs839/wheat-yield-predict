@@ -1,20 +1,19 @@
-"""
-上传数据即时诊断
-================
-一份县区级逐日气象传进来，立刻回答三个问题：
-1. 这份数据里有哪些灾害过程（哪几天、什么类型、落在哪个生育期）；
-2. 对产量意味着什么（只对经过回归验证的灾种给减产量级，其余只报暴露强度）；
-3. 该不该做点什么（交回农事建议模块）。
+"""上传数据后的即时诊断。
 
-判据与建模口径保持一致：
-- 晚霜冻：4 月最低温 < 0℃（对应面板回归 fz4_0，β = −1.96%/天）
-- 干热风：5 月最高温 ≥ 35℃ 且相对湿度 ≤ 40%（对应 hd_may，未达显著，只报天数）
+一份县区级逐日气象进来，要马上答三件事：里面有哪些灾害过程、哪几天、什么
+类型、落在哪个生育期；对产量意味着什么；以及该不该做点什么（这部分交回
+农事建议模块）。
+
+判据跟建模那边保持一套，不能各说各话：
+- 晚霜冻：4 月最低温 < 0℃，对应面板回归的 fz4_0，β = −1.96%/天
+- 干热风：5 月最高温 ≥ 35℃ 且相对湿度 ≤ 40%，对应 hd_may，没到显著，只报天数
 - 高温：3—6 月最高温 ≥ 35℃
-- 低温：3 月 / 5 月最低温 < 0℃（4 月已单列）
+- 低温：3 月、5 月最低温 < 0℃（4 月已经单列了）
 - 暴雨：日降水 ≥ 25mm
 
-减产量级一律取自剂量分档的实测均值（dose_frost.json），不做线性外推：
-β 是"每多 1 天"的弹性，分档是"这一档平均减产多少"，两者不能混着算区间。
+减产幅度不搞线性外推，一律取剂量分档的实测均值（dose_frost.json）。
+β 说的是"每多一天"的弹性，分档说的是"这一档平均掉多少"，两者不能混起来
+算区间。
 """
 
 import pandas as pd
@@ -58,7 +57,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
     d["md"] = d["date"].dt.strftime("%m-%d")
     events = []
 
-    # 1) 4 月晚霜冻
+    # 4 月晚霜冻
     fz = d[(d["month"] == 4) & (d["t2m_min"] < 0)]
     if not fz.empty:
         days = len(fz)
@@ -72,7 +71,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
             "action": "霜冻前灌水、喷施叶面肥提高抗寒性；冻后及时查苗补种",
         })
 
-    # 2) 5 月干热风
+    # 5 月干热风
     if "rh" in d.columns:
         hd = d[(d["month"] == 5) & (d["t2m_max"] >= 35) & (d["rh"] <= 40)]
     else:
@@ -85,7 +84,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
             "action": "预报前 1—2 天灌水降温、喷施磷酸二氢钾延缓叶片衰老",
         })
 
-    # 3) 高温日
+    # 高温日
     hot = d[(d["month"].isin([3, 4, 5, 6])) & (d["t2m_max"] >= 35)]
     if not hot.empty:
         events.append({
@@ -95,7 +94,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
             "action": "关注灌浆期高温逼熟，必要时喷施叶面肥保绿叶",
         })
 
-    # 4) 非 4 月低温
+    # 非 4 月低温
     cold = d[(d["month"].isin([3, 5])) & (d["t2m_min"] < 0)]
     if not cold.empty:
         events.append({
@@ -105,7 +104,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
             "action": "夜间骤降注意防冻，尤其是返青与灌浆阶段",
         })
 
-    # 5) 暴雨
+    # 暴雨
     if "precip" in d.columns:
         rain = d[d["precip"] >= 25]
         if not rain.empty:

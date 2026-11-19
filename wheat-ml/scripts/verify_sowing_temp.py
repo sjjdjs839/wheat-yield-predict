@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""验证：10 月温度是否独立于 cold_days（用于修正说明书附 5.1 的表述）
+"""查一件事：10 月温度到底独立不独立于 cold_days。说明书附 5.1 的表述靠它定。
 
-复用 scripts.panel_overwinter 的建表与回归口径（双向固定效应 + 县聚类标准误）。
-运行：python -m scripts.verify_sowing_temp
+建表和回归口径直接复用 scripts.panel_overwinter，双向固定效应 + 县聚类标准误。
+
+    python -m scripts.verify_sowing_temp
 """
 import io
 import json

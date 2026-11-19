@@ -1,16 +1,16 @@
-"""MySQL 连接与可用性探测（带 5 秒缓存，连接失败自动降级）
+"""MySQL 连接和可用性探测，结果缓存 5 秒，连不上就自动降级。
 
-连接参数来源优先级：环境变量 > config/config.yaml 的 database 段。
-换一台机器部署时，不需要改任何文件，设置环境变量即可：
+参数取值优先级：环境变量 > config/config.yaml 的 database 段。换机器部署
+不用改文件，设环境变量就行：
 
-    WHEAT_DB_ENABLED=0        关闭数据库，全程走 CSV（最省事）
+    WHEAT_DB_ENABLED=0        不开库，全程走 CSV（最省事）
     WHEAT_DB_HOST=127.0.0.1
     WHEAT_DB_PORT=3306
     WHEAT_DB_USER=root
     WHEAT_DB_PASSWORD=<你的密码>
     WHEAT_DB_NAME=wheat_ml
 
-连接失败或表为空时，上层自动回退内置 CSV，页面功能不受影响。
+连不上或者表是空的，上层自己回退到内置 CSV，页面照常能用。
 """
 
 import os

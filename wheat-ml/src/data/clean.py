@@ -1,16 +1,12 @@
-"""
-数据清洗模块（对齐项目方案第三章）
-====================================
-职责：
-  1. 按 config 白名单遍历 data/raw/weather/{城市}/{地区}.csv
-  2. 兼容中文表头（年份 + 日序）与 NASA POWER 英文表头两种格式
-  3. 统一字段名、日期、缺失与异常处理（复用 src.data.validate）
-  4. 输出清洗后的长表 data/processed/weather_clean.csv
-  5. 输出数据审计报告 data/processed/data_audit.md
+"""数据清洗。
 
-输入：data/raw/weather/{城市}/{地区}.csv
-输出：data/processed/weather_clean.csv
-      （county, city, date, year, month, month_day, doy + 8 个标准气象字段）
+按 config 的白名单扫 data/raw/weather/{城市}/{地区}.csv，中文表头（年份 +
+日序）和 NASA POWER 英文表头两种都能吃。字段名、日期、缺失和异常统一处理，
+校验那套直接复用 src.data.validate，不另起一套。
+
+出两个东西：清洗后的长表 data/processed/weather_clean.csv，字段是 county /
+city / date / year / month / month_day / doy 加 8 个标准气象量；还有一份
+数据审计 data/processed/data_audit.md。
 """
 
 import yaml

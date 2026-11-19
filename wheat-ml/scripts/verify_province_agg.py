@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""省级汇总回测：县级预测按播种面积加权汇总，与年鉴实测比较。
+"""省级汇总回测。县级预测按播种面积加权加总，再和年鉴实测对一对。
 
-用法：在 wheat-ml 目录下执行
     python -m scripts.verify_province_agg
-输出：output/reports/province_agg.json
+结果在 output/reports/province_agg.json
 """
 from __future__ import annotations
 

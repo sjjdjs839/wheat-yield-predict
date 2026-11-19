@@ -1,19 +1,19 @@
-"""
-模型训练模块（对齐项目方案 第六章）
-====================================
-目标变量: yield_norm = wheat_yield ÷ 该县多年均值（学"相对丰欠"）
-预测后:   × county_mean_yield 还原真实单产，再算 R²/RMSE/MAE
-模型:     RandomForestRegressor + LinearRegression
-划分:     按年份划分训练/测试集（config.model.split.test_years），禁止随机拆分
+"""模型训练。
 
-产量标签来源：
-  1. data/raw/county_yield.csv          —— 真实产量（metrics 标记 reliable=true）
-  2. data/demo/county_yield_demo.csv    —— 演示标签（仅用于跑通链路，reliable=false）
+目标变量不是直接学单产，是 yield_norm = wheat_yield ÷ 该县多年均值，学的是
+"这个县今年相对自己是丰还是欠"。预测完再乘回 county_mean_yield 还原成
+kg/亩，然后才算 R²/RMSE/MAE。
 
-产出:
-  output/models/model_rf.joblib, model_lr.joblib, model_meta.json
-  output/models/county_stats.json
-  output/reports/metrics_{rf,lr}.json, importance_rf.csv, predictions_rf.csv
+模型就两个：RandomForestRegressor 和 LinearRegression。
+
+划分按年份切（config.model.split.test_years），不许随机拆分。气象数据有强
+年际相关，随机拆会把同一年的样本同时放进训练和测试，指标会虚高。
+
+产量标签两个来源：data/raw/county_yield.csv 是真实产量（metrics 里标
+reliable=true）；data/demo/county_yield_demo.csv 是演示标签，只用来跑通
+链路，reliable=false。
+
+产出在 output/models/ 和 output/reports/ 下。
 """
 
 import json
