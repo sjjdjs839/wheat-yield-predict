@@ -2,16 +2,21 @@
 {% from "_macros.html" import icon %}
 {% block content %}
 
-<!-- 工作台头部：紧凑页头（无横幅图） -->
+<!-- 工作台头部：麦田横幅 + 数据状态 -->
 <section class="dash-head">
-  <div class="container wk-head">
-    <div>
-      <h1>小麦气象灾害影响分析与智能预警平台</h1>
-      <p class="wk-sub">按县区与年份查看晚霜冻、干热风实况，量化灾害对单产的冲击幅度，按生育期给出减灾措施。</p>
-    </div>
-    <div class="wk-src">
-      <span class="dash-chip">{{ stats.dataset_text }}</span>
-      <span class="dash-chip">{{ stats.label_text }}</span>
+  <div class="dash-banner">
+    <div class="dash-banner-media" role="img" aria-label="麦田背景"
+         style="background-image:url('{{ url_for('static', filename='assets/field/field-band.webp') }}')"></div>
+    <div class="dash-banner-shade" aria-hidden="true"></div>
+    <div class="container dash-banner-inner">
+      <div class="dash-head-copy">
+        <h1>小麦气象灾害影响分析与智能预警平台</h1>
+        <p class="dash-lead">按县区与年份查看晚霜冻、干热风实况，量化灾害对单产的冲击幅度，按生育期给出减灾措施。</p>
+      </div>
+      <div class="dash-status-tags">
+        <span class="dash-chip">{{ stats.dataset_text }}</span>
+        <span class="dash-chip">{{ stats.label_text }}</span>
+      </div>
     </div>
   </div>
   <div class="container">
@@ -142,7 +147,7 @@
     </a>
     <a href="{{ url_for('upload') }}">
       <span class="wk-ico">{{ icon('upload') }}</span>
-      <span class="wk-txt"><b>上传数据</b><em>校验后入库</em></span>
+      <span class="wk-txt"><b>数据诊断</b><em>校验后入库</em></span>
       <span class="wk-go">{{ icon('arrow') }}</span>
     </a>
   </nav>

@@ -1,17 +1,17 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ '豫麦智测 · ' ~ title if title else '豫麦智测 · 河南省小麦气象灾害影响分析与智能预警平台' }}</title>
-<meta name="description" content="河南省小麦气象灾害影响分析与智能预警平台：晚霜冻与干热风预警、气象影响量化、灾害风险地图、生育期农事决策建议。">
+<meta name="description" content="河南省小麦气象灾害影响分析与预警系统：晚霜冻与干热风预警、气象影响量化、灾害风险地图、生育期农事决策建议。">
 <meta name="theme-color" content="#10271A">
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 <script>document.documentElement.classList.add('js');</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 {% block preload %}
 {% if active == 'index' %}
-<link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/aerial-farmland.jpg') }}" type="image/jpeg">
+<link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/field-band.webp') }}" type="image/webp">
 {% endif %}
 {% endblock %}
 <noscript><style>[data-reveal]{opacity:1!important;transform:none!important}</style></noscript>
@@ -49,71 +49,119 @@
   <symbol id="icon-soil" viewBox="0 0 24 24"><path d="M3 8h18M3 12h18M3 16h18M6 20h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
   <symbol id="icon-grain" viewBox="0 0 24 24"><ellipse cx="8" cy="9" rx="2.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse cx="16" cy="9" rx="2.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.5"/><ellipse cx="12" cy="16" rx="2.2" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
   <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
 </svg>
 
 <a class="skip-link" href="#main">跳到主要内容</a>
 
-<header class="site-head" id="site-head">
-  <div class="container head-inner">
-    <a class="brand" href="{{ url_for('index') }}" aria-label="豫麦智测首页">
-      <svg class="brand-mark" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
-      <span class="brand-text">
-        <span class="brand-name">豫麦智测</span>
-        <span class="brand-sub">HENAN WHEAT INTELLIGENCE</span>
+{% set page_names = {
+  'index': '总览', 'upload': '数据诊断', 'analysis': '气象分析', 'map': '灾害地图',
+  'dry_hot': '干热风预警', 'risk': '灾害预警', 'predict': '产量测算', 'advice': '农事建议'
+} %}
+
+<div class="app-shell" id="app-shell">
+  <aside class="side-rail" id="side-rail" aria-label="工作台侧边导航">
+    <a class="rail-brand" href="{{ url_for('index') }}" aria-label="豫麦智测工作台首页">
+      <svg class="rail-mark" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
+      <span class="rail-brand-text">
+        <span class="rail-name">豫麦智测</span>
+        <span class="rail-sub">HENAN WHEAT WORKBENCH</span>
       </span>
     </a>
 
-    <nav class="main-nav" aria-label="主导航">
-      <a href="{{ url_for('index') }}" class="{{ 'is-active' if active == 'index' }}" {% if active == 'index' %}aria-current="page"{% endif %}>概览</a>
-      <a href="{{ url_for('analysis') }}" class="{{ 'is-active' if active == 'analysis' }}" {% if active == 'analysis' %}aria-current="page"{% endif %}>气象分析</a>
-      <a href="{{ url_for('map_view') }}" class="{{ 'is-active' if active == 'map' }}" {% if active == 'map' %}aria-current="page"{% endif %}>灾害地图</a>
-      <a href="{{ url_for('dry_hot') }}" class="{{ 'is-active' if active == 'dry_hot' }}" {% if active == 'dry_hot' %}aria-current="page"{% endif %}>干热风预警</a>
-      <a href="{{ url_for('risk') }}" class="{{ 'is-active' if active == 'risk' }}" {% if active == 'risk' %}aria-current="page"{% endif %}>灾害预警</a>
-      <a href="{{ url_for('predict') }}" class="{{ 'is-active' if active == 'predict' }}" {% if active == 'predict' %}aria-current="page"{% endif %}>产量测算</a>
-    </nav>
-
-    <div class="nav-actions">
-      <a class="btn btn-gold btn-advice{{ ' is-active' if active == 'advice' }}" href="{{ url_for('advice') }}" {% if active == 'advice' %}aria-current="page"{% endif %}>
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-leaf"></use></svg>
-        <span>农事建议</span>
-      </a>
-      <a class="btn btn-primary btn-upload{{ ' is-active' if active == 'upload' }}" href="{{ url_for('upload') }}" {% if active == 'upload' %}aria-current="page"{% endif %}>
-        <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-upload"></use></svg>
-        <span>上传数据</span>
-      </a>
-    </div>
-  </div>
-</header>
-
-<main id="main" tabindex="-1">
-{% block content %}{% endblock %}
-</main>
-
-<footer class="site-foot">
-  <div class="container foot-main">
-    <div class="foot-brand">
-      <svg class="foot-mark" aria-hidden="true" focusable="false"><use href="#wheat-mark"></use></svg>
-      <div>
-        <p class="foot-name">豫麦智测</p>
-        <p class="foot-desc">河南省小麦气象灾害影响分析与智能预警平台</p>
+    <nav class="rail-nav" aria-label="主导航">
+      <div class="rail-group">
+        <p class="rail-label">总览</p>
+        <a class="rail-link{{ ' is-active' if active == 'index' }}" href="{{ url_for('index') }}" {% if active == 'index' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-seed"></use></svg>
+          <span>工作台</span>
+        </a>
+        <a class="rail-link{{ ' is-active' if active == 'upload' }}" href="{{ url_for('upload') }}" {% if active == 'upload' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-database"></use></svg>
+          <span>数据诊断</span>
+        </a>
       </div>
-    </div>
-    <nav class="foot-nav" aria-label="页脚导航">
-      <a href="{{ url_for('analysis') }}">气象分析</a>
-      <a href="{{ url_for('map_view') }}">灾害地图</a>
-      <a href="{{ url_for('dry_hot') }}">干热风预警</a>
-      <a href="{{ url_for('risk') }}">灾害预警</a>
-      <a href="{{ url_for('predict') }}">产量测算</a>
-      <a href="{{ url_for('advice') }}">农事建议</a>
-      <a href="{{ url_for('upload') }}">数据上传</a>
+
+      <div class="rail-group">
+        <p class="rail-label">分析研判</p>
+        <a class="rail-link{{ ' is-active' if active == 'analysis' }}" href="{{ url_for('analysis') }}" {% if active == 'analysis' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-chart"></use></svg>
+          <span>气象分析</span>
+        </a>
+        <a class="rail-link{{ ' is-active' if active == 'map' }}" href="{{ url_for('map_view') }}" {% if active == 'map' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-map"></use></svg>
+          <span>灾害地图</span>
+        </a>
+        <a class="rail-link{{ ' is-active' if active == 'dry_hot' }}" href="{{ url_for('dry_hot') }}" {% if active == 'dry_hot' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-sun"></use></svg>
+          <span>干热风预警</span>
+        </a>
+      </div>
+
+      <div class="rail-group">
+        <p class="rail-label">预警与决策</p>
+        <a class="rail-link{{ ' is-active' if active == 'risk' }}" href="{{ url_for('risk') }}" {% if active == 'risk' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-alert"></use></svg>
+          <span>灾害预警</span>
+        </a>
+        <a class="rail-link{{ ' is-active' if active == 'predict' }}" href="{{ url_for('predict') }}" {% if active == 'predict' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-ruler"></use></svg>
+          <span>产量测算</span>
+        </a>
+        <a class="rail-link{{ ' is-active' if active == 'advice' }}" href="{{ url_for('advice') }}" {% if active == 'advice' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-leaf"></use></svg>
+          <span>农事建议</span>
+        </a>
+      </div>
     </nav>
+
+    <div class="rail-foot">
+      <p class="rail-foot-label">数据范围</p>
+      <p class="rail-foot-value">{{ footer.year_range if footer else '2010—2024' }}</p>
+      <p class="rail-foot-note">{{ footer.counties if footer else 151 }} 个气象县区 · 图表本地渲染</p>
+    </div>
+  </aside>
+
+  <div class="rail-scrim" id="rail-scrim" hidden></div>
+
+  <div class="app-body">
+    <header class="top-bar" id="site-head">
+      <button class="rail-toggle" id="rail-toggle" type="button" aria-expanded="false" aria-controls="side-rail">
+        <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-menu"></use></svg>
+        <span>菜单</span>
+      </button>
+      <p class="top-crumb">
+        <span class="top-crumb-root">工作台</span>
+        <span class="top-crumb-sep" aria-hidden="true">/</span>
+        <strong>{{ page_names.get(active, title or '概览') }}</strong>
+      </p>
+      <div class="top-state">
+        <span class="top-dot"><i class="dot is-online"></i>数据就绪</span>
+        <span class="top-range">{{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 县</span>
+      </div>
+      <div class="top-actions">
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('advice') }}">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-leaf"></use></svg>
+          <span>农事建议</span>
+        </a>
+        <a class="btn btn-primary btn-sm" href="{{ url_for('upload') }}">
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-upload"></use></svg>
+          <span>数据诊断</span>
+        </a>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+    {% block content %}{% endblock %}
+    </main>
+
+    <footer class="work-foot">
+      <span>数据范围 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 个气象县区 · 按年份划分训练 / 测试集</span>
+      <span>图表与地图本地渲染，断网可用</span>
+    </footer>
   </div>
-  <div class="container foot-meta">
-    <span>数据范围 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 个气象县区 · 按年份划分训练 / 测试集</span>
-    <span>图表与地图本地渲染，断网可用</span>
-  </div>
-</footer>
+</div>
 
 {% if active in ['analysis', 'predict'] %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
