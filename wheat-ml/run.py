@@ -84,11 +84,11 @@ def main() -> int:
 
     no_browser = "--no-browser" in sys.argv or os.environ.get("WHEAT_NO_BROWSER") == "1"
 
-    print("=" * 52, flush=True)
-    print("  豫麦智测 · 河南省小麦气象分析与产量预测系统", flush=True)
+    print("=" * 62, flush=True)
+    print("  豫麦智测 · 河南省小麦气象灾害影响分析与智能预警平台", flush=True)
     print(f"  服务地址：{URL}", flush=True)
     print("  关闭本窗口即停止服务；浏览器标签可以保留。", flush=True)
-    print("=" * 52, flush=True)
+    print("=" * 62, flush=True)
 
     threading.Thread(target=warm_caches, daemon=True).start()
     if not no_browser:

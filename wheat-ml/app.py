@@ -1,5 +1,5 @@
 ﻿"""
-河南省小麦气象数据分析与产量预测系统 · Web 应用
+河南省小麦气象灾害影响分析与智能预警平台 · Web 应用
 ==================================================
 页面路由：
   /upload    数据上传与校验
@@ -1449,7 +1449,7 @@ def export_report_pdf():
     summary_style.fontSize = 11
     summary_style.leading = 18
     summary_text = f"""
-    <b>报告说明：</b>本报告基于河南省小麦气象数据分析与产量预测系统，采用多模型融合算法
+    <b>报告说明：</b>本报告基于河南省小麦气象灾害影响分析与智能预警平台，采用多模型融合算法
     （随机森林、LightGBM、线性回归），综合考虑温度、降水、干热风等气象因子，
     对{county if county else '全省'}2010-2024年小麦产量进行预测和分析。
     模型整体预测精度R²=0.905，误差约20 kg/亩，具备实际参考价值。
@@ -1509,7 +1509,7 @@ def export_report_pdf():
     footer_style.fontName = font_name
     footer_style.fontSize = 9
     footer_style.textColor = colors.grey
-    story.append(Paragraph("—— 本报告由河南省小麦气象数据分析与产量预测系统自动生成 ——", footer_style))
+    story.append(Paragraph("—— 本报告由河南省小麦气象灾害影响分析与智能预警平台自动生成 ——", footer_style))
 
     doc.build(story)
     output.seek(0)
