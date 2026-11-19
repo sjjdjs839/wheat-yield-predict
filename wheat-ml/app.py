@@ -191,6 +191,11 @@ def dataset_for_county(county: str) -> tuple[pd.DataFrame, dict]:
             return sub, {"filename": PROCESSED.name, "county": county,
                          "source": "内置数据集（CSV）",
                          "summary": {"rows": len(sub), "year_range": "2010—2024"}}
+        # 配置里有这个县、但气象表里一行都没有 → 返回空表并明确标记缺失。
+        # 绝不拿全省 150 县数据冒充该县（否则会出现「龙管会累计降水 5124.5 mm」这种露馅数字）。
+        return base.iloc[0:0], {"filename": PROCESSED.name, "county": county,
+                                "source": "无气象数据", "missing": True,
+                                "summary": {"rows": 0, "year_range": ""}}
     return base, {"filename": PROCESSED.name, "county": None,
                   "source": "内置数据集（CSV）",
                   "summary": {"rows": len(base), "year_range": "2010—2024"}}
@@ -486,6 +491,7 @@ def index():
 
     # 首页也按「晚霜冻优先」重排，并算出灾害摘要
     frost_ctx = {"frost_n": 0, "frost_heavy": 0, "frost_worst": None,
+                 "frost_first": None, "frost_any": 0,
                  "last_frost": _last_frost(risk_year)}
     if risk_brief:
         try:
@@ -496,10 +502,19 @@ def index():
                                     -x["days"], x["county"]))
             risk_brief["top"] = its[:5]
             frost_ctx["frost_n"] = sum(1 for x in its if (x["frost_level"] or 0) > 0)
-            frost_ctx["frost_heavy"] = sum(1 for x in its if (x["frost_level"] or 0) >= 3)
+            # 中度以上 = 4 月 ≥2 天 ≤0℃（frost_level >= 2），与页面标签同口径
+            frost_ctx["frost_heavy"] = sum(1 for x in its if (x["frost_level"] or 0) >= 2)
+            _pool = [x for x in its if (x["frost_level"] or 0) > 0]
+            frost_ctx["frost_any"] = len(_pool)
+            # 有显著减产的县（用于「最大预估影响」）
             frost_ctx["frost_worst"] = min(
-                [x for x in its if (x["frost_loss"] or 0) < -0.05],
+                [x for x in _pool if (x["frost_loss"] or 0) < -0.05],
                 key=lambda x: x["frost_loss"], default=None)
+            # 有霜冻但未减产的县（用于避免把「有霜冻」说成「没霜冻」）
+            frost_ctx["frost_first"] = min(
+                _pool,
+                key=lambda x: (x["frost_loss"] if x["frost_loss"] is not None else 0),
+                default=None)
             w = frost_ctx["frost_worst"]
             if w:
                 rest = [d for d in (risk_brief.get("decision") or []) if d["county"] != w["county"]]
@@ -1230,9 +1245,13 @@ def risk():
                            items=items, summary=snap["summary"], top=snap["top"],
                            total=len(snap["items"]), risk_type=risk_type,
                            frost_n=sum(1 for x in items if (x["frost_level"] or 0) > 0),
-                           frost_heavy=sum(1 for x in items if (x["frost_level"] or 0) >= 3),
-                           frost_worst=min([x for x in items if (x["frost_loss"] or 0) < -0.05],
+                           frost_heavy=sum(1 for x in items if (x["frost_level"] or 0) >= 2),
+                           frost_worst=min([x for x in items
+                                            if (x["frost_level"] or 0) > 0 and (x["frost_loss"] or 0) < -0.05],
                                            key=lambda x: x["frost_loss"], default=None),
+                           frost_first=min([x for x in items if (x["frost_level"] or 0) > 0],
+                                           key=lambda x: (x["frost_loss"] if x["frost_loss"] is not None else 0),
+                                           default=None),
                            last_frost=_last_frost(year),
                            dose=_dose_payload(),
                            mh=_multihazard_payload(),
@@ -1658,6 +1677,10 @@ def county_year_breakdown(county: str, year: int):
         "total_loss": _f("total_loss"),
         "total_low": _f("total_low"),
         "total_high": _f("total_high"),
+        # 距平口径：页面折算只用这两项，避免拿"绝对天数 × 弹性"夸大灾情
+        "fz4_anom": _f("fz4_anom"),
+        "fz3_anom": _f("fz3_anom"),
+        "frost_own": _f("frost_anom_loss"),
     }
     dose = _dose_payload()
     bands = []

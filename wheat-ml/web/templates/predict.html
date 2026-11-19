@@ -97,11 +97,13 @@
       </div>
       <p class="result-sub">预警线 {{ result.threshold }} kg/亩 · 该县 2010—2021 平均 {{ result.mean_yield }} kg/亩 · 相对常年 {{ '+' if result.vs_mean > 0 }}{{ result.vs_mean }}%{% if result.actual is not none %} · {{ result.year }} 年实测 {{ result.actual }} kg/亩{% endif %}</p>
       {% if breakdown and result %}
-      {% set fz4_pct = breakdown.fz4_beta * breakdown.fz4 %}
-      {% set fz3_pct = breakdown.fz3_beta * breakdown.fz3 %}
-      {% set tot_pct = fz4_pct + fz3_pct %}
+      {# 折算只用距平口径（frost_own），不用「绝对天数 × 弹性」——后者会把常年本身就有的
+         几天低温算成灾害。3 月低温分档检验不显著（p>0.05），只报天数不折算。 #}
+      {% set fz4_raw = breakdown.frost_own if breakdown.frost_own is not none else 0 %}
+      {% set fz4_pct = fz4_raw if fz4_raw < 0 else 0 %}
+      {% set tot_pct = fz4_pct %}
       <details class="more panel">
-        <summary>{% if tot_pct < -0.001 %}灾情让产量少多少：约 {{ (result.mean_yield * tot_pct / 100)|round(0)|abs }} 公斤/亩{% else %}灾情让产量少多少：本年没有霜冻损失{% endif %}</summary>
+        <summary>{% if tot_pct < -0.01 %}灾情让产量少多少：约 {{ (result.mean_yield * tot_pct / 100)|round(0)|abs }} 公斤/亩{% else %}灾情让产量少多少：本年霜冻没有造成减产{% endif %}</summary>
         <div class="detail-body">
         <div class="bd-flat">
         <div class="contrib-head">
@@ -112,14 +114,16 @@
           <tbody>
             <tr><td>县基线（2010—2021 平均）</td><td class="bd-num">{{ result.mean_yield }} kg/亩</td><td class="bd-note">这个县多年平均</td></tr>
             <tr>
-              <td>4 月 ≤0℃ {{ breakdown.fz4 }} 天 → 折减</td>
+<tr>
+              <td>4 月 ≤0℃ {{ breakdown.fz4 }} 天{% if breakdown.fz4_anom is not none %}（比常年 {{ '%+.1f'|format(breakdown.fz4_anom) }} 天）{% endif %} → 折减</td>
               <td class="bd-num {{ 'bd-down' if fz4_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(fz4_pct) }}%（{{ (result.mean_yield * fz4_pct / 100)|round(1) }} kg/亩）</td>
-              <td class="bd-note">每多 1 天约少 2%</td>
+              <td class="bd-note">按距平算，每多 1 天约少 2%</td>
             </tr>
             <tr>
-              <td>3 月 ≤0℃ {{ breakdown.fz3 }} 天 → 折减</td>
-              <td class="bd-num {{ 'bd-down' if fz3_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(fz3_pct) }}%（{{ (result.mean_yield * fz3_pct / 100)|round(1) }} kg/亩）</td>
-              <td class="bd-note">每多 1 天约少 0.6%</td>
+              <td>3 月 ≤0℃ {{ breakdown.fz3 }} 天{% if breakdown.fz3_anom is not none %}（比常年 {{ '%+.1f'|format(breakdown.fz3_anom) }} 天）{% endif %}</td>
+              <td class="bd-num bd-mute">仅暴露</td>
+              <td class="bd-note">分档检验不显著，不折算</td>
+            
             </tr>
             <tr>
               <td>5 月干热风 {{ breakdown.hd_streak }} 天</td>
@@ -127,13 +131,13 @@
               <td class="bd-note">历史上看不出明显减产</td>
             </tr>
             <tr class="bd-total">
-              <td>可追溯折减合计</td>
+              <td>可追溯折减合计（仅 4 月晚霜冻）</td>
               <td class="bd-num {{ 'bd-down' if tot_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(tot_pct) }}%（{{ (result.mean_yield * tot_pct / 100)|round(1) }} kg/亩）</td>
               <td class="bd-note">只算灾害，不含全年收成波动</td>
             </tr>
           </tbody>
         </table>
-        <p class="bd-foot">只叠加上面几类已验证的灾害；品种改良、田间管理等其他因素无法单独拆分，不计入。</p>
+<p class="bd-foot">合计只含 4 月晚霜冻，且用距平天数（比常年多几天），已剔除常年本来就有的低温；3 月低温只报暴露、不折算（分档检验 p&gt;0.05）；品种改良、田间管理等因素无法单独拆分，不计入。</p>
         <div class="bd-sim">
           <span class="bd-sim-title">若霜冻天数变大（依据剂量分档）：</span>
           {% for b in breakdown.dose_bands %}

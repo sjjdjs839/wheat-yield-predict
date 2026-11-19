@@ -405,6 +405,14 @@ def load_weather_file(path: str | Path, county: str | None = None,
     df["month_day"] = df["date"].dt.strftime("%m-%d")
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
 
+    # 0 行（只有表头）必须判不通过：否则会被用户设为「当前数据集」，
+    # 首页取年份极值时抛 ValueError，整站 500
+    if len(df) == 0:
+        report["issues"].append({
+            "level": "error", "field": "记录数",
+            "title": "文件里没有任何数据行",
+            "detail": "只有表头、没有记录。请检查导出时是否选中了数据区域。",
+        })
     if any(i["level"] == "error" for i in report["issues"]):
         report["ok"] = False
     report["summary"] = _summary(df)

@@ -17,13 +17,16 @@
       <small>4 月 ≥2 天 ≤0℃</small>
     </div>
     <div class="dh-card">
-      <span class="dh-label">最大预估影响</span>
-      {% if frost_worst and frost_worst.frost_loss is not none %}
-      <strong>{{ frost_worst.frost_loss }}<small style="font-size:12px"> %</small></strong>
-      <small>{{ frost_worst.county }} · 4 月 {{ frost_worst.fz4 }} 天</small>
-      {% else %}
-      <strong>—</strong>
-      <small>本年未出现晚霜冻</small>
+<span class="dh-label">最大预估影响</span>
+       {% if frost_worst and frost_worst.frost_loss is not none %}
+       <strong>{{ frost_worst.frost_loss }}<small style="font-size:12px"> %</small></strong>
+       <small>{{ frost_worst.county }} · 4 月 {{ frost_worst.fz4 }} 天</small>
+       {% elif frost_n > 0 %}
+       <strong>未减产</strong>
+       <small>{% if frost_first %}{{ frost_first.county }} · 4 月 {{ frost_first.fz4 }} 天{% endif %}</small>
+       {% else %}
+       <strong>—</strong>
+       <small>本年未出现晚霜冻</small>
       {% endif %}
     </div>
     <div class="dh-card">
@@ -40,6 +43,14 @@
       <strong>{{ frost_worst.county }}</strong>（{{ frost_worst.city }}）4 月出现 <strong>{{ frost_worst.fz4 }} 天</strong>最低温 ≤0℃{% if frost_worst.tmin4 is not none %}，最低 {{ frost_worst.tmin4 }}℃{% endif %}；按双向固定效应弹性（−1.96%/天）折算，相对该县常年预计影响 <strong>{{ frost_worst.frost_loss }}%</strong>
       {% if frost_worst.frost_low is not none %}（区间 {{ frost_worst.frost_low }}% ~ {{ frost_worst.frost_high }}%）{% endif %}——其中全省年景 {{ frost_worst.year_eff }}%，本县比常年偏冷再叠加 {{ frost_worst.frost_own }}%。
       {% set others = (items | rejectattr('county', 'equalto', frost_worst.county) | list)[:3] %}{% if others %}另有 {% for x in others %}{{ x.county }}（{{ x.fz4 }} 天）{% if not loop.last %}、{% endif %}{% endfor %} 同期受低温影响。{% endif %}
+    </p>
+  </div>
+{% elif frost_n > 0 %}
+  <div class="alert warning risk-focus">
+    <span class="tag">有霜冻，未造成减产</span>
+    <p>
+      {% if frost_first %}<strong>{{ frost_first.county }}</strong>（{{ frost_first.city }}）4 月出现 <strong>{{ frost_first.fz4 }} 天</strong>最低温 ≤0℃{% if frost_first.tmin4 is not none %}，最低 {{ frost_first.tmin4 }}℃{% endif %}。{% endif %}
+      共 <strong>{{ frost_n }}</strong> 个县出现霜冻，但当年 4 月整体偏暖（全省年景 {{ '%+.1f'|format(frost_first.year_eff) if frost_first and frost_first.year_eff is not none else '—' }}%），按距平弹性折算，最重一县相对常年 {{ '%+.1f'|format(frost_first.frost_loss) if frost_first and frost_first.frost_loss is not none else '—' }}%，未触发减产预警。
     </p>
   </div>
   {% else %}

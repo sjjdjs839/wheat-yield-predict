@@ -63,7 +63,7 @@
       {% else %}
       <div><dt>出现晚霜冻</dt><dd class="is-alert">{{ frost.frost_n }}<span>县</span></dd></div>
       <div><dt>中度以上</dt><dd>{{ frost.frost_heavy }}<span>县</span></dd></div>
-      <div><dt>最大预估影响</dt><dd>{{ frost.frost_worst.frost_loss }}<span>% · {{ frost.frost_worst.county }}</span></dd></div>
+<div><dt>最大预估影响</dt><dd>{% if frost.frost_worst %}{{ frost.frost_worst.frost_loss }}<span>% · {{ frost.frost_worst.county }}</span>{% else %}未减产<span>{% if frost.frost_first %}{{ frost.frost_first.county }} · 4 月 {{ frost.frost_first.fz4 }} 天{% endif %}</span>{% endif %}</dd></div>
       <div><dt>出现干热风</dt><dd>{{ risk.summary.heavy + risk.summary.light }}<span>县 · {{ risk.summary.max_days }} 天最高</span></dd></div>
       {% endif %}
     </dl>
