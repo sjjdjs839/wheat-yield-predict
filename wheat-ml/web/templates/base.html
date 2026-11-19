@@ -119,7 +119,7 @@
     <div class="rail-foot">
       <p class="rail-foot-label">数据范围</p>
       <p class="rail-foot-value">{{ footer.year_range if footer else '2010—2024' }}</p>
-      <p class="rail-foot-note">{{ footer.counties if footer else 151 }} 个气象县区 · 图表本地渲染</p>
+      <p class="rail-foot-note">{{ footer.counties if footer else 151 }} 个有观测县区 · 图表本地渲染</p>
     </div>
   </aside>
 
@@ -157,7 +157,7 @@
     </main>
 
     <footer class="work-foot">
-      <span>数据范围 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 个气象县区 · 按年份划分训练 / 测试集</span>
+      <span>数据范围 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 个有观测县区 · 按年份划分训练 / 测试集</span>
       <span>图表与地图本地渲染，断网可用</span>
     </footer>
   </div>

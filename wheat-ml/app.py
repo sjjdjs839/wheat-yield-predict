@@ -60,11 +60,30 @@ app.config["MAX_CONTENT_LENGTH"] = CONFIG["upload"]["max_size_mb"] * 1024 * 1024
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+_FOOTER_CACHE: dict = {}
+
+
+def _observed_county_count() -> int:
+    """有观测记录的县区数。
+
+    与行政区划配置数（len(ALL_COUNTIES)=151）差 1 个（洛阳市/龙管会无气象记录）。
+    页脚必须写「有观测」的数（150），否则和 821,850 = 150×5,479 行对不上，
+    评委一除就能反推出矛盾。
+    """
+    if "n" not in _FOOTER_CACHE:
+        try:
+            df = builtin_dataset()
+            _FOOTER_CACHE["n"] = int(df["county"].nunique()) if "county" in df.columns else 0
+        except Exception:
+            _FOOTER_CACHE["n"] = 0
+    return _FOOTER_CACHE["n"] or len(ALL_COUNTIES)
+
+
 @app.context_processor
 def inject_footer():
     """页脚使用的数据范围，避免在各页面重复计算。"""
     return {"footer": {
-        "counties": len(ALL_COUNTIES),
+        "counties": _observed_county_count(),
         "year_range": f"{CONFIG['upload']['year_min']}—{CONFIG['upload']['year_max']}",
     }}
 
