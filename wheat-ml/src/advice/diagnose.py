@@ -7,7 +7,7 @@
 3. 该不该做点什么（交回农事建议模块）。
 
 判据与建模口径保持一致：
-- 晚霜冻：4 月最低温 < 0℃（对应面板回归 fz4_0，β = −2.05%/天）
+- 晚霜冻：4 月最低温 < 0℃（对应面板回归 fz4_0，β = −1.96%/天）
 - 干热风：5 月最高温 ≥ 35℃ 且相对湿度 ≤ 40%（对应 hd_may，未达显著，只报天数）
 - 高温：3—6 月最高温 ≥ 35℃
 - 低温：3 月 / 5 月最低温 < 0℃（4 月已单列）
@@ -30,7 +30,7 @@ DOSE_BANDS = [
     (5, 99, -7.75, 12, "重度减产"),
 ]
 
-FROST_PER_DAY = -2.05   # 反向参考：每多 1 天的线性弹性（只用于说明，不参与区间计算）
+FROST_PER_DAY = -1.96   # 反向参考：每多 1 天的线性弹性（只用于说明，不参与区间计算）
 
 
 def _dates(d: pd.DataFrame) -> list:
@@ -67,7 +67,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
             "key": "frost", "label": "4 月晚霜冻", "days": days, "dates": _dates(fz),
             "level": "high" if sig else "watch",
             "loss_mid": mid, "loss_n": n, "loss_note": note, "loss_sig": sig,
-            "basis": "面板回归：4 月最低温<0℃ 每多 1 天单产 −2.05%（p<0.001）；"
+            "basis": "面板回归：4 月最低温<0℃ 每多 1 天单产 −1.96%（p<0.001）；"
                      "本档减产取剂量分档实测均值",
             "action": "霜冻前灌水、喷施叶面肥提高抗寒性；冻后及时查苗补种",
         })
@@ -142,7 +142,7 @@ def diagnose(df: pd.DataFrame, county: str, year: int) -> dict:
         if loss:
             verdict = (f"{year} 年识别到 {names}。4 月晚霜冻落在「{loss['note']}」档："
                        f"该档实测单产 {loss['mid']:+.2f}%（样本 n={loss['n']}），"
-                       f"线性弹性口径为每多 1 天 −2.05%。")
+                       f"线性弹性口径为每多 1 天 −1.96%。")
         else:
             verdict = (f"{year} 年识别到 {names}，但均未达到回归验证的显著减产阈值，"
                        f"系统只提示暴露强度，不折算产量损失。")
