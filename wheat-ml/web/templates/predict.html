@@ -108,7 +108,10 @@
       {% set fz4_pct = breakdown.fz4_beta * breakdown.fz4 %}
       {% set fz3_pct = breakdown.fz3_beta * breakdown.fz3 %}
       {% set tot_pct = fz4_pct + fz3_pct %}
-      <div class="bd-panel">
+      <details class="more panel">
+        <summary>{% if tot_pct < -0.001 %}能追溯的折减：{{ '%+.2f'|format(tot_pct) }}%（{{ (result.mean_yield * tot_pct / 100)|round(1) }} kg/亩）{% else %}能追溯的折减：本年无霜冻损失{% endif %}</summary>
+        <div class="detail-body">
+        <div class="bd-flat">
         <div class="contrib-head">
           <h3>这个数里，能追溯的部分</h3>
           <p class="block-note">上面是树模型用 19 维特征的参照；下面只列回归验证过、能按天数单独折算的灾种。没验证的只记暴露，不折算。</p>
@@ -147,7 +150,9 @@
             {% endif %}
           {% endfor %}
         </div>
-      </div>
+        </div>
+        </div>
+      </details>
       {% endif %}
 
       {% if result.contrib and result.contrib.available %}
