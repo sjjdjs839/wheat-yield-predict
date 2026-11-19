@@ -151,7 +151,10 @@
       {% endif %}
 
       {% if result.contrib and result.contrib.available %}
-      <div class="contrib-panel">
+      <details class="more panel">
+        <summary>因子归因：今年哪些因子在拉高 / 拉低产量</summary>
+        <div class="detail-body">
+        <div class="contrib-panel">
         <div class="contrib-head">
           <h3>今年产量主要被哪些因子影响</h3>
           <p class="block-note">绿色为推高产量的因子，红色为拉低产量的因子；数值按该县常年单产近似折算为 kg/亩，仅反映相对常年的影响方向与幅度。</p>
@@ -174,7 +177,9 @@
             {% else %}<p class="contrib-empty">无明显拉低因子</p>{% endif %}
           </div>
         </div>
-      </div>
+        </div>
+        </div>
+      </details>
       {% endif %}
 
       <details class="more panel">
@@ -241,43 +246,6 @@
   </section>
   {% endif %}
 
-  {% if result and feature_chart %}
-  <section class="block-lg">
-    <div class="block-head" data-reveal>
-      <div>
-        <h2>气象因子影响排序</h2>
-      </div>
-      <p class="block-note">按平均贡献占比排序</p>
-    </div>
-    <article class="chart-card wide">
-      <div class="chart-head">
-        <div>
-          <h3>{{ feature_chart.title }}</h3>
-          <p>{{ feature_chart.desc }}</p>
-        </div>
-      </div>
-      <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
-      <p class="chart-note">数值为各因子平均贡献占比，反映其对产量预测的实际影响程度；年份趋势与生育期积温通常影响最大。</p>
-      <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
-    </article>
-    <details class="more panel">
-      <summary>特征重要性数据表 · {{ feature_chart.payload.labels|length }} 项</summary>
-      <div class="detail-body">
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>特征</th><th>重要性占比</th></tr></thead>
-            <tbody>
-              {% for label in feature_chart.payload.labels %}
-              <tr><td>{{ label }}</td><td>{{ feature_chart.payload.values[loop.index0] }}%</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
-      </div>
-    </details>
-  </section>
-  {% endif %}
 
   {% if result %}
   <section class="block-lg" id="simulation">
@@ -349,6 +317,44 @@
       <p class="chart-note">预测值由当期气象特征驱动融合模型得到；若某年缺少产量标签，实测列显示为「—」。</p>
     </div>
   </details>
+  {% endif %}
+
+  {% if result and feature_chart %}
+  <section class="block-lg">
+    <div class="block-head" data-reveal>
+      <div>
+        <h2>气象因子影响排序</h2>
+      </div>
+      <p class="block-note">按平均贡献占比排序</p>
+    </div>
+    <article class="chart-card wide">
+      <div class="chart-head">
+        <div>
+          <h3>{{ feature_chart.title }}</h3>
+          <p>{{ feature_chart.desc }}</p>
+        </div>
+      </div>
+      <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
+      <p class="chart-note">数值为各因子平均贡献占比，反映其对产量预测的实际影响程度；年份趋势与生育期积温通常影响最大。</p>
+      <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
+    </article>
+    <details class="more panel">
+      <summary>特征重要性数据表 · {{ feature_chart.payload.labels|length }} 项</summary>
+      <div class="detail-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>特征</th><th>重要性占比</th></tr></thead>
+            <tbody>
+              {% for label in feature_chart.payload.labels %}
+              <tr><td>{{ label }}</td><td>{{ feature_chart.payload.values[loop.index0] }}%</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+      </div>
+    </details>
+  </section>
   {% endif %}
 </div>
 {% endblock %}
