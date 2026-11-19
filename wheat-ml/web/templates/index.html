@@ -30,7 +30,7 @@
   <div class="risk-brief">
     <div class="risk-brief-head">
       <div>
-        <h2>{{ risk.year }} 年全省灾害态势与决策提示</h2>
+        <h2>{{ risk.year }} 年灾情态势</h2>
         <p>
           {{ risk.summary.count }} 个有产量基准的县区中，
           <strong>{{ frost.frost_n }}</strong> 个出现 4 月低温（晚霜冻）{{
@@ -86,30 +86,22 @@
       </ul>
     </div>
     {% endif %}
+    {% set ns = namespace(n=0) %}
+    {% for x in risk.top[:4] %}{% if x.fz4 or x.days %}{% set ns.n = ns.n + 1 %}{% endif %}{% endfor %}
+    {% if ns.n > 0 %}
     <div class="risk-brief-top">
       <span>重点关注</span>
       {% for x in risk.top[:4] %}
+      {% if x.fz4 or x.days %}
       <a href="{{ url_for('risk') }}?year={{ risk.year }}">{{ x.county }}{% if x.fz4 %} 霜冻 {{ x.fz4 }} 天{% else %} 干热风 {{ x.days }} 天{% endif %}</a>
+      {% endif %}
       {% endfor %}
     </div>
+    {% endif %}
   </div>
 </section>
 {% endif %}
 
-<!-- 影响评估结论条 -->
-<section class="container dash-section">
-  <div class="alert">
-    <span class="tag">当前结论</span>
-    <p>
-      基于 2010—2024 年 110 个县、1635 条县级观测的双向固定效应面板回归：
-      <strong>4 月低温每多 1 天，单产相对常年下降 1.96%</strong>（95%CI −2.55%~−1.38%，p&lt;0.001；这是同时控制 3 月低温与干热风后的边际斜率。按实测分档看，<strong>0—2 天无显著损失、3—4 天 −2.6%、≥5 天 −7.8%</strong>——损失是阈值型的，不是线性的，所以页面判定按分档报）；
-      3 月低温每多 1 天下降 0.57%（p&lt;0.001）；
-      5 月干热风在六种口径下均不显著（p&gt;0.2），故只报暴露强度、不折算减产。
-      影响分两级折算：<strong>年效应</strong>（该年全省共同年景，如 2018 年 −2.5%、2022 年 +4.7%）+ <strong>县距平</strong>（本县比常年多冷几天 × 弹性）。
-      县域尺度气象对单产年际波动的组内解释力为 10.1%，其余受灌溉、品种与田间管理影响。
-    </p>
-  </div>
-</section>
 
 <!-- 功能入口：一行紧凑条，不占首屏 -->
 <section class="container dash-section">
@@ -142,6 +134,10 @@
       <div><dt>仿真底座 R²</dt><dd>{{ best_label }} {{ b.r2 }}</dd></div>
       <div><dt>MAE</dt><dd>{{ b.mae }}<small>kg/亩</small></dd></div>
     </dl>
+
+    <h2 class="model-sub">影响评估口径（为什么这样报数）</h2>
+    <p class="chart-note">基于 2010—2024 年 110 个县、1,635 条县级观测的双向固定效应面板回归：<strong>4 月低温每多 1 天，单产相对常年下降 1.96%</strong>（95%CI −2.55%~−1.38%，p&lt;0.001；这是同时控制 3 月低温与干热风后的边际斜率）。按实测分档看，<strong>0—2 天无显著损失、3—4 天 −2.6%、≥5 天 −7.8%</strong>——损失是阈值型的、不是线性的，所以页面判定按分档报。</p>
+    <p class="chart-note">3 月低温每多 1 天下降 0.57%（p&lt;0.001）；5 月干热风在六种口径下均不显著（p&gt;0.2），故只报暴露强度、不折算减产。影响分两级折算：<strong>年效应</strong>（该年全省共同年景，如 2018 年 −2.5%、2022 年 +4.7%）+ <strong>县距平</strong>（本县比常年多冷几天 × 弹性）。县域尺度气象对单产年际波动的组内解释力为 10.1%，其余受灌溉、品种与田间管理影响。</p>
     <p class="model-foot">上层结论来自面板回归（系数、p 值、置信区间），树模型仅作反事实仿真的底座，其 R² 不用于衡量灾害影响大小。融合权重 LightGBM 60% + 随机森林 20% + 线性回归 20%，共 {{ model.features|length }} 项特征。{% if not model.reliable %}当前使用演示产量标签，指标仅用于跑通链路。{% endif %}</p>
   </div>
 </details>
