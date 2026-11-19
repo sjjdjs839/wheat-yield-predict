@@ -526,7 +526,7 @@ def index():
                     "counties": st["counties"],
                     "year_range": f"{st['year_min']}—{st['year_max']}",
                     "label_text": label_text,
-                    "dataset_text": f"MySQL · {CONFIG['database']['name']}",
+                    "dataset_text": "逐日气象 · 县区统计产量",
                     "feature_rows": st["feature_rows"],
                     "yield_rows": st["yield_rows"],
                 }

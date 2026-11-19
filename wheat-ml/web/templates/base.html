@@ -70,7 +70,7 @@
       <a href="{{ url_for('map_view') }}" class="{{ 'is-active' if active == 'map' }}" {% if active == 'map' %}aria-current="page"{% endif %}>灾害地图</a>
       <a href="{{ url_for('dry_hot') }}" class="{{ 'is-active' if active == 'dry_hot' }}" {% if active == 'dry_hot' %}aria-current="page"{% endif %}>干热风预警</a>
       <a href="{{ url_for('risk') }}" class="{{ 'is-active' if active == 'risk' }}" {% if active == 'risk' %}aria-current="page"{% endif %}>灾害预警</a>
-      <a href="{{ url_for('predict') }}" class="{{ 'is-active' if active == 'predict' }}" {% if active == 'predict' %}aria-current="page"{% endif %}>产量预测</a>
+      <a href="{{ url_for('predict') }}" class="{{ 'is-active' if active == 'predict' }}" {% if active == 'predict' %}aria-current="page"{% endif %}>产量测算</a>
     </nav>
 
     <div class="nav-actions">
@@ -104,7 +104,7 @@
       <a href="{{ url_for('map_view') }}">灾害地图</a>
       <a href="{{ url_for('dry_hot') }}">干热风预警</a>
       <a href="{{ url_for('risk') }}">灾害预警</a>
-      <a href="{{ url_for('predict') }}">产量预测</a>
+      <a href="{{ url_for('predict') }}">产量测算</a>
       <a href="{{ url_for('advice') }}">农事建议</a>
       <a href="{{ url_for('upload') }}">数据上传</a>
     </nav>

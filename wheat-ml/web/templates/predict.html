@@ -1,8 +1,8 @@
 ﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{% set badges = [source] %}
-{{ page_head('情景仿真', '以树模型为底座做反事实对照：在已知气象与灾害条件下，这个县的单产相对常年处在什么水平。核心影响结论由面板回归给出，这里的数值只作情景参照。', badges) }}
+{% set badges = ['数据：2010—2024 年逐日气象 + 各县实收产量'] %}
+{{ page_head('产量测算', '选一个县和年份，看这个县今年的收成大概多少、比常年高还是低、有没有跌破预警线的风险。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法预测</span><p>{{ error }}</p></div>
@@ -66,7 +66,7 @@
             </span>
           </div>
           {% if zone_hint %}
-          <p class="zone-hint">{{ icon('alert') }}该县属{{ zone_hint.zone }}：模型在此类县上系统性偏低约 {{ zone_hint.bias }} kg/亩（该象限 MAE {{ zone_hint.mae }}），单县单年偏差可能明显大于象限平均；预测值宜作下限参考，请结合实地核查。</p>
+          <p class="zone-hint">{{ icon('alert') }}该县属{{ zone_hint.zone }}。这类县历史上模型容易算低，平均少算 12.5 公斤/亩，单县单年偏差还可能更大。预测值请当下限看，建议结合实地核查。</p>
           {% endif %}
         </div>
 
@@ -83,7 +83,7 @@
               <span><i class="legend-dot"></i>预测值 {{ result.pred }}</span>
               <span><i class="legend-line"></i>预警线 {{ result.threshold }}</span>
               <span><i class="legend-mean"></i>2010—2021 均值 {{ result.mean_yield }}</span>
-              <span><i class="legend-band"></i>误差量级 {{ result.pred_low }}—{{ result.pred_high }}</span>
+              <span><i class="legend-band"></i>预计区间 {{ result.pred_low }}—{{ result.pred_high }}</span>
             </div>
           </div>
         </div>
@@ -91,57 +91,49 @@
 
       <div class="metric-grid">
         <div class="metric is-primary"><span>预测单产</span><strong>{{ result.pred }}<small>kg/亩</small></strong></div>
-        <div class="metric"><span>误差量级</span><strong>{{ result.pred_low }} — {{ result.pred_high }}<small>kg/亩</small></strong></div>
-        <div class="metric"><span>相对预警线</span><strong>{{ '+' if result.vs_threshold > 0 }}{{ result.vs_threshold }}<small>%</small></strong></div>
-        <div class="metric"><span>破线概率</span><strong>{{ result.prob_below if result.prob_below is not none else '—' }}{% if result.prob_below is not none %}<small>%</small>{% endif %}</strong></div>
+        <div class="metric"><span>预计区间</span><strong>{{ result.pred_low }} — {{ result.pred_high }}<small>kg/亩</small></strong></div>
+        <div class="metric"><span>比预警线</span><strong>{{ '+' if result.vs_threshold > 0 }}{{ result.vs_threshold }}<small>%</small></strong></div>
+        <div class="metric"><span>可能跌破预警线</span><strong>{{ result.prob_below if result.prob_below is not none else '—' }}{% if result.prob_below is not none %}<small>%</small>{% endif %}</strong></div>
       </div>
       <p class="result-sub">预警线 {{ result.threshold }} kg/亩 · 该县 2010—2021 平均 {{ result.mean_yield }} kg/亩 · 相对常年 {{ '+' if result.vs_mean > 0 }}{{ result.vs_mean }}%{% if result.actual is not none %} · {{ result.year }} 年实测 {{ result.actual }} kg/亩{% endif %}</p>
-      <details class="more">
-        <summary>口径说明：误差量级、破线概率怎么算</summary>
-        <p class="chart-note">误差量级按测试集 MAE {{ result.mae }} 的 ±0.8 倍估算，测试集上约覆盖一半样本；这是误差量级，不是统计置信区间。</p>
-        {% if result.prob_below is not none %}
-        <p class="chart-note">破线概率为 500 棵决策树中预测值低于预警线的比例；树间区间 {{ result.tree_low }}—{{ result.tree_high }} kg/亩，反映模型不确定性，非统计置信区间。</p>
-        {% endif %}
-      </details>
-
       {% if breakdown and result %}
       {% set fz4_pct = breakdown.fz4_beta * breakdown.fz4 %}
       {% set fz3_pct = breakdown.fz3_beta * breakdown.fz3 %}
       {% set tot_pct = fz4_pct + fz3_pct %}
       <details class="more panel">
-        <summary>{% if tot_pct < -0.001 %}能追溯的折减：{{ '%+.2f'|format(tot_pct) }}%（{{ (result.mean_yield * tot_pct / 100)|round(1) }} kg/亩）{% else %}能追溯的折减：本年无霜冻损失{% endif %}</summary>
+        <summary>{% if tot_pct < -0.001 %}灾情让产量少多少：约 {{ (result.mean_yield * tot_pct / 100)|round(0)|abs }} 公斤/亩{% else %}灾情让产量少多少：本年没有霜冻损失{% endif %}</summary>
         <div class="detail-body">
         <div class="bd-flat">
         <div class="contrib-head">
-          <h3>这个数里，能追溯的部分</h3>
-          <p class="block-note">上面是树模型用 19 维特征的参照；下面只列回归验证过、能按天数单独折算的灾种。没验证的只记暴露，不折算。</p>
+          <h3>这个数是怎么来的</h3>
+          <p class="block-note">按 2010—2024 年各县实收产量折算：每多 1 天霜冻，单产大约少多少。没有验证过的灾种只提示风险，不折算成损失。</p>
         </div>
         <table class="bd-table">
           <tbody>
-            <tr><td>县基线（2010—2021 平均）</td><td class="bd-num">{{ result.mean_yield }} kg/亩</td><td class="bd-note">训练期县均值</td></tr>
+            <tr><td>县基线（2010—2021 平均）</td><td class="bd-num">{{ result.mean_yield }} kg/亩</td><td class="bd-note">这个县多年平均</td></tr>
             <tr>
               <td>4 月 ≤0℃ {{ breakdown.fz4 }} 天 → 折减</td>
               <td class="bd-num {{ 'bd-down' if fz4_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(fz4_pct) }}%（{{ (result.mean_yield * fz4_pct / 100)|round(1) }} kg/亩）</td>
-              <td class="bd-note">每多 1 天 −{{ '%.2f'|format(breakdown.fz4_beta|abs) }}%，p=0.000，n=1635</td>
+              <td class="bd-note">每多 1 天约少 2%</td>
             </tr>
             <tr>
               <td>3 月 ≤0℃ {{ breakdown.fz3 }} 天 → 折减</td>
               <td class="bd-num {{ 'bd-down' if fz3_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(fz3_pct) }}%（{{ (result.mean_yield * fz3_pct / 100)|round(1) }} kg/亩）</td>
-              <td class="bd-note">每多 1 天 −{{ '%.2f'|format(breakdown.fz3_beta|abs) }}%，p=0.000</td>
+              <td class="bd-note">每多 1 天约少 0.6%</td>
             </tr>
             <tr>
               <td>5 月干热风 {{ breakdown.hd_streak }} 天</td>
               <td class="bd-num bd-mute">仅暴露</td>
-              <td class="bd-note">三套判据 p&gt;0.2，不折算</td>
+              <td class="bd-note">历史上看不出明显减产</td>
             </tr>
             <tr class="bd-total">
               <td>可追溯折减合计</td>
               <td class="bd-num {{ 'bd-down' if tot_pct < 0 else 'bd-mute' }}">{{ '%+.2f'|format(tot_pct) }}%（{{ (result.mean_yield * tot_pct / 100)|round(1) }} kg/亩）</td>
-              <td class="bd-note">仅灾害项，不含年景</td>
+              <td class="bd-note">只算灾害，不含全年收成波动</td>
             </tr>
           </tbody>
         </table>
-        <p class="bd-foot">合计只叠加上面已验证的灾种；品种趋势与其他气象由树模型吸收，无单独可追溯项。年景项（全省共同年景）由当年数据估出，只解释已发生年份，不列入此表。</p>
+        <p class="bd-foot">只叠加上面几类已验证的灾害；品种改良、田间管理等其他因素无法单独拆分，不计入。</p>
         <div class="bd-sim">
           <span class="bd-sim-title">若霜冻天数变大（依据剂量分档）：</span>
           {% for b in breakdown.dose_bands %}
@@ -157,11 +149,11 @@
 
       {% if result.contrib and result.contrib.available %}
       <details class="more panel">
-        <summary>因子归因：今年哪些因子在拉高 / 拉低产量</summary>
+        <summary>今年哪些因素在影响产量</summary>
         <div class="detail-body">
         <div class="contrib-panel">
         <div class="contrib-head">
-          <h3>今年产量主要被哪些因子影响</h3>
+          <h3>今年产量受什么影响</h3>
           <p class="block-note">绿色为推高产量的因子，红色为拉低产量的因子；数值按该县常年单产近似折算为 kg/亩，仅反映相对常年的影响方向与幅度。</p>
         </div>
         <div class="contrib-cols">
@@ -188,7 +180,7 @@
       {% endif %}
 
       <details class="more panel">
-        <summary>模型说明：融合口径与精度指标</summary>
+        <summary>给评审：这个数怎么算出来的（技术细节）</summary>
         <div class="detail-body">
           <dl class="stat-list">
             <div><dt>融合权重</dt><dd>LightGBM 60% · 随机森林 20% · 线性回归 20%</dd></div>
@@ -202,6 +194,12 @@
             <div><dt>特征数</dt><dd>{{ feature_count|default(19) }} 项生育期特征（截至 5 月 31 日）</dd></div>
             <div><dt>因子影响口径</dt><dd>基于 SHAP 贡献分解，按该县常年单产折算为 kg/亩</dd></div>
             <div><dt>精度口径</dt><dd>绝对精度主要由「该县常年单产」基线提供：直接拿县常年均值当预测值，测试集 R² 即达 0.906、MAE 21.4 kg/亩；模型把它提升到 R² 0.95、MAE 14.9 kg/亩。模型真正捕捉的是「今年相对常年偏高还是偏低」，故本页同时给出基线、区间与预警概率，点估计不作精确结论使用。</dd></div>
+            <div><dt>预计区间口径</dt><dd>按测试集 MAE {{ result.mae }} kg/亩 的 ±0.8 倍估算，测试集上约覆盖一半样本；是误差量级，不是统计置信区间。</dd></div>
+            {% if result.prob_below is not none %}
+            <div><dt>可能跌破预警线</dt><dd>500 棵决策树中预测值低于预警线的比例；树间区间 {{ result.tree_low }}—{{ result.tree_high }} kg/亩，反映模型不确定性，非统计置信区间。</dd></div>
+            {% endif %}
+            <div><dt>灾害折减依据</dt><dd>双向固定效应面板回归（控制县固定效应与年份共同冲击），n=1,635 县年；4 月霜冻 β=−1.96%/天（p&lt;0.001）、3 月 −0.57%/天（p&lt;0.001）、5 月干热风在三种国标口径下均 p&gt;0.2，故只报暴露不折算。</dd></div>
+            <div><dt>剂量分档</dt><dd>剔除县年固定效应后实测：0 天 +0.25%、1 天 −0.49%、2 天 +0.10%、3—4 天 −2.58%、≥5 天 −7.75%（n 见追溯表）。</dd></div>
           </dl>
           {% if not reliable %}<p class="chart-note">当前模型使用演示产量标签训练，指标仅用于验证系统链路，不作准确率结论。</p>{% endif %}
         </div>
@@ -340,7 +338,7 @@
         </div>
       </div>
       <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
-      <p class="chart-note">数值为各因子平均贡献占比，反映其对产量预测的实际影响程度；年份趋势与生育期积温通常影响最大。</p>
+      <p class="chart-note">数值表示各因素对收成的影响大小；年份趋势与生育期积温通常影响最大。</p>
       <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
     </article>
     <details class="more panel">

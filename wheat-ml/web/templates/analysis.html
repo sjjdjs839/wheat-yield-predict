@@ -2,7 +2,7 @@
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
 {% set badges = [source] + ([county] if county else []) + (['全部年份'] if not year else [year|string ~ ' 年']) %}
-{{ page_head('气象分析', '按县区、年份与月份区间查看气象要素，并按五段生育期标注晚霜冻与干热风窗口，直接对应到减产弹性。', badges) }}
+{{ page_head('气象分析', '按县区、年份与月份区间查看气象要素，并按五段生育期标注晚霜冻与干热风窗口，并标出对应的减产幅度。', badges) }}
 <div class="container page-content">
   {% if error %}
   <div class="alert error"><span class="tag">无法分析</span><p>{{ error }}</p></div>

@@ -1,7 +1,7 @@
 ﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('干热风预警', '按城市展开查看各区县灌浆期干热风天数与等级，并给出应对方向；天数是暴露强度指标，不等同于减产幅度。', [year ~ ' 年', '县级天数']) }}
+{{ page_head('干热风预警', '按城市展开查看各区县灌浆期干热风天数与等级，并给出应对方向；天数是风险提示，不等于一定减产。', [year ~ ' 年', '县级天数']) }}
 <div class="container page-content dh-page">
   <div class="dh-summary">
     <div class="dh-card" data-reveal>

@@ -131,7 +131,7 @@
     </a>
     <a href="{{ url_for('predict') }}">
       <span class="wk-ico">{{ icon('target') }}</span>
-      <span class="wk-txt"><b>情景仿真</b><em>产量测算 · 可追溯折减</em></span>
+      <span class="wk-txt"><b>产量测算</b><em>收成测算 · 灾害折减</em></span>
       <span class="wk-go">{{ icon('arrow') }}</span>
     </a>
     <a href="{{ url_for('upload') }}">
@@ -147,7 +147,7 @@
 {% set b = best if best else model.metrics_rf %}
 <section class="container dash-section">
 <details class="panel dash-model">
-  <summary>模型与口径说明</summary>
+  <summary>给评审：模型与数据口径</summary>
   <div class="detail-body">
     <dl class="model-metrics">
       <div><dt>影响模型</dt><dd>双向固定效应面板</dd></div>
