@@ -1776,3 +1776,8 @@ main{overflow-x:clip}
   .stg-table{ font-size:12px; }
   .stg-table th, .stg-table td{ padding:8px 8px; }
 }
+
+/* 预测页首屏：结论行 + 主指标（与工作台语言对齐） */
+.result-kicker-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.result-kicker-row .status-pill{margin-top:0}
+.metric.is-primary strong{font-size:30px;letter-spacing:-.02em}
