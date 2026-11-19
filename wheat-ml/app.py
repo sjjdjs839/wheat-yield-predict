@@ -76,11 +76,21 @@ def _observed_county_count() -> int:
 
 @app.context_processor
 def inject_footer():
-    """页脚使用的数据范围，避免在各页面重复计算。"""
+    """页脚数据范围 + 当前上传数据集（顶栏提示用）"""
+    up = None
+    if LATEST.exists():
+        try:
+            m = json.loads(LATEST.read_text(encoding="utf-8"))
+            s = m.get("summary") or {}
+            yrs = s.get("years") or []
+            up = {"county": m.get("county") or "未标注",
+                  "year": max(yrs) if yrs else None}
+        except Exception:
+            up = None
     return {"footer": {
         "counties": _observed_county_count(),
         "year_range": f"{CONFIG['upload']['year_min']}—{CONFIG['upload']['year_max']}",
-    }}
+    }, "upload_meta": up}
 
 
 # ---- 数据访问 ----
@@ -665,6 +675,14 @@ def upload():
     if diag and diag.get("county"):
         advice_url = url_for("advice", county=diag.get("county"),
                              year=diag.get("year") if diag.get("year") else None)
+    # 上传通过且设为全站数据集时，直接跳到该县的气象分析页，省掉一层点击
+    if (request.method == "POST" and report and report.get("ok")
+            and request.form.get("use_as_dataset") and county):
+        params = {"county": county}
+        if diag and diag.get("year"):
+            params["year"] = diag["year"]
+        return redirect(url_for("analysis", **params))
+
     return render_template("upload.html", title="数据诊断", active="upload",
                            report=report, error=error, dataset=meta, diag=diag,
                            counties=ALL_COUNTIES, max_size=CONFIG["upload"]["max_size_mb"],

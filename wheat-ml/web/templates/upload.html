@@ -133,8 +133,8 @@
 
         <div class="upload-row">
           <div class="field">
-            <label for="county-input">地区名称（可选）</label>
-            <input id="county-input" type="text" name="county" placeholder="如：登封" list="county-list">
+            <label for="county-input">地区名称（填县名）</label>
+            <input id="county-input" type="text" name="county" placeholder="如：内黄县" list="county-list">
             <datalist id="county-list">
               {% for c in counties %}<option value="{{ c }}"></option>{% endfor %}
             </datalist>
@@ -142,10 +142,10 @@
           <button class="btn btn-primary" id="upload-submit" type="submit">上传并诊断</button>
         </div>
         <label class="upload-rule" style="margin-top:10px">
-          <input type="checkbox" name="use_as_dataset" value="1">
-          <span>同时设为全站数据集（分析 / 地图 / 预测将改用这份数据，单县数据会让全省视图只剩该县）</span>
+          <input type="checkbox" name="use_as_dataset" value="1" checked>
+          <span>上传后全站切到这个县（气象分析、产量测算、农事建议都按这份数据走）</span>
         </label>
-        <p class="upload-note">默认只做诊断并把当期观测写入农事建议，不替换全站数据；恢复内置数据可在下方操作。</p>
+        <p class="upload-note">默认勾选。取消勾选则只做一次诊断，不改变全站数据；要恢复内置数据可在下方操作。</p>
       </form>
     </div>
   </div>

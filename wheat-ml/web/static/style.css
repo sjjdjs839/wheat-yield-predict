@@ -1966,3 +1966,7 @@ body{background:var(--rice-100)}
   .top-crumb-root,.top-crumb-sep{display:none}
   .top-crumb{font-size:13.5px}
 }
+
+/* 顶栏「当前数据」提示：用的是上传数据集时变成金色，和内置数据区分开 */
+.top-dot.is-up{color:var(--wheat-700,#8A6A24);font-weight:600}
+.top-dot.is-up .dot{background:var(--wheat-500)}

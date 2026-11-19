@@ -137,8 +137,13 @@
         <strong>{{ page_names.get(active, title or '概览') }}</strong>
       </p>
       <div class="top-state">
+        {% if upload_meta %}
+        <span class="top-dot is-up"><i class="dot is-local"></i>当前数据：{{ upload_meta.county }}{% if upload_meta.year %} · {{ upload_meta.year }}{% endif %}</span>
+        <span class="top-range">内置库 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 县</span>
+        {% else %}
         <span class="top-dot"><i class="dot is-online"></i>数据就绪</span>
         <span class="top-range">{{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 县</span>
+        {% endif %}
       </div>
       <div class="top-actions">
         <a class="btn btn-ghost btn-sm" href="{{ url_for('advice') }}">

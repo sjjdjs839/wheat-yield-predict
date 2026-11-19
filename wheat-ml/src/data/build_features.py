@@ -97,9 +97,17 @@ def build_county(df_county: pd.DataFrame) -> pd.DataFrame:
     if out.empty:
         return out
 
-    # 距平类特征：以该县多年均值为常年值
-    mean_p = out["season_precip"].mean()
-    std_p = out["season_precip"].std()
+    # 距平基准锁在训练期年份上。上传当年的数据不该反过来改写历史年份的距平，
+    # 否则同一县同一年，传了 2026 的观测之后 2024 的预测值会跟着飘。
+    # 常年值本来就应该是固定参照，不是跟着新数据滚动的。
+    base_years = [y for y in out["year"].tolist() if y <= 2024]
+    if base_years:
+        ref = out[out["year"].isin(base_years)]
+        mean_p = ref["season_precip"].mean()
+        std_p = ref["season_precip"].std()
+    else:
+        mean_p = out["season_precip"].mean()
+        std_p = out["season_precip"].std()
     out["precip_anom"] = (out["season_precip"] - mean_p) / mean_p
     out["season_precip_norm"] = (out["season_precip"] - mean_p) / mean_p
     out["spi_12"] = (out["season_precip"] - mean_p) / std_p
