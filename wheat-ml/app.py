@@ -114,12 +114,16 @@ def uploaded_dataset() -> tuple[pd.DataFrame, dict] | None:
     if not LATEST.exists():
         return None
     meta = json.loads(LATEST.read_text(encoding="utf-8"))
+    # 没有县名就当作没有上传数据集。老版本会把空县名写成「未标注」，
+    # 结果全站挂到一个不存在的县上，产量测算直接报「缺少生育期记录」。
+    if not (meta.get("county") or "").strip():
+        return None
     path = PROJECT_ROOT / meta["path"]
     if not path.exists():
         return None
-    df, report = load_weather_file(path, meta.get("county"))
+    df, report = load_weather_file(path, meta["county"])
     return _canonical(df), {"filename": meta["filename"],
-                            "county": meta.get("county") or "未标注",
+                            "county": meta["county"],
                             "source": "上传数据", "summary": report["summary"]}
 
 
@@ -134,10 +138,9 @@ def current_dataset() -> tuple[pd.DataFrame, dict]:
 
 
 def dataset_counties(df: pd.DataFrame) -> list[str]:
+    """数据里出现过的县名。空值时返回空列表，不再造一个假县出来。"""
     names = sorted(df["county"].dropna().unique().tolist()) if "county" in df else []
-    if names and names[0] == "未标注":
-        return names
-    return names or ["未标注"]
+    return names
 
 
 def uploaded_scope() -> dict | None:
@@ -608,6 +611,7 @@ def index():
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
     report, error, diag = None, None, None
+    county = ""
     if request.method == "POST":
         f = request.files.get("file")
         county = (request.form.get("county") or "").strip()
@@ -643,12 +647,22 @@ def upload():
                                     "month_span": "", "verdict": "",
                                     "error": "诊断未能完成：" + str(exc)[:80]}
                     if request.form.get("use_as_dataset"):
-                        LATEST.write_text(json.dumps({
-                            "path": str(saved.relative_to(PROJECT_ROOT)),
-                            "filename": f.filename,
-                            "county": county or None,
-                            "summary": report["summary"],
-                        }, ensure_ascii=False), encoding="utf-8")
+                        # 全站切换必须先说清是哪个县，否则全站会挂到一个空壳上
+                        if not county:
+                            error = ("请先选择县区。设为全站数据集时，必须指定数据属于哪个县，"
+                                     "否则气象分析、产量测算都取不到该县记录。")
+                            saved.unlink(missing_ok=True)
+                        elif county not in ALL_COUNTIES:
+                            error = (f"「{county}」不在项目配置的 {len(ALL_COUNTIES)} 个县区里。"
+                                     "请从下拉列表中选择，或先用同名县区重新上传。")
+                            saved.unlink(missing_ok=True)
+                        else:
+                            LATEST.write_text(json.dumps({
+                                "path": str(saved.relative_to(PROJECT_ROOT)),
+                                "filename": f.filename,
+                                "county": county,
+                                "summary": report["summary"],
+                            }, ensure_ascii=False), encoding="utf-8")
                     else:
                         saved.unlink(missing_ok=True)
                 else:
@@ -664,7 +678,7 @@ def upload():
         summary = meta.get("summary") or {}
         up_years = summary.get("years") or []
         up_counties = summary.get("counties") or []
-        default_county = meta.get("county") or (up_counties[0] if up_counties else "未标注")
+        default_county = meta.get("county") or (up_counties[0] if up_counties else "")
         params = {"county": default_county}
         if up_years:
             params["year"] = max(up_years)
@@ -676,8 +690,9 @@ def upload():
         advice_url = url_for("advice", county=diag.get("county"),
                              year=diag.get("year") if diag.get("year") else None)
     # 上传通过且设为全站数据集时，直接跳到该县的气象分析页，省掉一层点击
-    if (request.method == "POST" and report and report.get("ok")
-            and request.form.get("use_as_dataset") and county):
+    if (request.method == "POST" and report and report.get("ok") and not error
+            and county in ALL_COUNTIES
+            and request.form.get("use_as_dataset")):
         params = {"county": county}
         if diag and diag.get("year"):
             params["year"] = diag["year"]
@@ -685,7 +700,8 @@ def upload():
 
     return render_template("upload.html", title="数据诊断", active="upload",
                            report=report, error=error, dataset=meta, diag=diag,
-                           counties=ALL_COUNTIES, max_size=CONFIG["upload"]["max_size_mb"],
+                           counties=ALL_COUNTIES, form_county=county,
+                           max_size=CONFIG["upload"]["max_size_mb"],
                            analysis_url=analysis_url, predict_url=predict_url,
                            advice_url=advice_url)
 

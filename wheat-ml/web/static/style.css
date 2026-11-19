@@ -1970,3 +1970,9 @@ body{background:var(--rice-100)}
 /* 顶栏「当前数据」提示：用的是上传数据集时变成金色，和内置数据区分开 */
 .top-dot.is-up{color:var(--wheat-700,#8A6A24);font-weight:600}
 .top-dot.is-up .dot{background:var(--wheat-500)}
+
+/* 上传页必填标记与字段提示 */
+.req-mark{font-style:normal;font-size:11px;font-weight:600;color:var(--alert-600);
+  border:1px solid rgba(180,71,47,.28);border-radius:3px;padding:0 4px;margin-left:5px;
+  vertical-align:middle}
+.field-hint{margin:5px 0 0;font-size:12px;line-height:1.5;color:var(--ink-600)}

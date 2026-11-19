@@ -8,6 +8,20 @@
   <div class="alert error"><span class="tag">上传失败</span><p>{{ error }}</p></div>
   {% endif %}
 
+  {% if dataset %}
+  <div class="alert ok" id="current-dataset">
+    <span class="tag">当前数据集</span>
+    <p>
+      <strong>{{ dataset.county or '—' }}</strong>
+      {% if dataset.summary and dataset.summary.year_range %}· {{ dataset.summary.year_range }}{% endif %}
+      {% if dataset.summary and dataset.summary.rows %}· {{ dataset.summary.rows }} 行{% endif %}
+      <span class="muted">来自 {{ dataset.filename }}，气象分析、产量测算、农事建议都按这份数据走。</span>
+    </p>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('reset_dataset') }}"
+       onclick="return confirm('恢复内置数据？当前上传的数据会从全站撤下，回到 2010—2024 的 150 县内置库。')">恢复内置数据</a>
+  </div>
+  {% endif %}
+
   {% if report %}
   <div class="upload-feedback {{ 'is-ok' if report.ok else 'is-error' }}" role="status">
     <div>
@@ -33,7 +47,7 @@
   {% if diag.empty %}
   <div class="alert warning">
     <span class="tag">未生成诊断</span>
-    <p>{{ diag.error or '未填写地区名称，系统无法定位到具体县区，只做了字段校验。填写地区名称后可生成灾害诊断。' }}</p>
+    <p>{{ diag.error or '这份数据没有定位到具体县区，只做了字段校验。回到上方重新选择县区后再上传可生成诊断。' }}</p>
   </div>
   {% else %}
   <section class="block-lg" id="diagnose">
@@ -103,7 +117,7 @@
   {% if not dataset %}
   <div class="alert ok">
     <span class="tag">内置数据集</span>
-    <p>当前分析、地图与预测读取项目内置的清洗后数据。上传数据默认只做诊断并写入当期观测，不替换全站数据集；需要替换时在上传时勾选对应选项。</p>
+    <p>当前分析、地图与预测读取项目内置的清洗后数据。上传本县观测后，全站会切到这份数据；随时可在本页下方恢复内置数据。</p>
   </div>
   {% endif %}
 
@@ -115,8 +129,8 @@
           <div><dt>时间字段</dt><dd>年份 + 日序（1—366），或完整日期（YYYY-MM-DD）；两种不可混用</dd></div>
           <div><dt>缺失值</dt><dd>留空，不要填 0；短波辐射若为 W/m² 自动换算为 MJ/m²/day</dd></div>
           <div><dt>自动识别</dt><dd>中英文字段名与单位；检查缺失、重复、越界异常值，逐条给行号</dd></div>
-          <div><dt>通过之后</dt><dd>识别灾害过程 → 折算减产量级 → 写入当期观测，供农事建议取数</dd></div>
-          <div><dt>不影响全站</dt><dd>默认只做诊断，不替换分析与预测读取的内置数据集</dd></div>
+          <div><dt>通过之后</dt><dd>识别灾害过程 → 折算减产量级 → 写入当期观测，并将全站切到该县</dd></div>
+          <div><dt>需要县区</dt><dd>必须选定所属县区，否则无法归户，系统会拒绝切换</dd></div>
         </dl>
       </div>
     </aside>
@@ -133,11 +147,12 @@
 
         <div class="upload-row">
           <div class="field">
-            <label for="county-input">地区名称（填县名）</label>
-            <input id="county-input" type="text" name="county" placeholder="如：内黄县" list="county-list">
-            <datalist id="county-list">
-              {% for c in counties %}<option value="{{ c }}"></option>{% endfor %}
-            </datalist>
+            <label for="county-input">所属县区 <em class="req-mark">必填</em></label>
+            <select id="county-input" name="county" required>
+              <option value="">请选择县区</option>
+              {% for c in counties %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select>
+            <p class="field-hint">数据会挂到这个县名下，决定全站切到哪一页。</p>
           </div>
           <button class="btn btn-primary" id="upload-submit" type="submit">上传并诊断</button>
         </div>
@@ -145,7 +160,7 @@
           <input type="checkbox" name="use_as_dataset" value="1" checked>
           <span>上传后全站切到这个县（气象分析、产量测算、农事建议都按这份数据走）</span>
         </label>
-        <p class="upload-note">默认勾选。取消勾选则只做一次诊断，不改变全站数据；要恢复内置数据可在下方操作。</p>
+        <p class="upload-note">默认勾选：上传通过后全站切到这个县。取消勾选则只用这份数据做一次诊断，不动全站。</p>
       </form>
     </div>
   </div>
