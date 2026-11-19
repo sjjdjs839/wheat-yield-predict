@@ -1890,7 +1890,7 @@ def predict():
             feature_chart = {
                 "kind": "hBar",
                 "title": "特征重要性",
-                "desc": "SHAP 平均贡献占比；数值越高，对产量预测的影响越大。",
+                "desc": "各因素对产量的平均影响大小；数值越高，影响越大。",
                 "payload": {
                     "labels": [item["name"] for item in feature_items],
                     "values": [item["value"] for item in feature_items],
