@@ -409,7 +409,7 @@ code{
 
 /* ---------- filters ---------- */
 .filter-panel{
-  display:flex;align-items:flex-end;gap:12px;
+  display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;
   padding:18px 20px;border:1px solid var(--line);border-radius:var(--radius);
   background:var(--rice-100);
 }
@@ -874,6 +874,9 @@ td .chip{padding:3px 8px;font-size:11px}
   .page-content{padding:24px 0 72px}
   .filter-panel{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
   .filter-panel .field{min-width:0}
+  .filter-panel .field-wide{grid-column:1/-1}
+  .filter-panel .field-wide select,
+  .filter-panel .field-wide .county-filter{max-width:100%}
   .filter-panel .btn{grid-column:1/-1;width:100%}
   .filter-reset{grid-column:1/-1;justify-self:start;align-self:auto;padding-top:0}
   .insight-panel{padding:24px 22px;margin-top:24px}
@@ -1997,7 +2000,7 @@ td .status-pill{margin-top:0}
 .bd-table tr.is-off td{opacity:.52}
 .bd-table tr.is-off .row-actions{opacity:1}
 .issue-line{font-size:12.5px;color:var(--ink-600);margin:3px 0}
-.county-filter{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
+.county-filter{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
   background:var(--paper);font-size:13px;color:var(--ink-900)}
 .county-filter:focus{outline:none;border-color:var(--forest-700)}
 
@@ -2057,3 +2060,8 @@ td .status-pill{margin-top:0}
 .tag.tag-base{background:rgba(210,162,76,.16);color:#8a6420}
 .feat-table tr.is-baseline{background:rgba(210,162,76,.06)}
 .feat-table tr.is-baseline td:first-child{color:var(--ink-500)}
+
+/* 带关键字筛选的县区字段：独占一整行，避免与旁边字段的高度差把标签错开 */
+.field-wide{flex:1 1 100%!important;max-width:none}
+.field-wide .county-filter{height:34px;font-size:12px;padding:6px 11px;max-width:420px}
+.field-wide select{max-width:420px}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -181,7 +181,7 @@
 {% if active in ['map', 'risk'] %}
 <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
 {% endif %}
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}?v={{ css_v }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

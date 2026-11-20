@@ -1,4 +1,4 @@
-/* 豫麦智测 · 图表主题、进入动效、上传校验与二次确认 */
+﻿/* 豫麦智测 · 图表主题、进入动效、上传校验与二次确认 */
 (function () {
   'use strict';
 
@@ -850,3 +850,45 @@
   }
 
   initSideRail();
+  initCountyPickers();
+
+  /**
+   * 县区下拉筛选：模板里在 select 前放一个 .county-filter 输入框即可，
+   * 这里自动接管，不需要各页面另写脚本。选中项始终保留可见，避免筛选把当前县藏掉。
+   */
+  function initCountyPickers() {
+    Array.prototype.forEach.call(document.querySelectorAll('.county-filter'), function (box) {
+      var sel = box.nextElementSibling;
+      if (!sel || sel.tagName !== 'SELECT' || sel.dataset.pickerBound) return;
+      sel.dataset.pickerBound = '1';
+      var total = sel.querySelectorAll('option').length;
+
+      function apply() {
+        var q = (box.value || '').trim();
+        var keep = 0;
+        Array.prototype.forEach.call(sel.querySelectorAll('optgroup'), function (g) {
+          var shown = 0;
+          Array.prototype.forEach.call(g.querySelectorAll('option'), function (o) {
+            var hit = !q || o.textContent.indexOf(q) >= 0 || g.label.indexOf(q) >= 0;
+            var isSel = o.selected;
+            o.hidden = !hit && !isSel;
+            o.disabled = !hit && !isSel;
+            if (!o.hidden) shown++;
+            if (hit) keep++;
+          });
+          g.hidden = shown === 0;
+        });
+        if (q) {
+          box.setAttribute('aria-label', '匹配 ' + keep + ' 个县区');
+        } else {
+          box.setAttribute('aria-label', '共 ' + total + ' 个县区');
+        }
+      }
+
+      box.addEventListener('input', apply);
+      box.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); apply(); sel.focus(); }
+      });
+      apply();
+    });
+  }

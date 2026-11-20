@@ -227,8 +227,9 @@ def uploaded_scope() -> dict | None:
 
 
 def scope_city_groups(scope: dict | None) -> dict | None:
-    """上传数据不套用内置城市分组，返回 None 让模板使用扁平县区列表。"""
-    return None if scope else CITY_GROUPS
+    """始终按地市分组。上传县名本身来自内置县区表，所以分组里一定有它；
+    之前在有上传数据时返回 None，会让 151 个县退化成一条平铺长列表。"""
+    return CITY_GROUPS
 
 
 def builtin_dataset() -> pd.DataFrame:
