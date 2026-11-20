@@ -725,6 +725,8 @@ td .chip{padding:3px 8px;font-size:11px}
 .upload-note{margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--rice-100);font-size:12px;line-height:1.7;color:var(--ink-600)}
 .dataset-panel{display:flex;flex-direction:column;gap:14px}
 .dataset-text{font-size:14px;line-height:1.7;color:var(--ink-700)}
+.dataset-text strong{display:block;margin-bottom:2px;color:var(--ink-900)}
+.dataset-text span{display:block}
 .dataset-actions{display:flex;flex-wrap:wrap;gap:10px}
 .stat-strip{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;
@@ -1985,3 +1987,60 @@ body{background:var(--rice-100)}
   text-underline-offset: 2px;
   font-weight: 600;
 }
+
+/* ---------- 数据清单与近期预警 ---------- */
+.status-pill.is-warn{background:rgba(210,162,76,.16);color:#8A6520}
+.status-pill.is-bad{background:rgba(180,71,47,.11);color:var(--alert-600)}
+.tag-hot{background:rgba(180,71,47,.11);color:var(--alert-600)}
+td .status-pill{margin-top:0}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bd-table tr.is-off td{opacity:.52}
+.bd-table tr.is-off .row-actions{opacity:1}
+.issue-line{font-size:12.5px;color:var(--ink-600);margin:3px 0}
+.county-filter{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
+  background:var(--paper);font-size:13px;color:var(--ink-900)}
+.county-filter:focus{outline:none;border-color:var(--forest-700)}
+
+/* ---------- 近期观测预警表（置末尾，特异性压过 .bd-table） ---------- */
+.bd-table.warn-table{min-width:0;width:100%;table-layout:auto}
+.bd-table.warn-table th,.bd-table.warn-table td{padding:10px 5px;vertical-align:top}
+.bd-table.warn-table th:nth-child(1),.bd-table.warn-table td:nth-child(1){width:20%}
+.bd-table.warn-table th:nth-child(2),.bd-table.warn-table td:nth-child(2){width:25%;text-align:left;white-space:nowrap}
+.bd-table.warn-table th:nth-child(3),.bd-table.warn-table td:nth-child(3){width:21%}
+.bd-table.warn-table th:nth-child(4),.bd-table.warn-table td:nth-child(4){text-align:center}
+.bd-table.warn-table th:nth-child(5),.bd-table.warn-table td:nth-child(5){width:13%;text-align:center}
+.bd-table.warn-table .level-pill{padding:2px 9px;font-size:12px}
+.bd-table.warn-table .nowrap{white-space:nowrap}
+.bd-table.warn-table .field-hint{display:block;margin-top:2px;font-size:11.5px}
+@media (max-width:760px){
+  .bd-table.warn-table th,.bd-table.warn-table td{padding:8px 3px;font-size:11.5px}
+  .bd-table.warn-table th:nth-child(1),.bd-table.warn-table td:nth-child(1){width:17%}
+  .bd-table.warn-table th:nth-child(2),.bd-table.warn-table td:nth-child(2){width:29%;white-space:nowrap}
+  .bd-table.warn-table th:nth-child(3),.bd-table.warn-table td:nth-child(3){width:22%}
+  .bd-table.warn-table th:nth-child(4),.bd-table.warn-table td:nth-child(4){white-space:normal;line-height:1.35}
+  .bd-table.warn-table th:nth-child(5),.bd-table.warn-table td:nth-child(5){width:14%}
+  .bd-table.warn-table .field-hint{font-size:11px}
+}
+
+/* ---------- 数据清单表 ---------- */
+.bd-table.ds-table{min-width:0;width:100%;table-layout:auto}
+.bd-table.ds-table th,.bd-table.ds-table td{vertical-align:top}
+.bd-table.ds-table th:nth-child(1),.bd-table.ds-table td:nth-child(1){width:34%}
+.bd-table.ds-table th:nth-child(2),.bd-table.ds-table td:nth-child(2){width:11%;text-align:center}
+.bd-table.ds-table th:nth-child(3),.bd-table.ds-table td:nth-child(3){width:9%;text-align:right}
+.bd-table.ds-table th:nth-child(4),.bd-table.ds-table td:nth-child(4){width:28%}
+.bd-table.ds-table th:nth-child(5),.bd-table.ds-table td:nth-child(5){width:10%;text-align:center}
+.bd-table.ds-table th:nth-child(6),.bd-table.ds-table td:nth-child(6){width:18%}
+.bd-table.ds-table .ds-file{display:block;word-break:break-all;line-height:1.3}
+@media (max-width:760px){
+  .bd-table.ds-table th,.bd-table.ds-table td{padding:9px 4px;font-size:11.5px}
+  .bd-table.ds-table th:nth-child(1),.bd-table.ds-table td:nth-child(1){width:46%}
+  .bd-table.ds-table th:nth-child(3),.bd-table.ds-table td:nth-child(3){display:none}
+  .bd-table.ds-table th:nth-child(4),.bd-table.ds-table td:nth-child(4){display:none}
+  .bd-table.ds-table th:nth-child(5),.bd-table.ds-table td:nth-child(5){width:16%}
+  .bd-table.ds-table th:nth-child(6),.bd-table.ds-table td:nth-child(6){width:22%}
+  .bd-table.ds-table .ds-span{display:none}
+  .bd-table.ds-table .row-actions{display:flex;flex-direction:column;gap:4px;align-items:stretch}
+  .bd-table.ds-table .row-actions a,.bd-table.ds-table .row-actions button{font-size:11.5px;padding:3px 4px;white-space:nowrap}
+}
+

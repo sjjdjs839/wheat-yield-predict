@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#10271A">
 <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
 <script>document.documentElement.classList.add('js');</script>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ css_v }}">
 {% block preload %}
 {% if active == 'index' %}
 <link rel="preload" as="image" href="{{ url_for('static', filename='assets/field/field-band.webp') }}" type="image/webp">
@@ -57,7 +57,8 @@
 
 {% set page_names = {
   'index': '总览', 'upload': '数据诊断', 'analysis': '气象分析', 'map': '灾害地图',
-  'dry_hot': '干热风预警', 'risk': '灾害预警', 'predict': '产量测算', 'advice': '农事建议'
+  'dry_hot': '干热风预警', 'risk': '灾害预警', 'predict': '产量测算', 'advice': '农事建议',
+  'datasets': '数据清单'
 } %}
 
 <div class="app-shell" id="app-shell">
@@ -80,6 +81,10 @@
         <a class="rail-link{{ ' is-active' if active == 'upload' }}" href="{{ url_for('upload') }}" {% if active == 'upload' %}aria-current="page"{% endif %}>
           <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-database"></use></svg>
           <span>数据诊断</span>
+        </a>
+        <a class="rail-link{{ ' is-active' if active == 'datasets' }}" href="{{ url_for('datasets') }}" {% if active == 'datasets' %}aria-current="page"{% endif %}>
+          <svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-chart"></use></svg>
+          <span>数据清单</span>
         </a>
       </div>
 
@@ -139,7 +144,9 @@
       <div class="top-state">
         {% if upload_meta %}
         <span class="top-dot is-up"><i class="dot is-local"></i>当前数据：{{ upload_meta.county }}{% if upload_meta.year %} · {{ upload_meta.year }}{% endif %}</span>
-        <span class="top-range">内置库 {{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 县</span>
+        <span class="top-range">
+          上传 {{ upload_meta.count }} 份{% if upload_meta.counties > 1 %} · 覆盖 {{ upload_meta.counties }} 县{% endif %}{% if upload_meta.recent %} · 当期 {{ upload_meta.recent }} 份{% endif %} · 内置 {{ footer.counties if footer else 151 }} 县
+        </span>
         {% else %}
         <span class="top-dot"><i class="dot is-online"></i>数据就绪</span>
         <span class="top-range">{{ footer.year_range if footer else '2010—2024' }} · {{ footer.counties if footer else 151 }} 县</span>

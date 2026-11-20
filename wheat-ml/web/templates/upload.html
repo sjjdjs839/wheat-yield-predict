@@ -1,272 +1,151 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{% set badges = ['CSV / XLSX / XLS', '单文件 ≤ ' ~ max_size ~ ' MB'] %}
-{{ page_head('数据诊断', '上传一份县区级逐日气象，系统先校验字段与异常，再识别其中的灾害过程（霜冻、干热风、高温、暴雨），给出减产量级与当期建议。', badges) }}
-<div class="container page-content">
-  {% if error %}
-  <div class="alert error"><span class="tag">上传失败</span><p>{{ error }}</p></div>
-  {% endif %}
+{% set badges = ['CSV / XLSX / XLS', '可多份同时传', '单文件 ≤ ' ~ max_size ~ ' MB'] %}
+{{ page_head('数据诊断', '传一份或一批县区逐日气象。通过校验的直接存进数据清单，全站的取数都从这里来；近期观测还会进预警。', badges) }}
 
-  {% if dataset %}
-  <div class="alert ok" id="current-dataset">
-    <span class="tag">当前数据集</span>
-    <p>
-      <strong>{{ dataset.county or '—' }}</strong>
-      {% if dataset.summary and dataset.summary.year_range %}· {{ dataset.summary.year_range }}{% endif %}
-      {% if dataset.summary and dataset.summary.rows %}· {{ dataset.summary.rows }} 行{% endif %}
-      <span class="muted">来自 {{ dataset.filename }}，气象分析、产量测算、农事建议都按这份数据走。</span>
-    </p>
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('reset_dataset') }}"
-       onclick="return confirm('恢复内置数据？当前上传的数据会从全站撤下，回到 2010—2024 的 150 县内置库。')">恢复内置数据</a>
+{% if error %}
+<div class="alert error" role="alert"><span class="tag">未通过</span><p>{{ error }}</p></div>
+{% endif %}
+
+<div class="dataset-panel">
+  <div class="dataset-text">
+    <strong>数据清单</strong>
+    <span>
+      已存 <b>{{ dataset_count }}</b> 份 · 覆盖 <b>{{ county_count }}</b> 个县区 · 其中当期观测 <b>{{ recent_count }}</b> 份
+    </span>
+    <span class="field-hint">
+      内置库仍是 2010—2024 那 150 个县；上传的数据叠在上面，同一天以上传的为准。
+    </span>
   </div>
-  {% endif %}
+  <div class="dataset-actions">
+    <a class="btn btn-light btn-sm" href="{{ url_for('datasets') }}">管理数据清单</a>
+  </div>
+</div>
 
-  {% if report %}
-  <div class="upload-feedback {{ 'is-ok' if report.ok else 'is-error' }}" role="status">
-    <div>
-      <strong>{{ '校验通过，已生成诊断结果' if report.ok else '校验未通过，请核对问题' }}</strong>
-      {% if report.ok %}
-      <p>{{ report.summary.get('rows', '—') }} 行 · {{ report.summary.get('year_range', '—') }} · {{ report.summary.get('date_range', '—') }}</p>
+{% if results %}
+<section class="block-lg" id="upload-results">
+  <div class="block-head"><h2>本次上传 · {{ results|length }} 份</h2>
+    <span class="block-sub">通过校验的已入库，未通过的没有留下任何文件</span>
+  </div>
+  <div class="table-wrap">
+    <table class="bd-table">
+      <thead>
+        <tr><th>文件</th><th>县区</th><th>行数</th><th>类型</th><th>结果</th></tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr>
+          <td class="mono">{{ r.filename }}</td>
+          <td>{{ r.county or '—' }}</td>
+          <td>{{ r.rows or '—' }}</td>
+          <td>
+            {% if r.saved and r.kind == 'recent' %}
+              <span class="tag tag-hot">当期观测</span>
+            {% elif r.saved %}
+              <span class="tag">年度数据集</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if r.ok and r.saved %}
+              <span class="status-pill is-ok">已保存</span>
+              {% if r.to_stage %}<span class="field-hint">已进预警与农事建议</span>{% endif %}
+            {% elif r.ok %}
+              <span class="status-pill">仅校验</span>
+            {% else %}
+              <span class="status-pill is-bad">{{ r.error }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="upload-note" style="margin-top:14px">
+    <p>下一步：<a class="spec-link" href="{{ url_for('analysis') }}">看气象分析</a> ·
+      <a class="spec-link" href="{{ url_for('risk') }}">看预警</a> ·
+      <a class="spec-link" href="{{ url_for('predict') }}">算产量</a> ·
+      <a class="spec-link" href="{{ url_for('advice') }}">出农事建议</a></p>
+  </div>
+
+  {% for r in results if r.report %}
+  <details class="stage-fold" style="margin-top:10px">
+    <summary>{{ r.filename }} · 校验明细</summary>
+    <div class="stage-body">
+      {% if r.report.issues %}
+        {% for issue in r.report.issues %}
+        <p class="issue-line"><b>{{ issue.level }}</b> {{ issue.title }}{% if issue.detail %} — {{ issue.detail }}{% endif %}</p>
+        {% endfor %}
       {% else %}
-      <p>发现 {{ report.issues|length }} 个问题，下方校验结果里有逐条说明；本次数据不会进入诊断。</p>
+        <p class="field-hint">字段与记录未发现异常。</p>
+      {% endif %}
+      {% if r.report.columns %}
+      <p class="field-hint">识别到的字段：{% for raw, std in r.report.columns.items() %}{{ raw }}→{{ std }}{% if not loop.last %}、{% endif %}{% endfor %}</p>
       {% endif %}
     </div>
-    <div class="upload-feedback-actions">
-      {% if report.ok and dataset %}
-      <a class="btn btn-primary btn-sm" href="{{ analysis_url }}">去分析</a>
-      <a class="btn btn-ghost btn-sm" href="{{ predict_url }}">去预测</a>
-      {% else %}
-      <a class="btn btn-ghost btn-sm" href="#validation-report">查看校验详情</a>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
+  </details>
+  {% endfor %}
+</section>
+{% endif %}
 
-  {% if diag %}
-  {% if diag.empty %}
-  <div class="alert warning">
-    <span class="tag">未生成诊断</span>
-    <p>{{ diag.error or '这份数据没有定位到具体县区，只做了字段校验。回到上方重新选择县区后再上传可生成诊断。' }}</p>
-  </div>
-  {% else %}
-  <section class="block-lg" id="diagnose">
-    <div class="block-head">
-      <div>
-        <h2>本次数据诊断</h2>
-      </div>
-      <p class="block-note">{{ diag.county }} · {{ diag.year }} 年 · 覆盖 {{ diag.days }} 天（{{ diag.month_span }}）</p>
-    </div>
+<div class="upload-layout">
+  <aside class="up-spec">
+    <h3>字段与校验口径</h3>
+    <dl class="up-spec-list">
+      <div><dt>必需字段</dt><dd>日期（或年份 + 日序）、最高温、最低温、平均温、日降水量</dd></div>
+      <div><dt>选填字段</dt><dd>2m 风速、相对湿度、地表短波辐射、露点温度；缺辐射时辐射卡不出图，其余照常</dd></div>
+      <div><dt>多县上传</dt><dd>一次可选多个文件，文件名写成「县区_年份.csv」即可自动分县；县名认不出来会单独提示，不整批作废</dd></div>
+      <div><dt>自动分类</dt><dd>收尾日期在近 30 天内且跨度不长 → 当期观测（进预警）；否则 → 年度数据集（进分析预测）</dd></div>
+      <div><dt>模板下载</dt><dd><a class="spec-link" href="{{ url_for('upload_template') }}">下载逐日气象模板（CSV）</a></dd></div>
+    </dl>
+  </aside>
 
-    <div class="alert {{ 'error' if diag.loss and diag.loss.sig else ('warning' if diag.events else 'ok') }}">
-      <span class="tag">结论</span>
-      <p>{{ diag.verdict }}</p>
-    </div>
+  <div class="upload-card">
+    <form id="upload-form" method="post" enctype="multipart/form-data">
+      <label class="dropzone" id="dropzone" for="file-input" data-max-size="{{ max_size }}">
+        <span class="drop-icon">{{ icon('upload') }}</span>
+        <span class="drop-title">拖气象数据到这里</span>
+        <span class="drop-hint" id="drop-hint">或点击选择文件 · 可一次选多份 · CSV / Excel · 单份不超过 {{ max_size }} MB</span>
+        <input id="file-input" type="file" name="file" accept=".csv,.xlsx,.xls" multiple required>
+        <span class="drop-file" id="drop-file">尚未选择文件</span>
+      </label>
 
-    {% if diag.events %}
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>灾害过程</th><th>天数</th><th>发生日期</th><th>产量影响</th></tr></thead>
-        <tbody>
-          {% for e in diag.events %}
-          <tr>
-            <td><strong>{{ e.label }}</strong></td>
-            <td>{{ e.days }} 天</td>
-            <td>{{ e.dates|join('、') }}</td>
-            <td>
-              {% if e.loss_mid is not none %}
-              <strong>{{ '%+.2f'|format(e.loss_mid) }}%</strong><small>（n={{ e.loss_n }}）</small>
-              {% else %}只报暴露强度，不折算{% endif %}
-            </td>
-          </tr>
+      <div class="upload-row">
+        <label for="county-input">所属县区 <em class="req-mark">单份时必填</em></label>
+        <input type="search" id="county-filter" class="county-filter"
+               placeholder="输入关键字筛选，如 内黄 / 安阳" autocomplete="off">
+        <select id="county-input" name="county">
+          <option value="">不指定 — 按文件名识别（一次传多份时用这个）</option>
+          {% if county_groups %}
+          {% for city, items in county_groups.items() %}
+          <optgroup label="{{ city }}">
+            {% for c in items.values() %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
+          </optgroup>
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <p class="chart-note">减产只对通过回归验证的灾种给出；未达显著性的灾种只报天数。判定口径与建模一致，避免夸大。</p>
-    {% endif %}
+          {% endif %}
+        </select>
+        <span class="field-hint">只传一份时在这里指定县区；传多份时留空，按文件名认县。</span>
+      </div>
 
-    {% if diag.stages %}
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>生育期</th><th>窗口</th><th>本段天数</th><th>命中灾害</th></tr></thead>
-        <tbody>
-          {% for s in diag.stages %}
-          <tr>
-            <td>{{ s.name }}</td>
-            <td>{{ s.period }}</td>
-            <td>{{ s.days }} 天</td>
-            <td>{{ s.events|join('、') if s.events else '—' }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
+      <div class="upload-row" style="margin-top:14px">
+        <label for="kind-input">这批数据算什么 <em class="req-mark">决定进不进预警</em></label>
+        <select id="kind-input" name="kind">
+          <option value="auto" selected>自动判定 — 收尾在近 30 天内算当期观测</option>
+          <option value="recent">当期观测 — 现在就盯这段，进预警和农事建议</option>
+          <option value="annual">年度数据集 — 留档回看，只进分析预测</option>
+        </select>
+        <span class="field-hint">演示时传 5 月真实观测，选「当期观测」即可按灌浆期口径判干热风。</span>
+      </div>
 
-    <div class="dataset-actions">
-      {% if diag.saved_to_advice %}
-      <a class="btn btn-primary btn-sm" href="{{ advice_url }}">查看农事建议 {{ icon('arrow', 'btn-arrow') }}</a>
-      {% endif %}
-      <a class="btn btn-ghost btn-sm" href="#validation-report">校验详情</a>
-    </div>
-  </section>
-  {% endif %}
-  {% endif %}
+      <label class="upload-rule" style="margin-top:10px">
+        <input type="checkbox" name="save" value="1" checked>
+        保存进数据清单（默认勾选）
+      </label>
+      <span class="field-hint">勾上：通过校验就存下来，全站都能读到，之后可在数据清单里停用或删除。取消：只做一次性校验，不留档。</span>
 
-  {% if not dataset %}
-  <div class="alert ok">
-    <span class="tag">内置数据集</span>
-    <p>当前分析、地图与预测读取项目内置的清洗后数据。上传本县观测后，全站会切到这份数据；随时可在本页下方恢复内置数据。</p>
+      <button class="btn btn-primary" type="submit" style="margin-top:14px;width:100%">上传并校验</button>
+    </form>
   </div>
-  {% endif %}
-
-  <div class="upload-layout">
-    <aside class="upload-aside">
-      <div class="up-spec">
-        <h3>字段与校验口径</h3>
-        <dl class="up-spec-list">
-          <div><dt>必需字段</dt><dd>日期（或年份 + 日序）、最高温、最低温、平均温、日降水量</dd></div>
-          <div><dt>选填字段</dt><dd>2m 风速、相对湿度、地表短波辐射、露点温度；缺辐射时气象分析的辐射卡不出图，其余照常</dd></div>
-          <div><dt>时间字段</dt><dd>年份 + 日序（1—366），或完整日期（YYYY-MM-DD）；两种不可混用</dd></div>
-          <div><dt>模板下载</dt><dd><a class="spec-link" href="{{ url_for('upload_template') }}">下载逐日气象模板（CSV）</a>，按列填好后上传</dd></div>
-          <div><dt>缺失值</dt><dd>留空，不要填 0；短波辐射若为 W/m² 自动换算为 MJ/m²/day</dd></div>
-          <div><dt>自动识别</dt><dd>中英文字段名与单位；检查缺失、重复、越界异常值，逐条给行号</dd></div>
-          <div><dt>通过之后</dt><dd>识别灾害过程 → 折算减产量级 → 写入当期观测，并将全站切到该县</dd></div>
-          <div><dt>需要县区</dt><dd>必须选定所属县区，否则无法归户，系统会拒绝切换</dd></div>
-        </dl>
-      </div>
-    </aside>
-
-    <div class="upload-card">
-      <form id="upload-form" method="post" enctype="multipart/form-data">
-        <label class="dropzone" id="dropzone" for="file-input" data-max-size="{{ max_size }}">
-          <span class="drop-icon" aria-hidden="true">{{ icon('upload') }}</span>
-          <span class="drop-title">拖拽气象数据到这里</span>
-          <span class="drop-hint">或点击选择文件 · CSV / Excel · 不超过 {{ max_size }} MB</span>
-          <span class="drop-file" data-file-name aria-live="polite">尚未选择文件</span>
-          <input id="file-input" type="file" name="file" accept=".csv,.xlsx,.xls" required>
-        </label>
-
-        <div class="upload-row">
-          <div class="field county-field">
-            <label for="county-input">所属县区 <em class="req-mark">必填</em></label>
-            <input type="search" id="county-filter" class="county-filter"
-                   placeholder="输入关键字筛选，如 内黄 / 安阳" autocomplete="off"
-                   aria-label="筛选县区">
-            <select id="county-input" name="county" required>
-              <option value="">请选择县区（共 {{ counties|length }} 个，可先在上方输入筛选）</option>
-              {% for city, items in county_groups.items() %}
-              <optgroup label="{{ city }}">
-                {% for c in items.values() %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
-              </optgroup>
-              {% endfor %}
-            </select>
-            <p class="field-hint">先输关键字缩小范围，再在下拉里选；数据会挂到这个县名下，决定全站切到哪一页。</p>
-          </div>
-          <button class="btn btn-primary" id="upload-submit" type="submit">上传并诊断</button>
-        </div>
-        <label class="upload-rule" style="margin-top:10px">
-          <input type="checkbox" name="use_as_dataset" value="1" checked>
-          <span>上传后全站切到这个县（气象分析、产量测算、农事建议都按这份数据走）</span>
-        </label>
-        <p class="upload-note">默认勾选：上传通过后全站切到这个县。取消勾选则只用这份数据做一次诊断，不动全站。</p>
-      </form>
-    </div>
-  </div>
-
-  {% if report %}
-  <section class="block-lg" id="validation-report">
-    <div class="block-head">
-      <div>
-        <h2>校验结果</h2>
-      </div>
-      <p class="block-note">{{ report.filename }} · {{ '校验通过' if report.ok else '存在问题，请核对提示' }}</p>
-    </div>
-
-    {% if report.issues %}
-    {% for issue in report.issues %}
-    <div class="alert {{ issue.level }}">
-      <span class="tag">{{ '错误' if issue.level == 'error' else ('提示' if issue.level == 'warning' else '信息') }}</span>
-      <p><strong>{{ issue.title }}</strong>{% if issue.detail %} —— {{ issue.detail }}{% endif %}</p>
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="alert ok"><span class="tag">通过</span><p>字段与记录未发现明显问题，可以直接用于分析。</p></div>
-    {% endif %}
-
-    <div class="stat-strip">
-      <div class="stat"><span>记录行数</span><strong>{{ report.summary.get('rows', '—') }}<small> 行</small></strong></div>
-      <div class="stat"><span>年份范围</span><strong class="is-text">{{ report.summary.get('year_range', '—') }}</strong></div>
-      <div class="stat"><span>日期范围</span><strong class="is-text">{{ report.summary.get('date_range', '—') }}</strong></div>
-      <div class="stat"><span>识别字段</span><strong>{{ report.columns|length }}<small> 个</small></strong></div>
-    </div>
-
-    {% if report.columns %}
-    <details class="more panel">
-      <summary>字段识别 · {{ report.columns|length }} 个</summary>
-      <div class="detail-body">
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>原始列名</th><th>标准字段</th></tr></thead>
-            <tbody>
-              {% for raw, std in report.columns.items() %}
-              <tr><td>{{ raw }}</td><td>{{ std }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
-      </div>
-    </details>
-    {% endif %}
-
-    {% if report.preview %}
-    {% set preview_labels = {'date': '日期', 'year': '年份', 't2m_max': '最高温', 't2m_min': '最低温',
-                             't2m': '平均温', 'precip': '降水', 'wind': '风速', 'radiation': '辐射',
-                             'dew': '露点', 'rh': '湿度'} %}
-    <details class="more panel">
-      <summary>数据预览 · 前 {{ report.preview|length }} 行</summary>
-      <div class="detail-body">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>{% for k in report.preview[0].keys() %}<th>{{ preview_labels.get(k, k) }}</th>{% endfor %}</tr>
-            </thead>
-            <tbody>
-              {% for row in report.preview %}
-              <tr>{% for v in row.values() %}<td>{{ v if v is not none else '—' }}</td>{% endfor %}</tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
-      </div>
-    </details>
-    {% endif %}
-  </section>
-  {% endif %}
-
-  {% if dataset %}
-  <section class="block-lg">
-    <div class="block-head">
-      <div>
-        <h2>当前数据集</h2>
-      </div>
-      <p class="block-note">分析、预测与建议页面优先使用该数据</p>
-    </div>
-    <div class="panel dataset-panel">
-      <p class="dataset-text"><strong>{{ dataset.filename }}</strong>{% if dataset.county %}（{{ dataset.county }}）{% endif %}，共 {{ dataset.summary.rows }} 行。上传新文件校验通过后会自动替换。</p>
-      <div class="dataset-actions">
-        <a class="btn btn-primary btn-sm" href="{{ analysis_url }}">去分析 {{ icon('arrow', 'btn-arrow') }}</a>
-        <a class="btn btn-ghost btn-sm" href="{{ predict_url }}">去预测</a>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('reset_dataset') }}"
-           data-confirm="恢复内置数据集后，当前上传的数据将不再参与分析。确定继续？">恢复内置数据集</a>
-      </div>
-      <p class="chart-note">恢复内置数据集不会删除原始上传文件，但该文件将不再参与分析与预测。</p>
-    </div>
-  </section>
-  {% endif %}
 </div>
 {% endblock %}
 
@@ -275,38 +154,48 @@
 (function () {
   var filter = document.getElementById('county-filter');
   var sel = document.getElementById('county-input');
-  if (!filter || !sel) return;
-  var groups = Array.prototype.slice.call(sel.querySelectorAll('optgroup'));
+  var input = document.getElementById('file-input');
+  var fileLabel = document.getElementById('drop-file');
+  var TOTAL = sel ? sel.querySelectorAll('option[value]:not([value=""])').length : 0;
 
   function apply() {
-    var q = filter.value.trim();
-    var keepTotal = 0;
-    groups.forEach(function (g) {
-      var keep = 0;
-      Array.prototype.forEach.call(g.children, function (o) {
+    if (!filter || !sel) return;
+    var q = (filter.value || '').trim();
+    var keep = 0;
+    Array.prototype.forEach.call(sel.querySelectorAll('optgroup'), function (g) {
+      var shown = 0;
+      Array.prototype.forEach.call(g.querySelectorAll('option'), function (o) {
         var hit = !q || o.textContent.indexOf(q) >= 0 || g.label.indexOf(q) >= 0;
         o.hidden = !hit;
         o.disabled = !hit;
-        if (hit) keep++;
+        if (hit) { shown++; keep++; }
       });
-      g.hidden = keep === 0;
-      keepTotal += keep;
+      g.hidden = shown === 0;
     });
-    // 只剩一个匹配时直接选中，省一次点击
-    var first = sel.querySelector('option[value]:not([hidden]):not([disabled])');
-    var visible = Array.prototype.filter.call(sel.querySelectorAll('option'),
-      function (o) { return !o.hidden && !o.disabled && o.value; });
-    sel.options[0].textContent = !q
-      ? '请选择县区（共 ' + keepTotal + ' 个，可先在上方输入筛选）'
-      : (keepTotal ? '匹配 ' + keepTotal + ' 个县区' : '没有匹配的县区');
-    if (keepTotal === 1 && visible.length === 1) {
-      sel.value = visible[0].value;
-    }
+    sel.options[0].textContent = q
+      ? '匹配 ' + keep + ' 个县区'
+      : '不指定 — 按文件名识别（一次传多份时用这个）';
+    var visible = Array.prototype.filter.call(sel.querySelectorAll('option[value]:not([value=""])'),
+      function (o) { return !o.hidden; });
+    if (q && keep === 1 && visible.length === 1) sel.value = visible[0].value;
   }
-  filter.addEventListener('input', apply);
-  filter.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); apply(); sel.focus(); }
-  });
+
+  if (filter) {
+    filter.addEventListener('input', apply);
+    filter.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); apply(); sel.focus(); } });
+    apply();
+  }
+
+  if (input) {
+    input.addEventListener('change', function () {
+      var n = input.files ? input.files.length : 0;
+      fileLabel.textContent = n ? ('已选 ' + n + ' 份文件') : '尚未选择文件';
+      if (n > 1 && sel && sel.value) {
+        sel.value = '';
+        if (filter) { filter.value = ''; apply(); }
+      }
+    });
+  }
 })();
 </script>
 {% endblock %}

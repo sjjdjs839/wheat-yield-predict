@@ -20,6 +20,8 @@ from pathlib import Path
 
 from flask import (Flask, render_template, request, redirect, url_for, Response)
 
+from src.data import upload_index
+from src.analysis import recent_warnings
 from src.data.validate import validate_file, load_weather_file
 from src.data.build_features import build_county, CANONICAL_TO_NASA
 from src.analysis.web_charts import build_web
@@ -74,26 +76,36 @@ def _observed_county_count() -> int:
     return _FOOTER_CACHE["n"] or len(ALL_COUNTIES)
 
 
+_CSS_FILE = Path(__file__).resolve().parent / "web" / "static" / "style.css"
+try:
+    _CSS_V = str(int(_CSS_FILE.stat().st_mtime))
+except Exception:
+    _CSS_V = "0"
+
+
+def _css_version():
+    return _CSS_V
+
 @app.context_processor
 def inject_footer():
-    """页脚数据范围 + 当前上传数据集（顶栏提示用）"""
+    """页脚数据范围 + 顶栏的上传数据提示"""
+    recs = upload_index.all()
     up = None
-    if LATEST.exists():
-        try:
-            m = json.loads(LATEST.read_text(encoding="utf-8"))
-            s = m.get("summary") or {}
-            yrs = s.get("years") or []
-            up = {"county": m.get("county") or "未标注",
-                  "year": max(yrs) if yrs else None}
-        except Exception:
-            up = None
+    if recs:
+        latest = upload_index.latest_record() or recs[-1]
+        counties = sorted({r["county"] for r in recs})
+        up = {"county": latest["county"],
+              "year": (latest.get("years") or [None])[-1],
+              "count": len(recs),
+              "counties": len(counties),
+              "more": counties if len(counties) > 1 else [],
+              "recent": sum(1 for r in recs if r.get("kind") == upload_index.KIND_RECENT)}
     return {"footer": {
         "counties": _observed_county_count(),
         "year_range": f"{CONFIG['upload']['year_min']}—{CONFIG['upload']['year_max']}",
-    }, "upload_meta": up}
+    }, "upload_meta": up, "css_v": _css_version()}
 
 
-# ---- 数据访问 ----
 def _canonical(df: pd.DataFrame) -> pd.DataFrame:
     """统一为标准小写字段名，并补 month_day"""
     rename = {k: v for k, v in NASA_TO_CANON.items() if k in df.columns}
@@ -109,22 +121,72 @@ def _read_processed(path: str, mtime: float) -> pd.DataFrame:
     return _canonical(pd.read_csv(path, parse_dates=["date"]))
 
 
+_UPLOAD_CACHE: dict = {}
+
+
+def _upload_sig() -> tuple:
+    """清单与文件的指纹，用来判断缓存是否还可用"""
+    sig = []
+    if upload_index.INDEX_PATH.exists():
+        sig.append(round(upload_index.INDEX_PATH.stat().st_mtime, 3))
+    for rec in upload_index.all():
+        p = PROJECT_ROOT / rec["path"]
+        sig.append((rec["id"], rec["path"], round(p.stat().st_mtime, 3), p.stat().st_size))
+    return tuple(sig)
+
+
+def _uploaded_records() -> list:
+    """读取每份上传数据，附上清单里的元信息"""
+    out = []
+    for rec in upload_index.all():
+        path = PROJECT_ROOT / rec["path"]
+        try:
+            df, _ = load_weather_file(path, rec["county"])
+        except Exception:
+            continue
+        if df is None or df.empty:
+            continue
+        df = _canonical(df)
+        # 清单里的县名优先：文件名可能不带县，或者带的是简称
+        df["county"] = rec["county"]
+        out.append((df, rec))
+    return out
+
+
+def uploaded_records() -> list:
+    """带缓存的上传数据集列表"""
+    sig = _upload_sig()
+    if _UPLOAD_CACHE.get("sig") == sig:
+        return _UPLOAD_CACHE.get("val") or []
+    val = _uploaded_records()
+    _UPLOAD_CACHE.clear()
+    _UPLOAD_CACHE.update({"sig": sig, "val": val})
+    return val
+
+
+def guess_county(filename: str) -> str:
+    """从文件名里认县名；取最长命中，避免「安阳县」被「安阳」之类截断。"""
+    stem = Path(filename).stem
+    hits = [c for c in ALL_COUNTIES if c in stem]
+    if not hits:
+        return ""
+    return max(hits, key=len)
+
+
 def uploaded_dataset() -> tuple[pd.DataFrame, dict] | None:
-    """最近一次上传的数据集（存在且文件可读时返回）"""
-    if not LATEST.exists():
+    """所有启用中的上传数据合成一张表；一份都没有就返回 None"""
+    recs = uploaded_records()
+    if not recs:
         return None
-    meta = json.loads(LATEST.read_text(encoding="utf-8"))
-    # 没有县名就当作没有上传数据集。老版本会把空县名写成「未标注」，
-    # 结果全站挂到一个不存在的县上，产量测算直接报「缺少生育期记录」。
-    if not (meta.get("county") or "").strip():
-        return None
-    path = PROJECT_ROOT / meta["path"]
-    if not path.exists():
-        return None
-    df, report = load_weather_file(path, meta["county"])
-    return _canonical(df), {"filename": meta["filename"],
-                            "county": meta["county"],
-                            "source": "上传数据", "summary": report["summary"]}
+    merged = pd.concat([d for d, _ in recs], ignore_index=True)
+    merged = merged.drop_duplicates(subset=["county", "date"], keep="last")
+    counties = sorted(merged["county"].dropna().unique().tolist())
+    return merged, {"filename": "%d 份上传数据" % len(recs),
+                    "county": None,
+                    "source": "上传数据 + 内置数据",
+                    "counties": counties,
+                    "records": [r for _, r in recs],
+                    "summary": {"rows": len(merged), "counties": counties}}
 
 
 def current_dataset() -> tuple[pd.DataFrame, dict]:
@@ -144,15 +206,24 @@ def dataset_counties(df: pd.DataFrame) -> list[str]:
 
 
 def uploaded_scope() -> dict | None:
-    """上传数据的县区与年份范围，用于筛选器默认值和年份列表。"""
+    """上传数据的县区、年份与默认落点。
+
+    默认落点取最近一次登记的那个县，多县上传时它就是演示的入口。
+    """
     up = uploaded_dataset()
     if not up:
         return None
     df, meta = up
-    counties = dataset_counties(df)
-    years = sorted(int(y) for y in df["year"].dropna().unique()) if "year" in df else []
+    counties = meta.get("counties") or dataset_counties(df)
+    default = upload_index.latest_county()
+    if default not in counties:
+        default = counties[0] if counties else ""
+    years = upload_index.years_for(default) if default else []
+    if not years and "year" in df.columns:
+        sub = df[df["county"] == default] if default else df
+        years = sorted({int(y) for y in sub["year"].dropna().unique()})
     return {"df": df, "meta": meta, "counties": counties, "years": years,
-            "default_county": counties[0]}
+            "default_county": default, "records": meta.get("records") or []}
 
 
 def scope_city_groups(scope: dict | None) -> dict | None:
@@ -181,51 +252,44 @@ def feature_csv_rows() -> int:
 
 
 def dataset_for_county(county: str) -> tuple[pd.DataFrame, dict]:
-    """上传数据 + 内置数据合并（上传数据优先，缺的年份用内置补）"""
+    """该县可用数据：内置历史 + 该县所有启用中的上传数据（同日以上传为准）"""
     base = builtin_dataset()
-    up = uploaded_dataset()
+    base_sub = base[base["county"] == county] if ("county" in base.columns and not base.empty) else pd.DataFrame()
 
-    if up and county and county != "未标注":
-        up_df, up_meta = up
-        up_sub = up_df[up_df["county"] == county]
-        if not up_sub.empty:
-            # 合并：上传数据 + 内置数据（去重，上传优先）
-            base_sub = base[base["county"] == county] if "county" in base.columns else pd.DataFrame()
-            if not base_sub.empty:
-                combined = pd.concat([base_sub, up_sub]).drop_duplicates(subset=["county", "date"], keep="last")
-                return combined, {"filename": up_meta["filename"], "county": county,
-                                  "source": f"上传数据 + 内置数据",
-                                  "summary": {"rows": len(combined)}}
-            return up_sub, up_meta
+    ups = [(d, r) for d, r in uploaded_records() if r["county"] == county]
+    if ups:
+        # 按登记时间从早到晚叠放，后传的覆盖先传的同一天
+        ups.sort(key=lambda x: x[1].get("uploaded_at", ""))
+        pieces = ([base_sub] if not base_sub.empty else []) + [d for d, _ in ups]
+        combined = pd.concat(pieces, ignore_index=True)
+        combined = combined.drop_duplicates(subset=["county", "date"], keep="last")
+        combined = combined.sort_values("date").reset_index(drop=True)
+        return combined, {"filename": "、".join(r["filename"] for _, r in ups),
+                          "county": county,
+                          "source": "上传数据 + 内置数据" if not base_sub.empty else "上传数据",
+                          "summary": {"rows": len(combined)},
+                          "records": [r for _, r in ups]}
 
-    if county and county != "未标注" and repo.available():
+    if county and repo.available():
         try:
             w = repo.county_weather(county)
             if not w.empty:
-                summary = up[1]["summary"] if up else {"rows": len(w),
-                                                       "year_range": "2010—2024"}
-                return w, {"filename": f"{CONFIG['database']['name']}.weather_daily",
+                return w, {"filename": "%s.weather_daily" % CONFIG["database"]["name"],
                            "county": county,
-                           "source": f"MySQL 数据库 · {CONFIG['database']['name']}",
-                           "summary": summary}
+                           "source": "MySQL 数据库 · %s" % CONFIG["database"]["name"],
+                           "summary": {"rows": len(w)}}
         except Exception:
             pass                                    # 数据库异常时继续走 CSV
 
-    base = builtin_dataset()
-    if county and county != "未标注":
-        sub = base[base["county"] == county]
-        if not sub.empty:
-            return sub, {"filename": PROCESSED.name, "county": county,
-                         "source": "内置数据集（CSV）",
-                         "summary": {"rows": len(sub), "year_range": "2010—2024"}}
-        # 配置里有这个县、但气象表里一行都没有 → 返回空表并明确标记缺失。
-        # 绝不拿全省 150 县数据冒充该县（否则会出现「龙管会累计降水 5124.5 mm」这种露馅数字）。
-        return base.iloc[0:0], {"filename": PROCESSED.name, "county": county,
-                                "source": "无气象数据", "missing": True,
-                                "summary": {"rows": 0, "year_range": ""}}
-    return base, {"filename": PROCESSED.name, "county": None,
-                  "source": "内置数据集（CSV）",
-                  "summary": {"rows": len(base), "year_range": "2010—2024"}}
+    if county and not base_sub.empty:
+        return base_sub, {"filename": PROCESSED.name, "county": county,
+                          "source": "内置数据集（CSV）",
+                          "summary": {"rows": len(base_sub)}}
+
+    cols = ["county", "date", "year", "month_day", "t2m_max", "t2m_min", "t2m",
+            "precip", "wind", "radiation", "dew", "rh"]
+    return pd.DataFrame(columns=cols), {"filename": "", "county": county,
+                                        "source": "无数据", "summary": {"rows": 0}}
 
 
 def model_meta() -> dict | None:
@@ -627,107 +691,191 @@ def upload_template():
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
-    report, error, diag = None, None, None
-    county = ""
+    results = []
+    error = None
+    form_county = ""
+    saved_ids = []
+
     if request.method == "POST":
-        f = request.files.get("file")
-        county = (request.form.get("county") or "").strip()
-        if not f or not f.filename:
+        files = [f for f in request.files.getlist("file") if f and f.filename]
+        form_county = (request.form.get("county") or "").strip()
+        do_save = bool(request.form.get("save"))
+        kind_arg = (request.form.get("kind") or "auto").strip()
+        # auto 交给日期范围判，其余按人指定的来
+        force_kind = kind_arg if kind_arg in (upload_index.KIND_ANNUAL,
+                                              upload_index.KIND_RECENT) else None
+
+        if not files:
             error = "未选择文件。"
-        else:
-            ext = Path(f.filename).suffix.lower()
-            if ext not in CONFIG["upload"]["allowed_ext"]:
-                error = f"不支持的文件类型 {ext}，仅支持 {'、'.join(CONFIG['upload']['allowed_ext'])}。"
-            else:
-                UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-                saved = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{f.filename}"
-                f.save(saved)
-                report = validate_file(saved)
-                if report["ok"]:
-                    # 诊断优先：一份原始气象进，出灾害清单 + 减产评估（可选入库出建议）
-                    if county:
+        elif form_county and form_county not in ALL_COUNTIES:
+            error = ("「%s」不在项目配置的 %d 个县区里。请从下拉列表里选，"
+                     "或者把文件名写成「县区_年份.csv」让系统自己认。"
+                     % (form_county, len(ALL_COUNTIES)))
+            form_county = ""
+        elif len(files) > 1 and form_county:
+            # 多文件时下拉只当一个兜底，每个文件仍以文件名为准
+            pass
+
+        if not error:
+            UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+            for f in files:
+                item = {"filename": f.filename, "county": "", "ok": False,
+                        "kind": "", "rows": 0, "error": "", "saved": False,
+                        "diag": None}
+                ext = Path(f.filename).suffix.lower()
+                if ext not in CONFIG["upload"]["allowed_ext"]:
+                    item["error"] = "不支持的类型 %s" % ext
+                    results.append(item)
+                    continue
+
+                # 单文件用下拉选的县；多文件时靠文件名认
+                county = form_county if (len(files) == 1 and form_county) else guess_county(f.filename)
+                item["county"] = county or "未识别"
+
+                path = UPLOAD_DIR / ("%s_%s" % (uuid.uuid4().hex[:8], f.filename))
+                f.save(path)
+                try:
+                    report = validate_file(path)
+                except Exception as exc:
+                    report = {"ok": False, "issues": [{"title": "校验失败：" + str(exc)}],
+                              "summary": {}}
+                item["report"] = report
+
+                if not report.get("ok"):
+                    item["error"] = "字段校验未通过"
+                    path.unlink(missing_ok=True)
+                    results.append(item)
+                    continue
+                if not county:
+                    item["error"] = "文件名里没有县区名，请先在下拉里选好再传"
+                    path.unlink(missing_ok=True)
+                    results.append(item)
+                    continue
+                if county not in ALL_COUNTIES:
+                    item["error"] = "「%s」不在配置的县区里" % county
+                    path.unlink(missing_ok=True)
+                    results.append(item)
+                    continue
+
+                try:
+                    df, _ = load_weather_file(path, county, stage_mode=True)
+                except Exception as exc:
+                    item["error"] = "解析失败：" + str(exc)
+                    path.unlink(missing_ok=True)
+                    results.append(item)
+                    continue
+                if df is None or df.empty:
+                    item["error"] = "文件里没有可用记录"
+                    path.unlink(missing_ok=True)
+                    results.append(item)
+                    continue
+
+                item["ok"] = True
+                item["rows"] = len(df)
+                item["year"] = int(df["year"].max())
+
+                if do_save:
+                    rec = upload_index.add(
+                        rel_path=str(path.relative_to(PROJECT_ROOT)),
+                        filename=f.filename, county=county, df=df,
+                        force_kind=force_kind)
+                    item["kind"] = rec["kind"]
+                    item["saved"] = True
+                    item["id"] = rec["id"]
+                    saved_ids.append(rec["id"])
+                    # 当期观测进预警与农事建议；年度数据集只做分析回看
+                    if rec["kind"] == upload_index.KIND_RECENT:
                         try:
-                            df_up, _ = load_weather_file(saved, county, stage_mode=True)
-                            if df_up is not None and not df_up.empty:
-                                up_year = int(df_up["year"].max())
-                                diag = run_diagnose(df_up, county, up_year)
-                                diag["county"] = county
-                                diag["year"] = up_year
-                                # 当期/未来年写入阶段观测库，农事建议页立刻可用；
-                                # 历史年只诊断不写库，避免覆盖内置年份的语义
-                                if up_year > max(BASE_YEARS):
-                                    stage_store.upsert(county, up_year, df_up)
-                                    diag["saved_to_advice"] = True
-                        except Exception as exc:
-                            diag = {"empty": True, "county": county, "year": None, "days": 0,
-                                    "events": [], "stages": [], "loss": None,
-                                    "month_span": "", "verdict": "",
-                                    "error": "诊断未能完成：" + str(exc)[:80]}
-                    if request.form.get("use_as_dataset"):
-                        # 全站切换必须先说清是哪个县，否则全站会挂到一个空壳上
-                        if not county:
-                            error = ("请先选择县区。设为全站数据集时，必须指定数据属于哪个县，"
-                                     "否则气象分析、产量测算都取不到该县记录。")
-                            saved.unlink(missing_ok=True)
-                        elif county not in ALL_COUNTIES:
-                            error = (f"「{county}」不在项目配置的 {len(ALL_COUNTIES)} 个县区里。"
-                                     "请从下拉列表中选择，或先用同名县区重新上传。")
-                            saved.unlink(missing_ok=True)
-                        else:
-                            LATEST.write_text(json.dumps({
-                                "path": str(saved.relative_to(PROJECT_ROOT)),
-                                "filename": f.filename,
-                                "county": county,
-                                "summary": report["summary"],
-                            }, ensure_ascii=False), encoding="utf-8")
-                    else:
-                        saved.unlink(missing_ok=True)
+                            stage_store.upsert(county, item["year"], df)
+                            item["to_stage"] = True
+                        except Exception:
+                            item["to_stage"] = False
+                    try:
+                        item["diag"] = run_diagnose(df, county, item["year"])
+                    except Exception:
+                        item["diag"] = None
                 else:
-                    saved.unlink(missing_ok=True)
-    meta = None
-    if LATEST.exists():
-        meta = json.loads(LATEST.read_text(encoding="utf-8"))
-        meta.setdefault("summary", {})
+                    path.unlink(missing_ok=True)
 
-    analysis_url = url_for("analysis")
-    predict_url = url_for("predict")
-    if meta:
-        summary = meta.get("summary") or {}
-        up_years = summary.get("years") or []
-        up_counties = summary.get("counties") or []
-        default_county = meta.get("county") or (up_counties[0] if up_counties else "")
-        params = {"county": default_county}
-        if up_years:
-            params["year"] = max(up_years)
-        analysis_url = url_for("analysis", **params)
-        predict_url = url_for("predict", **params)
+                results.append(item)
 
-    advice_url = url_for("advice")
-    if diag and diag.get("county"):
-        advice_url = url_for("advice", county=diag.get("county"),
-                             year=diag.get("year") if diag.get("year") else None)
-    # 上传通过且设为全站数据集时，直接跳到该县的气象分析页，省掉一层点击
-    if (request.method == "POST" and report and report.get("ok") and not error
-            and county in ALL_COUNTIES
-            and request.form.get("use_as_dataset")):
-        params = {"county": county}
-        if diag and diag.get("year"):
-            params["year"] = diag["year"]
-        return redirect(url_for("analysis", **params))
+    if request.method == "POST":
+        _UPLOAD_CACHE.clear()
+
+    ok_saved = [r for r in results if r.get("ok") and r.get("saved")]
+    # 全部通过且有入库，直接进最新那个县的页面，省掉一层点击
+    if ok_saved and not error:
+        latest = upload_index.latest_record()
+        if latest:
+            county = latest["county"]
+            years = upload_index.years_for(county)
+            params = {"county": county}
+            if years:
+                params["year"] = max(years)
+            return redirect(url_for("analysis", **params))
 
     return render_template("upload.html", title="数据诊断", active="upload",
-                           report=report, error=error, dataset=meta, diag=diag,
+                           results=results, error=error, form_county=form_county,
                            counties=ALL_COUNTIES, county_groups=CONFIG["counties"],
-                           form_county=county,
                            max_size=CONFIG["upload"]["max_size_mb"],
-                           analysis_url=analysis_url, predict_url=predict_url,
-                           advice_url=advice_url)
+                           dataset_count=len(upload_index.all()),
+                           county_count=len(upload_index.counties()),
+                           recent_count=sum(1 for r in upload_index.all()
+                                            if r.get("kind") == upload_index.KIND_RECENT))
+
+
+@app.route("/datasets")
+def datasets():
+    """上传数据清单：谁在生效、占多少行、什么时候传的"""
+    recs = upload_index.all(active_only=False)
+    recs.sort(key=lambda r: r.get("uploaded_at", ""), reverse=True)
+    live = [r for r in recs if r.get("active", True)]
+    return render_template("datasets.html", title="数据清单", active="datasets",
+                           records=recs,
+                           total=len(live),
+                           counties=len(upload_index.counties()),
+                           rows=upload_index.total_rows(),
+                           recent=sum(1 for r in live if r.get("kind") == upload_index.KIND_RECENT),
+                           kind_label=upload_index.KIND_LABEL,
+                           latest_id=(upload_index.latest_record() or {}).get("id", ""))
+
+
+@app.route("/datasets/<ds_id>/toggle")
+def dataset_toggle(ds_id):
+    upload_index.toggle(ds_id)
+    _UPLOAD_CACHE.clear()
+    return redirect(url_for("datasets"))
+
+
+@app.route("/datasets/<ds_id>/delete")
+def dataset_delete(ds_id):
+    rec = upload_index.find(ds_id)
+    if rec:
+        upload_index.remove(ds_id)
+        _UPLOAD_CACHE.clear()
+        # 当期观测同时从预警库里撤掉，否则删了文件还会继续报警
+        if rec.get("kind") == upload_index.KIND_RECENT:
+            for y in (rec.get("years") or []):
+                try:
+                    stage_store.reset(rec["county"], int(y))
+                except Exception:
+                    pass
+    return redirect(url_for("datasets"))
+
+
+@app.route("/datasets/clear")
+def datasets_clear():
+    """全部停用：回到内置数据，但记录和文件都留着，随时能再开回来"""
+    upload_index.deactivate_all()
+    _UPLOAD_CACHE.clear()
+    return redirect(url_for("datasets"))
 
 
 @app.route("/reset_dataset")
 def reset_dataset():
-    LATEST.unlink(missing_ok=True)
-    return redirect(url_for("upload"))
+    upload_index.deactivate_all()
+    _UPLOAD_CACHE.clear()
+    return redirect(url_for("datasets"))
 
 
 @app.route("/analysis")
@@ -1316,6 +1464,11 @@ def risk():
     if level_arg in ("heavy", "light", "none"):
         items = [x for x in items if x["level"] == level_arg]
 
+    # 近期观测预警：只看当期观测，和上面的年度清单是两条线
+    warn_counties_ = [r["county"] for r in upload_index.all()
+                      if r.get("kind") == upload_index.KIND_RECENT]
+    warnings_ = recent_warnings.board(sorted(set(warn_counties_)), window_days=15) if warn_counties_ else None
+
     return render_template("risk.html", title="灾害预警", active="risk",
                            years=years, year=year, cities=snap["cities"],
                            city=city_arg, level=level_arg,
@@ -1329,7 +1482,7 @@ def risk():
                            frost_first=min([x for x in items if (x["frost_level"] or 0) > 0],
                                            key=lambda x: (x["frost_loss"] if x["frost_loss"] is not None else 0),
                                            default=None),
-                           last_frost=_last_frost(year),
+                           last_frost=_last_frost(year), warnings=warnings_,
                            dose=_dose_payload(),
                            mh=_multihazard_payload(),
                            ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100)

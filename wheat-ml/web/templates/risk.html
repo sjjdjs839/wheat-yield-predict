@@ -5,6 +5,66 @@
 {{ page_head('灾害预警', '先看晚霜冻，再看干热风。4 月低温是目前数据里最确定的减产因素（每多 1 天约少 2%）；干热风只报暴露强度，不给减产数字。', badges) }}
 
 <div class="container page-content">
+  <section class="block-lg" id="recent-warnings">
+    <div class="block-head">
+      <h2>近期观测预警</h2>
+      <span class="block-sub">
+        {% if warnings %}按当期观测的近 {{ warnings.window_days }} 天日值判定 · 重度 {{ warnings.heavy }} 个县 · 轻度 {{ warnings.light }} 个 · 无 {{ warnings.none }} 个
+        {% else %}还没传当期观测：这一块只看近期逐日数据，年度清单在下面{% endif %}
+      </span>
+    </div>
+
+    {% if warnings and warnings.rows %}
+    <div class="table-wrap">
+      <table class="bd-table warn-table">
+        <thead>
+          <tr><th>县区 / 生育期</th><th>观测窗口</th><th>命中</th><th>依据</th><th>等级</th></tr>
+        </thead>
+        <tbody>
+          {% for r in warnings.rows %}
+          <tr>
+            <td><b>{{ r.county }}</b><div class="field-hint">{{ r.stage_name }}</div></td>
+            <td class="mono nowrap">{{ r.window|replace(' — ', '~') }}<div class="field-hint">{{ r.days }} 天</div></td>
+            <td>
+              {% if r.hits %}
+                {% for h in r.hits %}<span class="tag{{ ' tag-hot' if h.level >= 2 }}">{{ h.name }} {{ h.days }} 天</span> {% endfor %}
+              {% else %}
+                <span class="field-hint">时段内无致灾日值</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.hits %}
+                {% for h in r.hits %}<div class="field-hint">{{ h.detail }}</div>{% endfor %}
+              {% else %}
+                <span class="field-hint">最低 {{ r.tmin }}℃ · 最高 {{ r.tmax }}℃</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.level >= 2 %}
+                <span class="status-pill is-bad">重度</span>
+              {% elif r.level == 1 %}
+                <span class="status-pill is-warn">轻度</span>
+              {% else %}
+                <span class="status-pill is-ok">无</span>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if warnings.empty %}
+    <p class="field-hint" style="margin-top:8px">有当期观测登记但读不到记录：{{ warnings.empty|join('、') }}。</p>
+    {% endif %}
+    {% else %}
+    <div class="stage-empty">
+      <p>这一块只吃当期观测。现在传的是年度数据集，属于回看，不构成今天的险情。</p>
+      <p>要让它动起来：<a class="spec-link" href="{{ url_for('upload') }}">传一份最近十几天的逐日气象</a>，收尾日期在近 30 天内，系统会把它标成当期观测。</p>
+    </div>
+    {% endif %}
+  </section>
+
   <div class="dh-summary">
     <div class="dh-card is-alert">
       <span class="dh-label">出现晚霜冻县区</span>

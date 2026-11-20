@@ -1,0 +1,95 @@
+﻿{% extends "base.html" %}
+{% from "_macros.html" import page_head %}
+{% block content %}
+{% set badges = [total ~ ' 份在用', counties ~ ' 个县区', recent ~ ' 份当期观测'] %}
+{{ page_head('数据清单', '每次上传在这里留一条记录。停用等于把它从全站取数里摘掉，删除会连当期观测一起撤走。', badges) }}
+
+<div class="dataset-panel">
+  <div class="dataset-text">
+    <strong>当前在用</strong>
+    <span><b>{{ total }}</b> 份 · <b>{{ counties }}</b> 个县区 · 合计 <b>{{ rows }}</b> 行</span>
+    <span class="field-hint">停用后该县回落到内置 2010—2024；删除只影响这一份，不动别的县。</span>
+  </div>
+  <div class="dataset-actions">
+    {% if total %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('datasets_clear') }}"
+       onclick="return confirm('把现在在用的 {{ total }} 份全部停用？记录和文件都会留着，之后还能再开回来。')">全部停用</a>
+    {% endif %}
+    <a class="btn btn-primary btn-sm" href="{{ url_for('upload') }}">上传新数据</a>
+  </div>
+</div>
+
+{% if records %}
+<section class="block-lg">
+  <div class="block-head"><h2>已登记 · {{ records|length }} 条</h2>
+    <span class="block-sub">按上传时间倒序，最上面那份就是各页面的默认落点</span>
+  </div>
+  <div class="table-wrap">
+    <table class="bd-table ds-table">
+      <thead>
+        <tr>
+          <th>县区 / 文件</th><th>类型</th><th>行数</th>
+          <th>覆盖区间</th><th>状态</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr class="{{ '' if r.active else 'is-off' }}">
+          <td>
+            <b>{{ r.county }}</b>
+            {% if r.id == latest_id %}<span class="tag tag-hot">默认</span>{% endif %}
+            <div class="field-hint mono ds-file">{{ r.filename }}</div>
+            {% if r.start %}<div class="field-hint mono ds-span">{{ r.years|join('、') }} · {{ r.start }} → {{ r.end }}</div>{% endif %}
+            <div class="field-hint">{{ r.uploaded_at }}</div>
+          </td>
+          <td>
+            {% if r.kind == 'recent' %}
+              <span class="tag tag-hot">当期观测</span>
+            {% else %}
+              <span class="tag">年度</span>
+            {% endif %}
+          </td>
+          <td>{{ r.rows }}</td>
+          <td class="mono">
+            {% if r.years %}{{ r.years|join('、') }}{% else %}—{% endif %}
+            {% if r.start %}<div class="field-hint mono">{{ r.start }} → {{ r.end }}</div>{% endif %}
+          </td>
+          <td>
+            {% if r.active %}
+              <span class="status-pill is-ok">在用</span>
+            {% else %}
+              <span class="status-pill">已停用</span>
+            {% endif %}
+          </td>
+          <td class="row-actions">
+            <a class="btn btn-light btn-sm"
+               href="{{ url_for('dataset_toggle', ds_id=r.id) }}">
+              {{ '停用' if r.active else '启用' }}
+            </a>
+            <a class="btn btn-ghost btn-sm"
+               href="{{ url_for('dataset_delete', ds_id=r.id) }}"
+               onclick="return confirm('删除 {{ r.county }} 的这份「{{ r.filename }}」？文件会一起删掉，{{ '当期观测也会从预警里撤走' if r.kind == 'recent' else '其他县不受影响' }}。')">删除</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="block-lg">
+  <div class="stage-empty">
+    <p>还没有上传数据，全站按内置 2010—2024 的 {{ 150 }} 个县在跑。</p>
+    <p><a class="btn btn-primary btn-sm" href="{{ url_for('upload') }}">去传一份</a></p>
+  </div>
+</section>
+{% endif %}
+
+<section class="block-lg">
+  <div class="block-head"><h2>两种类型差在哪</h2></div>
+  <div class="data-facts" style="display:grid;gap:10px">
+    <p><b>当期观测</b> — 收尾日期在近 30 天内、跨度不长。它会进当期观测库，驱动灾害预警和农事建议，判定只看这段窗口。</p>
+    <p><b>年度数据集</b> — 覆盖整年或历史年份。它进气象分析、产量测算和灾害地图，按年度回看，<em>不会</em>被当成今天的险情。</p>
+  </div>
+</section>
+{% endblock %}
