@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    豫麦智测 · 麦浪智域设计系统
    Tokens → Base → Layout → Components → Pages → Responsive
    ============================================================ */
@@ -2132,3 +2132,56 @@ td .status-pill{margin-top:0}
   background:var(--rice-50);color:var(--forest-700);font-size:12px;white-space:nowrap}
 .yield-strip p{margin:0;font-size:13px;line-height:1.75;color:var(--ink-700)}
 @media(max-width:640px){.yield-strip{flex-direction:column;gap:8px}}
+
+/* ==== 数据清单空态 ==== */
+.ds-empty{padding:30px 28px;border:1px dashed var(--line);border-radius:16px;background:var(--paper)}
+.ds-empty-title{margin:0;font-size:15px;font-weight:600;color:var(--ink-900)}
+.ds-empty-lead{margin:8px 0 0;max-width:46em;font-size:13.5px;line-height:1.75;color:var(--ink-600)}
+@media (max-width:760px){
+  .ds-empty{padding:22px 18px}
+}
+
+/* ==== 数据诊断 / 数据清单 版式收口 ==== */
+.dataset-panel{
+  padding:16px 18px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--paper);
+  gap:12px;
+}
+.dataset-text{font-size:13.5px;line-height:1.65}
+.dataset-text strong{font-size:13px;letter-spacing:.01em}
+.dataset-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+@media (min-width:821px){
+  .dataset-panel{
+    flex-direction:row;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+    padding:18px 22px;
+  }
+  .dataset-text{flex:1 1 auto;min-width:0}
+  .dataset-actions{flex:0 0 auto}
+}
+
+/* 左栏字段表：标签宽度跟着内容走，别硬占 74px */
+.up-spec-list > div{grid-template-columns:max-content minmax(0,1fr);gap:12px 14px}
+.up-spec-list dt{font-size:11px;letter-spacing:.02em;color:var(--ink-600)}
+.up-spec-list dd{font-size:12.8px;line-height:1.65}
+
+@media (min-width:901px){
+  .upload-layout{grid-template-columns:minmax(0,5fr) minmax(0,6.4fr);gap:28px}
+  .up-spec{padding:18px 20px}
+}
+
+/* 小节标题与内容的呼吸 */
+.container.page-content .block-head{margin-bottom:14px}
+.container.page-content .block-lg{margin-top:24px}
+.ds-empty{margin-top:2px}
+
+.ds-empty-cta{margin-top:16px}
+.ds-empty-title{font-size:16px}
+.container.page-content > .upload-layout{margin-top:18px}
+.container.page-content > .ds-empty,
+.container.page-content > section{margin-top:24px}

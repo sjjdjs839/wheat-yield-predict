@@ -4,149 +4,152 @@
 {% set badges = ['CSV / XLSX / XLS', '可多份同时传', '单文件 ≤ ' ~ max_size ~ ' MB'] %}
 {{ page_head('数据诊断', '传一份或一批县区逐日气象。通过校验的直接存进数据清单，全站的取数都从这里来；近期观测还会进预警。', badges) }}
 
-{% if error %}
-<div class="alert error" role="alert"><span class="tag">未通过</span><p>{{ error }}</p></div>
-{% endif %}
+<div class="container page-content">
+  {% if error %}
+  <div class="alert error" role="alert"><span class="tag">未通过</span><p>{{ error }}</p></div>
+  {% endif %}
 
-<div class="dataset-panel">
-  <div class="dataset-text">
-    <strong>数据清单</strong>
-    <span>
-      已存 <b>{{ dataset_count }}</b> 份 · 覆盖 <b>{{ county_count }}</b> 个县区 · 其中当期观测 <b>{{ recent_count }}</b> 份
-    </span>
-    <span class="field-hint">
-      内置库仍是 2010—2024 那 150 个县；上传的数据叠在上面，同一天以上传的为准。
-    </span>
-  </div>
-  <div class="dataset-actions">
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('datasets') }}">管理数据清单 &rsaquo;</a>
-  </div>
-</div>
-
-{% if results %}
-<section class="block-lg" id="upload-results">
-  <div class="block-head"><h2>本次上传 · {{ results|length }} 份</h2>
-    <span class="block-sub">通过校验的已入库，未通过的没有留下任何文件</span>
-  </div>
-  <div class="table-wrap">
-    <table class="bd-table">
-      <thead>
-        <tr><th>文件</th><th>县区</th><th>行数</th><th>类型</th><th>结果</th></tr>
-      </thead>
-      <tbody>
-        {% for r in results %}
-        <tr>
-          <td class="mono">{{ r.filename }}</td>
-          <td>{{ r.county or '—' }}</td>
-          <td>{{ r.rows or '—' }}</td>
-          <td>
-            {% if r.saved and r.kind == 'recent' %}
-              <span class="tag tag-hot">当期观测</span>
-            {% elif r.saved %}
-              <span class="tag">年度数据集</span>
-            {% else %}—{% endif %}
-          </td>
-          <td>
-            {% if r.ok and r.saved %}
-              <span class="status-pill is-ok">已保存</span>
-              {% if r.to_stage %}<span class="field-hint">已进预警与农事建议</span>{% endif %}
-            {% elif r.ok %}
-              <span class="status-pill">仅校验</span>
-            {% else %}
-              <span class="status-pill is-bad">{{ r.error }}</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="upload-note" style="margin-top:14px">
-    <p>下一步：<a class="spec-link" href="{{ url_for('analysis') }}">看气象分析</a> ·
-      <a class="spec-link" href="{{ url_for('risk') }}">看预警</a> ·
-      <a class="spec-link" href="{{ url_for('predict') }}">算产量</a> ·
-      <a class="spec-link" href="{{ url_for('advice') }}">出农事建议</a></p>
-  </div>
-
-  {% for r in results if r.report %}
-  <details class="stage-fold" style="margin-top:10px">
-    <summary>{{ r.filename }} · 校验明细</summary>
-    <div class="stage-body">
-      {% if r.report.issues %}
-        {% for issue in r.report.issues %}
-        <p class="issue-line"><b>{{ issue.level }}</b> {{ issue.title }}{% if issue.detail %} — {{ issue.detail }}{% endif %}</p>
-        {% endfor %}
-      {% else %}
-        <p class="field-hint">字段与记录未发现异常。</p>
-      {% endif %}
-      {% if r.report.columns %}
-      <p class="field-hint">识别到的字段：{% for raw, std in r.report.columns.items() %}{{ raw }}→{{ std }}{% if not loop.last %}、{% endif %}{% endfor %}</p>
-      {% endif %}
+  <div class="dataset-panel">
+    <div class="dataset-text">
+      <strong>数据清单</strong>
+      <span>
+        已存 <b>{{ dataset_count }}</b> 份 · 覆盖 <b>{{ county_count }}</b> 个县区 · 其中当期观测 <b>{{ recent_count }}</b> 份
+      </span>
+      <span class="field-hint">
+        内置库仍是 2010—2024 那 150 个县；上传的数据叠在上面，同一天以上传的为准。
+      </span>
     </div>
-  </details>
-  {% endfor %}
-</section>
-{% endif %}
+    <div class="dataset-actions">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('datasets') }}">管理数据清单 &rsaquo;</a>
+    </div>
+  </div>
 
-<div class="upload-layout">
-  <aside class="up-spec">
-    <h3>字段与校验口径</h3>
-    <dl class="up-spec-list">
-      <div><dt>必需字段</dt><dd>日期（或年份 + 日序）、最高温、最低温、平均温、日降水量</dd></div>
-      <div><dt>选填字段</dt><dd>2m 风速、相对湿度、地表短波辐射、露点温度；缺辐射时辐射卡不出图，其余照常</dd></div>
-      <div><dt>多县上传</dt><dd>一次可选多个文件，文件名写成「县区_年份.csv」即可自动分县；县名认不出来会单独提示，不整批作废</dd></div>
-      <div><dt>自动分类</dt><dd>收尾日期在近 30 天内且跨度不长 → 当期观测（进预警）；否则 → 年度数据集（进分析预测）</dd></div>
-      <div><dt>模板下载</dt><dd><a class="spec-link" href="{{ url_for('upload_template') }}">下载逐日气象模板（CSV）</a></dd></div>
-    </dl>
-  </aside>
-
-  <div class="upload-card">
-    <form id="upload-form" method="post" enctype="multipart/form-data">
-      <label class="dropzone" id="dropzone" for="file-input" data-max-size="{{ max_size }}">
-        <span class="drop-icon">{{ icon('upload') }}</span>
-        <span class="drop-title">拖气象数据到这里</span>
-        <span class="drop-hint" id="drop-hint">或点击选择文件 · 可一次选多份 · CSV / Excel · 单份不超过 {{ max_size }} MB</span>
-        <input id="file-input" type="file" name="file" accept=".csv,.xlsx,.xls" multiple required>
-        <span class="drop-file" id="drop-file">尚未选择文件</span>
-      </label>
-
-      <div class="upload-row">
-        <label for="county-input">所属县区 <em class="req-mark">单份时必填</em></label>
-        <input type="search" id="county-filter" class="county-filter"
-               placeholder="输入关键字筛选，如 内黄 / 安阳" autocomplete="off">
-        <select id="county-input" name="county">
-          <option value="">不指定 — 按文件名识别（一次传多份时用这个）</option>
-          {% if county_groups %}
-          {% for city, items in county_groups.items() %}
-          <optgroup label="{{ city }}">
-            {% for c in items.values() %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
-          </optgroup>
+  {% if results %}
+  <section class="block-lg" id="upload-results">
+    <div class="block-head"><h2>本次上传 · {{ results|length }} 份</h2>
+      <span class="block-sub">通过校验的已入库，未通过的没有留下任何文件</span>
+    </div>
+    <div class="table-wrap">
+      <table class="bd-table">
+        <thead>
+          <tr><th>文件</th><th>县区</th><th>行数</th><th>类型</th><th>结果</th></tr>
+        </thead>
+        <tbody>
+          {% for r in results %}
+          <tr>
+            <td class="mono">{{ r.filename }}</td>
+            <td>{{ r.county or '—' }}</td>
+            <td>{{ r.rows or '—' }}</td>
+            <td>
+              {% if r.saved and r.kind == 'recent' %}
+                <span class="tag tag-hot">当期观测</span>
+              {% elif r.saved %}
+                <span class="tag">年度数据集</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if r.ok and r.saved %}
+                <span class="status-pill is-ok">已保存</span>
+                {% if r.to_stage %}<span class="field-hint">已进预警与农事建议</span>{% endif %}
+              {% elif r.ok %}
+                <span class="status-pill">仅校验</span>
+              {% else %}
+                <span class="status-pill is-bad">{{ r.error }}</span>
+              {% endif %}
+            </td>
+          </tr>
           {% endfor %}
-          {% endif %}
-        </select>
-        <span class="field-hint">只传一份时在这里指定县区；传多份时留空，按文件名认县。</span>
+        </tbody>
+      </table>
+    </div>
+    <div class="upload-note" style="margin-top:14px">
+      <p>下一步：<a class="spec-link" href="{{ url_for('analysis') }}">看气象分析</a> ·
+        <a class="spec-link" href="{{ url_for('risk') }}">看预警</a> ·
+        <a class="spec-link" href="{{ url_for('predict') }}">算产量</a> ·
+        <a class="spec-link" href="{{ url_for('advice') }}">出农事建议</a></p>
+    </div>
+
+    {% for r in results if r.report %}
+    <details class="stage-fold" style="margin-top:10px">
+      <summary>{{ r.filename }} · 校验明细</summary>
+      <div class="stage-body">
+        {% if r.report.issues %}
+          {% for issue in r.report.issues %}
+          <p class="issue-line"><b>{{ issue.level }}</b> {{ issue.title }}{% if issue.detail %} — {{ issue.detail }}{% endif %}</p>
+          {% endfor %}
+        {% else %}
+          <p class="field-hint">字段与记录未发现异常。</p>
+        {% endif %}
+        {% if r.report.columns %}
+        <p class="field-hint">识别到的字段：{% for raw, std in r.report.columns.items() %}{{ raw }}→{{ std }}{% if not loop.last %}、{% endif %}{% endfor %}</p>
+        {% endif %}
       </div>
+    </details>
+    {% endfor %}
+  </section>
+  {% endif %}
 
-      <div class="upload-row" style="margin-top:14px">
-        <label for="kind-input">这批数据算什么 <em class="req-mark">决定进不进预警</em></label>
-        <select id="kind-input" name="kind">
-          <option value="auto" selected>自动判定 — 收尾在近 30 天内算当期观测</option>
-          <option value="recent">当期观测 — 现在就盯这段，进预警和农事建议</option>
-          <option value="annual">年度数据集 — 留档回看，只进分析预测</option>
-        </select>
-        <span class="field-hint">演示时传 5 月真实观测，选「当期观测」即可按灌浆期口径判干热风。</span>
-      </div>
+  <div class="upload-layout">
+    <aside class="up-spec">
+      <h3>字段与校验口径</h3>
+      <dl class="up-spec-list">
+        <div><dt>必需字段</dt><dd>日期（或年份 + 日序）、最高温、最低温、平均温、日降水量</dd></div>
+        <div><dt>选填字段</dt><dd>2m 风速、相对湿度、地表短波辐射、露点温度；缺辐射时辐射卡不出图，其余照常</dd></div>
+        <div><dt>多县上传</dt><dd>一次可选多个文件，文件名写成「县区_年份.csv」即可自动分县；县名认不出来会单独提示，不整批作废</dd></div>
+        <div><dt>自动分类</dt><dd>收尾日期在近 30 天内且跨度不长 → 当期观测（进预警）；否则 → 年度数据集（进分析预测）</dd></div>
+        <div><dt>模板下载</dt><dd><a class="spec-link" href="{{ url_for('upload_template') }}">下载逐日气象模板（CSV）</a></dd></div>
+      </dl>
+    </aside>
 
-      <label class="upload-rule" style="margin-top:10px">
-        <input type="checkbox" name="save" value="1" checked>
-        保存进数据清单（默认勾选）
-      </label>
-      <span class="field-hint">勾上：通过校验就存下来，全站都能读到，之后可在数据清单里停用或删除。取消：只做一次性校验，不留档。</span>
+    <div class="upload-card">
+      <form id="upload-form" method="post" enctype="multipart/form-data">
+        <label class="dropzone" id="dropzone" for="file-input" data-max-size="{{ max_size }}">
+          <span class="drop-icon">{{ icon('upload') }}</span>
+          <span class="drop-title">拖气象数据到这里</span>
+          <span class="drop-hint" id="drop-hint">或点击选择文件 · 可一次选多份 · CSV / Excel · 单份不超过 {{ max_size }} MB</span>
+          <input id="file-input" type="file" name="file" accept=".csv,.xlsx,.xls" multiple required>
+          <span class="drop-file" id="drop-file">尚未选择文件</span>
+        </label>
 
-      <button class="btn btn-primary" type="submit" style="margin-top:14px;width:100%">上传并校验</button>
-    </form>
+        <div class="upload-row">
+          <label for="county-input">所属县区 <em class="req-mark">单份时必填</em></label>
+          <input type="search" id="county-filter" class="county-filter"
+                 placeholder="输入关键字筛选，如 内黄 / 安阳" autocomplete="off">
+          <select id="county-input" name="county">
+            <option value="">不指定 — 按文件名识别（一次传多份时用这个）</option>
+            {% if county_groups %}
+            {% for city, items in county_groups.items() %}
+            <optgroup label="{{ city }}">
+              {% for c in items.values() %}<option value="{{ c }}"{% if form_county and c == form_county %} selected{% endif %}>{{ c }}</option>{% endfor %}
+            </optgroup>
+            {% endfor %}
+            {% endif %}
+          </select>
+          <span class="field-hint">只传一份时在这里指定县区；传多份时留空，按文件名认县。</span>
+        </div>
+
+        <div class="upload-row" style="margin-top:14px">
+          <label for="kind-input">这批数据算什么 <em class="req-mark">决定进不进预警</em></label>
+          <select id="kind-input" name="kind">
+            <option value="auto" selected>自动判定 — 收尾在近 30 天内算当期观测</option>
+            <option value="recent">当期观测 — 现在就盯这段，进预警和农事建议</option>
+            <option value="annual">年度数据集 — 留档回看，只进分析预测</option>
+          </select>
+          <span class="field-hint">演示时传 5 月真实观测，选「当期观测」即可按灌浆期口径判干热风。</span>
+        </div>
+
+        <label class="upload-rule" style="margin-top:10px">
+          <input type="checkbox" name="save" value="1" checked>
+          保存进数据清单（默认勾选）
+        </label>
+        <span class="field-hint">勾上：通过校验就存下来，全站都能读到，之后可在数据清单里停用或删除。取消：只做一次性校验，不留档。</span>
+
+        <button class="btn btn-primary" type="submit" style="margin-top:14px;width:100%">上传并校验</button>
+      </form>
+    </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
