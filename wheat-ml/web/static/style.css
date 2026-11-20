@@ -2122,3 +2122,13 @@ td .status-pill{margin-top:0}
   border-radius:999px;font-size:12px;color:var(--ink-700);cursor:pointer;background:var(--paper)}
 .filter-chip input{accent-color:var(--forest-700);width:14px;height:14px}
 .filter-note{font-size:12px;color:#8a8880}
+
+
+/* 农事建议页的产量参照条 */
+.yield-strip{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;
+  border:1px solid var(--line);border-left:3px solid var(--wheat-500);
+  border-radius:12px;background:var(--paper)}
+.yield-strip-tag{flex:none;padding:2px 8px;border-radius:999px;
+  background:var(--rice-50);color:var(--forest-700);font-size:12px;white-space:nowrap}
+.yield-strip p{margin:0;font-size:13px;line-height:1.75;color:var(--ink-700)}
+@media(max-width:640px){.yield-strip{flex-direction:column;gap:8px}}

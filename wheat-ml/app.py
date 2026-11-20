@@ -397,14 +397,14 @@ def batch_predict(feat: pd.DataFrame, bundle, mean_yield) -> list:
         p_rf = rf.predict(X)
         p_lgbm = lgbm.predict(X) if lgbm is not None else p_rf
         p_lr = lr.predict(X) if lr is not None else p_rf
-        fused = 0.2 * p_rf + 0.6 * p_lgbm + 0.2 * p_lr
         vals = [v["mean_yield"] for v in stats.values()] if stats else []
         global_mean = float(np.median(vals)) if vals else mean_yield
         out = []
         for i, (_, r) in enumerate(feat.iterrows()):
             cy = r["county"]
             m = county_prior_of(stats, cy, global_mean)
-            out.append(float(fused[i]) * m)
+            # 与 /predict 同序：各模型先还原成单产再加权，避免'先加权再还原'带来的末位偏差
+            out.append(0.2 * float(p_rf[i]) * m + 0.6 * float(p_lgbm[i]) * m + 0.2 * float(p_lr[i]) * m)
         return out
     except Exception:
         return [None] * len(feat)
@@ -2516,9 +2516,36 @@ def advice():
     is_history = (bool(year) and year <= builtin_max and not has_stage)
     upload_needed = (not stages_complete) and (not is_history)
 
+    # 产量参照：直接按 /predict 同一套单行算法算，保证两页数值一字不差
+    # （清单页的批量预测与单行预测在浮点末位会差 0.1，不能拿来当参照）
+    pred_ref, thr_ref = None, None
+    if year in BASE_YEARS:
+        try:
+            _bundle = load_models()
+            if _bundle:
+                _rf, _lr, _lgbm, _stats = _bundle
+                _mean, _ = county_mean_yield(_stats, county)
+                _feats = predict_years(data, county)
+                if "county_prior" in FEATS:
+                    _feats["county_prior"] = _mean
+                _row = _feats[_feats["year"] == year]
+                if not _row.empty:
+                    _X = _row[FEATS].fillna(_feats[FEATS].median(numeric_only=True))
+                    _prf = float(_rf.predict(_X)[0]) * _mean
+                    _plg = (float(_lgbm.predict(_X)[0]) * _mean
+                            if _lgbm is not None else _prf)
+                    _plr = (float(_lr.predict(_X)[0]) * _mean
+                            if _lr is not None else _prf)
+                    _pred = 0.2 * _prf + 0.6 * _plg + 0.2 * _plr
+                    pred_ref = round(_pred, 1)
+                    thr_ref = round(_mean * CONFIG["alert"]["default_ratio"], 1)
+        except Exception:
+            pred_ref, thr_ref = None, None
+
     if has_stage:
         # 本期观测优先：按累积的当阶段气象出建议
         result = generate_advice(stage_df, county, year,
+                                 predicted_yield=pred_ref, threshold=thr_ref,
                                  dry_ref=dry_hot_reference(county),
                                  frost_ref=frost_reference(county, year))
         result["alert"] = False
@@ -2531,6 +2558,7 @@ def advice():
     else:
         # 历史年：内置全年数据
         result = generate_advice(data, county, year,
+                                 predicted_yield=pred_ref, threshold=thr_ref,
                                  dry_ref=dry_hot_reference(county),
                                  frost_ref=frost_reference(county, year))
         result["alert"] = False
@@ -2541,7 +2569,7 @@ def advice():
     return render_template("advice.html", title="农事建议", active="advice",
                            counties=counties, city_groups=scope_city_groups(scope),
                            county=county, years=years, year=year,
-                           threshold=0, result=result, error=None, source=source,
+                           threshold=thr_ref or 0, result=result, error=None, source=source,
                            counts=counts, staged_days=staged_days,
                            upload_needed=upload_needed,
                            stages_complete=stages_complete,

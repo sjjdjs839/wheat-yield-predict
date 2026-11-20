@@ -167,6 +167,15 @@
   </div>
   {% endif %}
 
+  {% if result.get('yield_note') %}
+  <section class="block-lg advice-yield">
+    <div class="yield-strip">
+      <span class="yield-strip-tag">产量参照</span>
+      <p>{{ result.yield_note }}</p>
+    </div>
+  </section>
+  {% endif %}
+
   {% if result.top_actions %}
   <section class="block-lg">
     <div class="block-head" data-reveal>
