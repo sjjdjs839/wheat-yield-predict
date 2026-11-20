@@ -45,7 +45,7 @@ python run.py                        # 加 --no-browser 则不弹浏览器
 ### 换电脑为什么能直接跑
 
 仓库里已提交原始气象 CSV（`data/raw`，41 MB）与特征表、县单产基准、指标报告；
-`weather_clean.csv`（72 MB）与模型 `.joblib`（18 MB）是可重建产物，**不随仓库提交**，
+`weather_clean.csv`（72 MB）与模型 `.joblib`（18 MB）是可重建产物，因此在 git 仓库里不提交；**交付用的代码包 zip 内已包含这两项，解压即可直接运行**，
 由启动脚本在首次运行时自动生成。因此：
 
 - 有 MySQL：走库表（更快，`python -m scripts.init_database` 可导入）
