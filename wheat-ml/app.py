@@ -1125,6 +1125,7 @@ def analysis():
                            county=county, years=years, year=year,
                            month_from=month_from, month_to=month_to,
                            charts=result["charts"], evaluation=result["evaluation"],
+                           obs_compare=result.get("obs_compare"),
                            stage_windows=result.get("stage_windows"),
                            source=meta["source"], error=error)
 

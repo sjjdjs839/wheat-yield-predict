@@ -24,6 +24,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 with open(PROJECT_ROOT / "config" / "config.yaml", "r", encoding="utf-8") as f:
     CONFIG = yaml.safe_load(f)
 
+# 一年至少要有这么多天观测，才按「整年」参与年度对比。
+# 上传的当期观测常有十几天到几十天，够算窗口统计，不够算年降水量与全年高温日。
+FULL_YEAR_MIN_DAYS = 330
+
 COLORS = {"tmax": "#e53935", "tmin": "#1e88e5", "tmean": "#43a047",
           "precip": "#29b6f6", "wind": "#8e24aa", "radiation": "#fb8c00",
           "dew": "#00acc1", "rh": "#6d4c41"}
@@ -186,7 +190,12 @@ def chart_month_compare(df: pd.DataFrame, year: int | None) -> dict:
 
 
 def annual_summary(df: pd.DataFrame) -> pd.DataFrame:
-    """分年气象统计表（综合评估基础）"""
+    """分年气象统计表（综合评估基础）
+
+    末尾两列是元信息，不是气候指标：观测天数、覆盖月份。
+    上传的当期观测往往只有十几天，若照公式硬算，年降水量会是"十几天的累计"、
+    全年高温日会是"十几天里的高温日"，跟完整年并列毫无可比性，下游要先看这两列。
+    """
     g = df.groupby("year")
     out = pd.DataFrame({
         "平均气温": g["t2m"].mean().round(2),
@@ -197,7 +206,14 @@ def annual_summary(df: pd.DataFrame) -> pd.DataFrame:
         "平均辐射": g["radiation"].mean().round(2) if "radiation" in df else np.nan,
         "高温日数": g["t2m_max"].apply(lambda s: int((s >= 35).sum())),
         "霜冻日数": g["t2m_min"].apply(lambda s: int((s < 0).sum())),
+        "观测天数": g.size().astype(int),
     })
+    if "date" in df.columns:
+        out["覆盖月份"] = g["date"].apply(
+            lambda s: int(pd.to_datetime(s, errors="coerce").dt.month.nunique())
+        )
+    else:
+        out["覆盖月份"] = np.nan
     return out.reset_index()
 
 
@@ -233,11 +249,26 @@ def evaluate_period(df: pd.DataFrame, year: int | None) -> dict:
     """
     s = annual_summary(df)
     if s.empty:
-        return {"year": year, "text": "数据不足以做年度评估。", "rows": []}
+        return {"year": year, "text": "数据不足以做年度评估。", "rows": [],
+                "partial": False, "days": None, "span": ""}
 
-    multi = s.drop(columns=["year"]).mean()
+    meta_cols = [c for c in ("观测天数", "覆盖月份") if c in s.columns]
+    multi = s.drop(columns=["year"] + meta_cols).mean()
     target = year if year and year in set(s["year"]) else int(s["year"].iloc[-1])
     cur = s[s["year"] == target].iloc[0]
+
+    # 观测不足一整年时，"年降水量""全年高温日"不成立，不能拿去做年尺度对比
+    obs_days = None
+    if "观测天数" in s.columns and pd.notna(cur["观测天数"]):
+        obs_days = int(cur["观测天数"])
+    partial = bool(obs_days is not None and obs_days < FULL_YEAR_MIN_DAYS)
+
+    span = ""
+    if partial and "date" in df.columns:
+        dt = pd.to_datetime(df["date"], errors="coerce")
+        dt = dt[dt.dt.year == target].dropna()
+        if len(dt):
+            span = f"{dt.min():%m-%d} ~ {dt.max():%m-%d}"
 
     def judge(name, better_high):
         c, m = float(cur[name]), float(multi[name])
@@ -253,6 +284,15 @@ def evaluate_period(df: pd.DataFrame, year: int | None) -> dict:
             word = f"低于常年 {abs(diff):.0f}%"
         return f"{name} {fmt.format(c)}（{word}）"
 
+    if partial:
+        # 十几天的观测算不出年降水量，硬比只会得出"降水偏少 96%"这种假结论
+        text = (f"{target} 年只有 {obs_days} 天观测（{span or '当月'}），"
+                f"年尺度指标不成立，不能与常年全年值比较；"
+                f"这 {obs_days} 天的冷暖与降水偏差见上方「当期观测对照」。")
+        return {"year": target, "text": text,
+                "rows": s.round(2).to_dict("records"),
+                "partial": True, "days": obs_days, "span": span}
+
     text = (f"{target} 年：{judge('平均气温', True)}；{judge('年降水量', True)}；"
             f"{judge('高温日数', False)}；{judge('霜冻日数', False)}。")
     if cur["年降水量"] < multi["年降水量"] * 0.8:
@@ -263,7 +303,8 @@ def evaluate_period(df: pd.DataFrame, year: int | None) -> dict:
         text += " 霜冻日数偏多，返青拔节期需防低温冷害。"
 
     return {"year": target, "text": text,
-            "rows": s.round(2).to_dict("records")}
+            "rows": s.round(2).to_dict("records"),
+            "partial": False, "days": obs_days, "span": span}
 
 
 def build_all(df: pd.DataFrame, year: int | None = None,

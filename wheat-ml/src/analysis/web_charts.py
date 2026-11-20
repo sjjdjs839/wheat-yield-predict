@@ -9,7 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from .weather_charts import _sub, annual_summary, evaluate_period
+from .weather_charts import (FULL_YEAR_MIN_DAYS, _sub, annual_summary,
+                              evaluate_period)
 
 COLORS = {
     "tmax": "#A65B3A",
@@ -240,10 +241,22 @@ def month_compare_chart(df, year=None):
     precip = build("precip", "sum")
     if not temp and not precip:
         return _empty("年月对比")
+    # 部分年只有几个月的数据，曲线在那里断开；不写清楚会被读成"其余月份为零"
+    thin_years = []
+    for y in years:
+        rows_n = int((df["year"] == y).sum())
+        if rows_n < FULL_YEAR_MIN_DAYS:
+            thin_years.append((y, rows_n))
+
+    desc = f"同月跨年对比，突出显示 {highlight} 年；其余年份为浅绿。"
+    if thin_years:
+        detail = "、".join(f"{y} 年（仅 {n} 天）" for y, n in thin_years)
+        desc += f" {detail}属当期观测，曲线只画到已观测的月份，断口处不代表其余月份为零。"
+
     return {
         "kind": "monthCompare",
         "title": "年月对比",
-        "desc": f"同月跨年对比，突出显示 {highlight} 年；其余年份为浅绿。",
+        "desc": desc,
         "payload": {
             "labels": labels,
             "temp": {"unit": "℃", "datasets": temp},
@@ -258,8 +271,17 @@ def annual_overview_chart(df, year=None):
         return _empty("综合评估", "需要至少两个年份的数据才能做年度对比。")
 
     summary = annual_summary(df)
+    # 年度指标只对完整年成立：十几天算出来的"年降水量""全年高温日"不是小一点，是量纲不对
+    partial_years = []
+    if "观测天数" in summary.columns:
+        partial_rows = summary[summary["观测天数"] < FULL_YEAR_MIN_DAYS]
+        partial_years = [(int(r["year"]), int(r["观测天数"])) for _, r in partial_rows.iterrows()]
+        summary = summary[summary["观测天数"] >= FULL_YEAR_MIN_DAYS]
+    if len(summary) < 2:
+        return _empty("综合评估", "完整年份不足两年，无法做年度对比；当期观测请看上方「当期观测对照」。")
+
     years = [int(y) for y in summary["year"]]
-    highlight = int(year) if year in years else years[-1]
+    highlight = int(year) if int(year) in years else years[-1]
     panels = []
     for name, unit, digits in [
         ("平均气温", "℃", 1),
@@ -279,28 +301,43 @@ def annual_overview_chart(df, year=None):
         })
     if not panels:
         return _empty("综合评估")
+    desc = f"年度指标与多年平均对比，绿色为 {highlight} 年；虚线为完整年的多年平均。"
+    if partial_years:
+        detail = "、".join(f"{y} 年（仅 {n} 天）" for y, n in partial_years)
+        desc += f" {detail}不足一整年，年度指标不成立，未进本图。"
+
     return {
         "kind": "panelBars",
         "title": "综合评估",
-        "desc": f"年度指标与多年平均对比，绿色为 {highlight} 年。",
+        "desc": desc,
         "payload": {"panels": panels, "highlight": highlight},
     }
+
+
+# 只有完整年才成立的指标：观测天数不够时这些数是窗口累计/窗口计数，不是全年值
+ANNUAL_ONLY_KEYS = ("年降水量", "高温日数", "霜冻日数")
 
 
 def _evaluation(df, year):
     result = evaluate_period(df, year)
     rows = []
     for row in result.get("rows", []):
+        days = row.get("观测天数")
+        partial_row = bool(days is not None and pd.notna(days) and int(days) < FULL_YEAR_MIN_DAYS)
         clean = {}
         for key, value in row.items():
             if key == "year":
                 clean[key] = int(value)
+            elif partial_row and key in ANNUAL_ONLY_KEYS:
+                clean[key] = None          # 十几天算不出年降水量，留空比填假数好
             elif isinstance(value, (int, float, np.integer, np.floating)):
                 clean[key] = _num(value, 2)
             else:
                 clean[key] = value
         rows.append(clean)
-    return {"year": result.get("year"), "text": result.get("text", ""), "rows": rows}
+    return {"year": result.get("year"), "text": result.get("text", ""), "rows": rows,
+            "partial": bool(result.get("partial")), "days": result.get("days"),
+            "span": result.get("span", "")}
 
 
 # ---- 生育期灾害窗口 ----
@@ -444,6 +481,117 @@ def stage_windows(df, year=None):
     }
 
 
+
+def obs_compare(df, year=None):
+    """当期观测窗口 vs 该县常年同期。
+
+    十几天算不出「年降水量」，但能回答「这十几天比常年同期暖多少、雨少多少」。
+    短期观测撑得住的结论就在这一层，年尺度结论交给上面的完整年。
+    基准取该县其他年份落在同一月日区间（同一窗口）的逐年值再平均，
+    不是全年均值——否则四月的数据会被拿去跟全年降水比，必然"偏少九成"。
+    """
+    if df is None or len(df) == 0 or "date" not in df.columns:
+        return None
+    d = df.copy()
+    d["date"] = pd.to_datetime(d["date"], errors="coerce")
+    d = d.dropna(subset=["date"])
+    if d.empty:
+        return None
+
+    yr = int(year) if year is not None else int(d["date"].dt.year.max())
+    cur = d[d["date"].dt.year == yr]
+    if cur.empty:
+        return None
+    # 整年数据不走这里，年尺度看「综合评估」
+    if len(cur) >= FULL_YEAR_MIN_DAYS:
+        return None
+
+    start, end = cur["date"].min(), cur["date"].max()
+    smd, emd = f"{start:%m-%d}", f"{end:%m-%d}"
+    days = int(len(cur))
+
+    base = d[d["date"].dt.year != yr].copy()
+    if base.empty:
+        return None
+    base["md"] = base["date"].dt.strftime("%m-%d")
+    base = base[(base["md"] >= smd) & (base["md"] <= emd)]
+    if base.empty:
+        return None
+
+    def one(frame):
+        has = lambda c: c in frame.columns
+        return {
+            "tavg": float(frame["t2m"].mean()) if has("t2m") and len(frame) else None,
+            "tmin": float(frame["t2m_min"].min()) if has("t2m_min") and len(frame) else None,
+            "tmax": float(frame["t2m_max"].max()) if has("t2m_max") and len(frame) else None,
+            "precip": float(frame["precip"].sum()) if has("precip") and len(frame) else None,
+            "cold": int((frame["t2m_min"] <= 0).sum()) if has("t2m_min") else 0,
+            "hot": int(((frame["t2m_max"] >= 35) & (frame["rh"] <= 40)).sum())
+                   if has("t2m_max") and has("rh") else 0,
+        }
+
+    c = one(cur)
+    per_year = [one(g) for _, g in base.groupby(base["date"].dt.year)]
+
+    def avg(key):
+        vals = [v[key] for v in per_year if v[key] is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    rows = []
+
+    def add_row(label, cur_val, base_val, unit, digits=1):
+        if cur_val is None or base_val is None:
+            return
+        rows.append({
+            "name": label,
+            "cur": f"{cur_val:.{digits}f}",
+            "base": f"{base_val:.{digits}f}",
+            "unit": unit,
+            "diff": f"{cur_val - base_val:+.{digits}f}",
+            "tone": "down" if cur_val < base_val else ("up" if cur_val > base_val else "same"),
+        })
+
+    add_row("窗口平均气温", c["tavg"], avg("tavg"), "℃")
+    add_row("窗口最低温", c["tmin"], avg("tmin"), "℃")
+    add_row("窗口累计降水", c["precip"], avg("precip"), "mm")
+    add_row("窗口内 ≤0℃ 天数", float(c["cold"]), avg("cold"), "天", 0)
+    add_row("窗口内干热风天数", float(c["hot"]), avg("hot"), "天", 0)
+
+    if not rows:
+        return None
+
+    # 一句人话结论：只说窗口内成立的事，不外推到全年
+    bits = []
+    t_cur, t_base = c["tavg"], avg("tavg")
+    if t_cur is not None and t_base is not None:
+        d_t = t_cur - t_base
+        if abs(d_t) >= 0.5:
+            bits.append(f"均温{'偏暖' if d_t > 0 else '偏冷'} {abs(d_t):.1f}℃")
+    p_cur, p_base = c["precip"], avg("precip")
+    if p_cur is not None and p_base is not None and p_base > 0:
+        ratio = (p_cur - p_base) / p_base * 100
+        if abs(ratio) >= 10:
+            bits.append(f"降水{'偏多' if ratio > 0 else '偏少'}{abs(ratio):.0f}%")
+    if c["cold"] > 0:
+        bits.append(f"出现 ≤0℃ 低温 {c['cold']} 天")
+    if c["hot"] > 0:
+        bits.append(f"干热风 {c['hot']} 天")
+
+    verdict = "；".join(bits) if bits else "各项与常年同期接近，窗口内无异常信号"
+
+    return {
+        "kind": "obsCompare",
+        "title": "当期观测对照",
+        "desc": f"{yr} 年只有 {days} 天观测（{start:%m-%d} ~ {end:%m-%d}），算不出年度指标，改与常年同期比。",
+        "year": yr,
+        "days": days,
+        "window": f"{start:%m-%d} ~ {end:%m-%d}",
+        "rows": rows,
+        "verdict": verdict,
+        "note": f"基准＝该县其他年份落在 {smd} ~ {emd} 同一区间的逐年值再平均（逐年相同权重），不是全年均值。",
+    }
+
+
 def build_web(df, year=None, month_from=None, month_to=None):
     """分析页一次性构建全部图表数据"""
     return {
@@ -457,6 +605,7 @@ def build_web(df, year=None, month_from=None, month_to=None):
             annual_overview_chart(df, year),
         ],
         "evaluation": _evaluation(df, year),
+        "obs_compare": obs_compare(df, year),
         "stage_windows": stage_windows(df, year),
         "years": sorted(int(y) for y in df["year"].dropna().unique()) if "year" in df else [],
     }

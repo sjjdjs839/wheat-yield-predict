@@ -51,7 +51,14 @@
   {% if evaluation %}
   {% set current = evaluation.rows|selectattr('year', 'equalto', evaluation.year)|list %}
   <section class="kpi-strip" data-reveal>
-    {% if current %}
+    {% if evaluation.partial and obs_compare %}
+    {# 十几天算不出年降水量，这里换成窗口指标，避免出现"年降水量 12mm"这种假数 #}
+    <dl class="kpi-strip-grid">
+      {% for r in obs_compare.rows[:4] %}
+      <div><dt>{{ r.name }}</dt><dd>{{ r.cur }}<span>{{ r.unit }}</span></dd></div>
+      {% endfor %}
+    </dl>
+    {% elif current %}
     <dl class="kpi-strip-grid">
       <div><dt>平均气温</dt><dd>{{ current[0]['平均气温'] }}<span>℃</span></dd></div>
       <div><dt>年降水量</dt><dd>{{ current[0]['年降水量'] }}<span>mm</span></dd></div>
@@ -60,9 +67,9 @@
     </dl>
     {% endif %}
     <div class="kpi-strip-bar">
-      <span class="kpi-strip-year">{{ evaluation.year }} 年</span>
+      <span class="kpi-strip-year">{{ evaluation.year }} 年{% if evaluation.partial %} · 仅 {{ evaluation.days }} 天观测{% endif %}</span>
       <details class="kpi-strip-more">
-        <summary>综合评估（相对 15 年同期）</summary>
+        <summary>{% if evaluation.partial %}窗口对照（相对常年同期）{% else %}综合评估（相对 15 年同期）{% endif %}</summary>
         <p>{{ evaluation.text }}</p>
       </details>
       {% if evaluation.rows %}<a class="kpi-strip-link" href="#year-detail">{{ evaluation.rows|length }} 年明细 {{ icon("arrow") }}</a>{% endif %}
@@ -92,10 +99,46 @@
           </tbody>
         </table>
       </div>
-      <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+      <p class="table-hint">观测天数不足 {{ 330 }} 天的年份，年降水量与全年高温日/霜冻日不成立，表中留空；平均气温为该年已观测日期的均值。表格较宽，移动端可左右滑动查看。</p>
     </div>
   </details>
   {% endif %}
+  {% endif %}
+
+  {% if obs_compare %}
+  <section class="block stg-block" data-reveal>
+    <div class="block-head">
+      <div>
+        <h2>{{ obs_compare.title }}</h2>
+        <p class="block-sub">{{ obs_compare.desc }}</p>
+      </div>
+      <span class="stg-year">{{ obs_compare.year }} 年 · {{ obs_compare.window }}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="stg-table">
+        <thead>
+          <tr>
+            <th>指标</th>
+            <th>本期（{{ obs_compare.window }}）</th>
+            <th>常年同期</th>
+            <th>偏差</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in obs_compare.rows %}
+          <tr>
+            <td><b>{{ r.name }}</b></td>
+            <td>{{ r.cur }} {{ r.unit }}</td>
+            <td>{{ r.base }} {{ r.unit }}</td>
+            <td class="mono">{{ r.diff }} {{ r.unit }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="stg-summary"><span class="stg-tag">结论</span>{{ obs_compare.verdict }}</p>
+    <p class="chart-note">{{ obs_compare.note }}</p>
+  </section>
   {% endif %}
 
   {% if stage_windows %}
