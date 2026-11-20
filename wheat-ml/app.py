@@ -1611,6 +1611,9 @@ def api_send_log():
     log = load_send_log()
     key = send_key(year, county)
     if action == "mark":
+        # 已记过就保留第一次的时间：重复点复制不该把'什么时候发出去的'刷成现在
+        if key in log:
+            return jsonify({"ok": True, "sent": log[key], "existing": True})
         log[key] = {"at": datetime.now().strftime("%Y-%m-%d %H:%M"), "to": "县农技站"}
     elif action == "unmark":
         log.pop(key, None)

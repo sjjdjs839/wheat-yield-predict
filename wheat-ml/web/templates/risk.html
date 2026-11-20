@@ -159,6 +159,10 @@
     <button class="btn btn-primary" type="submit">应用筛选</button>
     <a class="filter-reset" href="{{ url_for('risk') }}">重置</a>
   </form>
+  <div class="risk-filter-row">
+    <label class="filter-chip"><input type="checkbox" id="rk-only-pending"> 只看待通知</label>
+    <span class="filter-note">只保留已触发预警、但还没标记发出去的县区</span>
+  </div>
   <p class="filter-hint">清单按晚霜冻等级、预估影响降序排列，仅覆盖有产量基准的 {{ summary.count }} 个县区；预估影响为距平折算，用于排序与研判，不替代实地灾情核定。</p>
 
   <section class="block-lg">

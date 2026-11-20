@@ -939,6 +939,8 @@
           td.innerHTML = markBtn('mark');
           bumpSent(-1);
         }
+        var tb = document.getElementById('rk-main');
+        if (tb && tb.__refreshFilter) tb.__refreshFilter();
       }).catch(function () {
         btn.disabled = false;
         btn.textContent = '记录失败，重试';
@@ -1004,13 +1006,19 @@
       var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-county]'));
       var countEl = document.getElementById('rk-count');
       var emptyEl = document.getElementById('rk-no-match');
+      var pendingBox = document.getElementById('rk-only-pending');
 
       function apply() {
         var q = (box.value || '').trim().toLowerCase();
+        var onlyPending = !!(pendingBox && pendingBox.checked);
         var shown = 0;
         rows.forEach(function (tr) {
           var hay = ((tr.dataset.county || '') + ' ' + (tr.dataset.city || '')).toLowerCase();
           var hit = !q || hay.indexOf(q) >= 0;
+          if (hit && onlyPending) {
+            var cell = tr.querySelector('td.rk-send');
+            hit = !!(cell && cell.querySelector('button[data-action=mark]'));
+          }
           tr.style.display = hit ? '' : 'none';
           if (hit) shown++;
         });
@@ -1022,6 +1030,8 @@
       box.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); apply(); }
       });
+      if (pendingBox) pendingBox.addEventListener('change', apply);
+      table.__refreshFilter = apply;
       apply();
     });
   }
