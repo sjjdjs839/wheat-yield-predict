@@ -24,7 +24,7 @@
           {% for r in warnings.rows %}
           <tr>
             <td><b>{{ r.county }}</b><div class="field-hint">{{ r.stage_name }}</div></td>
-            <td class="mono nowrap">{{ r.window|replace(' — ', '~') }}<div class="field-hint">{{ r.days }} 天</div></td>
+            <td class="mono nowrap">{{ r.window|replace(' — ', '~') }}<div class="field-hint">{{ r.days }} 天</div>{% if r.stale %}<div class="field-hint" style="color:var(--alert-600)">回放 · 距今 {{ r.gap }} 天</div>{% endif %}</td>
             <td>
               {% if r.hits %}
                 {% for h in r.hits %}<span class="tag{{ ' tag-hot' if h.level >= 2 }}">{{ h.name }} {{ h.days }} 天</span> {% endfor %}
@@ -60,7 +60,7 @@
     {% else %}
     <div class="stage-empty">
       <p>这一块只吃当期观测。现在传的是年度数据集，属于回看，不构成今天的险情。</p>
-      <p>要让它动起来：<a class="spec-link" href="{{ url_for('upload') }}">传一份最近十几天的逐日气象</a>，收尾日期在近 30 天内，系统会把它标成当期观测。</p>
+      <p>要让它动起来：<a class="spec-link" href="{{ url_for('upload') }}">传一份一段时间的逐日气象</a>（半个月到三个月都行，跨度不超过 100 天），系统会把它标成当期观测。数据不是最近几天的也没关系，表格里会标「回放 · 距今 N 天」。</p>
     </div>
     {% endif %}
   </section>

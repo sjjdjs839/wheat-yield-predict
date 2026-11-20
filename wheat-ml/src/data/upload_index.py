@@ -56,8 +56,10 @@ def classify(start: date | None, end: date | None, today: date | None = None) ->
         return KIND_ANNUAL
     today = today or date.today()
     span = (end - start).days + 1
-    gap = (today - end).days
-    if gap <= RECENT_GAP_DAYS and span <= RECENT_SPAN_DAYS:
+    # 只看跨度：不超过 100 天的一段观测，本身就是「这段时间的天气」，归当期观测。
+    # 收尾离今天远不远，交给页面上的「回放」标记说明，不再拦在类型上——
+    # 赛前只能用历史时段回放，卡在这里会让人以为上传没生效。
+    if span <= RECENT_SPAN_DAYS:
         return KIND_RECENT
     return KIND_ANNUAL
 
