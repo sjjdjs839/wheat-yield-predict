@@ -19,6 +19,11 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+try:
+    from . import autofix
+except ImportError:                 # 以脚本方式直接运行时
+    import autofix
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 with open(PROJECT_ROOT / "config" / "config.yaml", "r", encoding="utf-8") as f:
     CONFIG = yaml.safe_load(f)
@@ -58,11 +63,8 @@ MISSING_TOKENS = {"", "na", "nan", "null", "none", "-999", "-9999", "999", "—"
 
 
 def _norm_col(col) -> str:
-    """列名归一化：去 BOM、全角括号转半角、去掉单位后缀、转小写"""
-    s = str(col).strip().replace("\ufeff", "").replace("（", "(").replace("）", ")")
-    s = re.sub(r"\([^)]*\)", "", s)          # 去掉 (℃) (mm) 等单位
-    s = re.sub(r"[℃%·\s]", "", s)
-    return s.lower()
+    """列名归一化：繁简、全角、括号单位一并处理，交给 autofix"""
+    return autofix.norm_col(col)
 
 
 def map_columns(raw_cols) -> tuple[dict, list]:
@@ -98,41 +100,39 @@ def _decode_text(raw: bytes) -> str:
     raise ValueError("无法识别文件编码，请另存为 UTF-8 编码的 CSV")
 
 
-def _read_csv(path: Path) -> pd.DataFrame:
-    """读取 CSV：自动跳 NASA POWER 注释头（前 N 行 + 第 N+1 行列名）"""
-    text = _decode_text(path.read_bytes())
-    lines = text.splitlines()
-    header_idx = 0
-    for i, line in enumerate(lines[:40]):
-        low = line.lower()
-        if ("year" in low and "doy" in low) or ("年份" in line and ("日" in line or "日序" in line)):
-            header_idx = i
-            break
-    return pd.read_csv(io.StringIO("\n".join(lines[header_idx:])))
+def _is_alias_cell(cell) -> bool:
+    """表头识别：这一格归一化后能不能落到某个标准字段上"""
+    n = _norm_col(cell)
+    if not n:
+        return False
+    for field, aliases in FIELD_ALIASES.items():
+        if n == _norm_col(field) or n in [_norm_col(a) for a in aliases]:
+            return True
+    return any(len(_norm_col(a)) >= 2 and _norm_col(a) in n
+               for aliases in FIELD_ALIASES.values() for a in aliases)
 
 
-def _read_excel(path: Path) -> pd.DataFrame:
-    return pd.read_excel(path, sheet_name=0)
+def load_raw(path: Path) -> tuple:
+    """读原始表，返回 (DataFrame, 修正说明)。
 
-
-def load_raw(path: Path) -> pd.DataFrame:
+    编码、分隔符、表头位置不对时自动纠正；认不出来的表不硬修，
+    交给后面的底线检查拒掉。
+    """
     ext = path.suffix.lower()
-    if ext == ".csv":
-        return _read_csv(path)
-    if ext in (".xlsx", ".xls"):
-        return _read_excel(path)
-    raise ValueError(f"不支持的文件类型: {ext}")
+    if ext not in UP["allowed_ext"]:
+        raise ValueError(f"不支持的文件类型: {ext}")
+    return autofix.read_table(path, is_alias=_is_alias_cell)
 
 
 def _to_numeric(series: pd.Series) -> pd.Series:
-    """字符串缺失标记 -> NaN，再转数值"""
-    if series.dtype == object:
-        s = series.astype(str).str.strip().str.lower()
-        series = series.where(~s.isin(MISSING_TOKENS))
-    return pd.to_numeric(series, errors="coerce")
+    """洗掉单位、负号、百分号、千分位再转数值。
+
+    原始表里「−1.8℃」「3.2 mm」「45%」很常见，直接 to_numeric 会让整列变空。
+    """
+    return autofix.clean_numeric(series)
 
 
-def _build_dates(df: pd.DataFrame, issues: list) -> pd.DataFrame:
+def _build_dates(df: pd.DataFrame, issues: list, fixes: list | None = None) -> pd.DataFrame:
     """
     统一「日」字段口径：
       - 有 date 列 -> 用完整日期
@@ -148,12 +148,20 @@ def _build_dates(df: pd.DataFrame, issues: list) -> pd.DataFrame:
         has_doy = False
 
     if has_date:
-        d = pd.to_datetime(df["date"], errors="coerce")
+        d, date_note = autofix.parse_dates(df["date"], df.get("year"))
         bad = int(d.isna().sum())
         if bad:
             issues.append({"level": "error", "field": "日期",
                            "title": f"{bad} 行日期无法解析",
-                           "detail": "需为 YYYY-MM-DD 格式。"})
+                           "detail": "已试过 YYYY-MM-DD、YYYY/M/D、YYYYMMDD、中文年月日、"
+                                     "Excel 序列号等写法仍认不出，请核对这一列。"})
+        if date_note:
+            if fixes is not None:
+                fixes.append("日期：" + date_note)
+            if not bad:
+                issues.append({"level": "info", "field": "日期",
+                               "title": "日期格式已自动统一",
+                               "detail": date_note})
         df["date"] = d
         if "year" in df.columns:
             mismatch = int((pd.to_numeric(df["year"], errors="coerce") != d.dt.year).sum())
@@ -355,9 +363,10 @@ def load_weather_file(path: str | Path, county: str | None = None,
     """
     path = Path(path)
     report = {"filename": path.name, "ok": True, "issues": [], "summary": {},
-              "columns": {}, "preview": []}
+              "columns": {}, "preview": [], "fixes": []}
 
-    raw = load_raw(path)
+    raw, read_notes = load_raw(path)
+    report["fixes"].extend(read_notes)
     mapping, unknown = map_columns(raw.columns)
     report["columns"] = {str(k): FIELD_CN.get(v, v) for k, v in mapping.items()}
     if unknown:
@@ -381,6 +390,11 @@ def load_weather_file(path: str | Path, county: str | None = None,
         if f in df.columns:
             df[f] = _to_numeric(df[f])
 
+    # 缺平均温、但有最高最低温时，按日均口径补齐；这不是编数，是标准换算
+    if "t2m" not in df.columns and {"t2m_max", "t2m_min"} <= set(df.columns):
+        df["t2m"] = (df["t2m_max"] + df["t2m_min"]) / 2
+        report["fixes"].append("缺平均温，已按（最高温 + 最低温）/ 2 补齐")
+
     missing_req = [FIELD_CN[f] for f in REQUIRED_FIELDS if f not in df.columns]
     if missing_req:
         report["ok"] = False
@@ -390,7 +404,7 @@ def load_weather_file(path: str | Path, county: str | None = None,
             "detail": "方案表 2 要求至少包含年份、日、最高温、最低温、平均温、日降水量。",
         })
 
-    df = _build_dates(df, report["issues"])
+    df = _build_dates(df, report["issues"], report["fixes"])
     df = _check_constraints(df, report["issues"], stage_mode=stage_mode)
 
     # 县级标识：上传文件未带县名时用参数补齐
@@ -402,6 +416,16 @@ def load_weather_file(path: str | Path, county: str | None = None,
     df["month"] = df["date"].dt.month
     df["month_day"] = df["date"].dt.strftime("%m-%d")
     df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+
+    # 底线：修完之后先确认这确实是逐日气象数据，否则整份拒收
+    passed, reason = autofix.guard(df)
+    if not passed:
+        report["ok"] = False
+        report["issues"].insert(0, {
+            "level": "error", "field": "数据类型",
+            "title": "看起来不是逐日气象数据",
+            "detail": reason,
+        })
 
     # 0 行（只有表头）必须判不通过：否则会被用户设为「当前数据集」，
     # 首页取年份极值时抛 ValueError，整站 500

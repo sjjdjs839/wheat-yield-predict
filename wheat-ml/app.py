@@ -166,13 +166,32 @@ def uploaded_records() -> list:
     return val
 
 
-def guess_county(filename: str) -> str:
-    """从文件名里认县名；取最长命中，避免「安阳县」被「安阳」之类截断。"""
+def county_candidates(filename: str) -> list:
+    """文件名里可能对应的县区，按匹配长度排序。
+
+    完整县名优先；其次允许省略末尾的 县/区/市（写「内黄」也能对上「内黄县」）。
+    这里只给候选，不替用户做决定。
+    """
     stem = Path(filename).stem
     hits = [c for c in ALL_COUNTIES if c in stem]
-    if not hits:
-        return ""
-    return max(hits, key=len)
+    if hits:
+        return sorted(hits, key=len, reverse=True)
+
+    loose = []
+    for c in ALL_COUNTIES:
+        core = c[:-1] if c and c[-1] in "县区市" else c
+        if len(core) >= 2 and core in stem:
+            loose.append(c)
+    return sorted(loose, key=len, reverse=True)
+
+
+def guess_county(filename: str) -> str:
+    """从文件名里认县名，只在候选唯一时才采用。
+
+    「安阳」这种同时对应多个县区的写法宁可让用户自己选，也不猜。
+    """
+    found = county_candidates(filename)
+    return found[0] if len(found) == 1 else ""
 
 
 def uploaded_dataset() -> tuple[pd.DataFrame, dict] | None:
@@ -902,7 +921,17 @@ def upload():
                     results.append(item)
                     continue
                 if not county:
-                    item["error"] = "文件名里没有县区名，请先在下拉里选好再传"
+                    cands = county_candidates(f.filename)
+                    if len(cands) > 1:
+                        item["error"] = ("文件名能对上 %d 个县区（%s），请在下拉里选一个再传"
+                                         % (len(cands), "、".join(cands[:4])))
+                    elif cands:
+                        item["error"] = ("没认出这份属于哪个县区；文件名里有「%s」，"
+                                         "是这个县就改成「%s_年份.csv」，或在上面下拉里选中再传"
+                                         % (cands[0][:-1] or cands[0], cands[0]))
+                    else:
+                        item["error"] = ("没认出这份属于哪个县区；请在「所属县区」下拉里"
+                                         "选中后重新上传")
                     path.unlink(missing_ok=True)
                     results.append(item)
                     continue

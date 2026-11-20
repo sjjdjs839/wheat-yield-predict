@@ -80,6 +80,14 @@
         {% else %}
           <p class="field-hint">字段与记录未发现异常。</p>
         {% endif %}
+        {% if r.report.fixes %}
+        <div class="autofix-block">
+          <p class="autofix-title">已自动修正 {{ r.report.fixes|length }} 处</p>
+          {% for f in r.report.fixes %}
+          <p class="issue-line is-fix"><span class="autofix-dot"></span>{{ f }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
         {% if r.report.columns %}
         <p class="field-hint">识别到的字段：{% for raw, std in r.report.columns.items() %}{{ raw }}→{{ std }}{% if not loop.last %}、{% endif %}{% endfor %}</p>
         {% endif %}
@@ -96,6 +104,8 @@
         <div><dt>必需字段</dt><dd>日期（或年份 + 日序）、最高温、最低温、平均温、日降水量</dd></div>
         <div><dt>选填字段</dt><dd>2m 风速、相对湿度、地表短波辐射、露点温度；缺辐射时辐射卡不出图，其余照常</dd></div>
         <div><dt>多县上传</dt><dd>一次可选多个文件，文件名写成「县区_年份.csv」即可自动分县；县名认不出来会单独提示，不整批作废</dd></div>
+        <div><dt>格式自愈</dt><dd>编码、分隔符、表头前的标题行、列名里的单位、日期写法、数值上的 ℃ 和负号都会自动纠正；缺平均温按（最高温 + 最低温）/ 2 补齐。修过的地方会列在上传结果里</dd></div>
+        <div><dt>只收气象表</dt><dd>日期解析不出、温度读不成数字、或温度大面积超出 −45—50℃ 的表会整份拒收，不做硬修</dd></div>
         <div><dt>自动分类</dt><dd>收尾日期在近 30 天内且跨度不长 → 当期观测（进预警）；否则 → 年度数据集（进分析预测）</dd></div>
         <div><dt>模板下载</dt><dd><a class="spec-link" href="{{ url_for('upload_template') }}">下载逐日气象模板（CSV）</a></dd></div>
       </dl>
