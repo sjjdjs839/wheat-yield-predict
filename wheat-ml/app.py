@@ -487,6 +487,10 @@ FEATURE_NAMES = {
     "county_prior": "县域常年单产先验",
 }
 
+# 这两项不含任何气象信息，是"这个县今年本该产多少"的长期基线，
+# 单列在气象因子排序之外，避免与气象驱动因子混为一谈。
+BASELINE_FEATS = {"year_index", "county_prior"}
+
 
 def _load_shap_global() -> pd.DataFrame | None:
     p = REPORTS_DIR / "shap_importance.csv"
@@ -512,6 +516,7 @@ def feature_importance_items() -> list[dict]:
                 "value": round(float(r["pct"]), 2),
                 "mean_shap": round(float(r["mean_shap"]), 6),
                 "source": "shap",
+                "kind": "baseline" if feat in BASELINE_FEATS else "weather",
             })
         return sorted(items, key=lambda item: item["value"], reverse=True)
     # 回退：随机森林分裂增益重要性
@@ -521,6 +526,7 @@ def feature_importance_items() -> list[dict]:
             "name": FEATURE_NAMES.get(feat, feat),
             "value": round(float(importance) * 100, 2),
             "source": "gain",
+            "kind": "baseline" if feat in BASELINE_FEATS else "weather",
         })
     return sorted(items, key=lambda item: item["value"], reverse=True)
 
@@ -2141,14 +2147,18 @@ def predict():
             }
 
         feature_items = feature_importance_items()
-        if feature_items:
+        weather_items = [x for x in feature_items if x.get("kind") == "weather"]
+        baseline_items = [x for x in feature_items if x.get("kind") == "baseline"]
+        # 表格里气象项在前、基线项置底，避免第一眼看到"品种改良"误以为它是气象因子
+        feature_rows = [dict(x) for x in weather_items] + [dict(x) for x in baseline_items]
+        if weather_items:
             feature_chart = {
                 "kind": "hBar",
-                "title": "特征重要性",
-                "desc": "各因素对产量的平均影响大小；数值越高，影响越大。",
+                "title": "气象因子对单产的影响大小",
+                "desc": "只算气象类因子；长期基线另列，不参与本图排序。",
                 "payload": {
-                    "labels": [item["name"] for item in feature_items],
-                    "values": [item["value"] for item in feature_items],
+                    "labels": [item["name"] for item in weather_items],
+                    "values": [item["value"] for item in weather_items],
                     "unit": "%",
                 },
             }
@@ -2163,6 +2173,7 @@ def predict():
                            reliable=bool(mm and mm.get("reliable")),
                            result=result, history=history, trend_chart=trend_chart,
                            feature_chart=feature_chart, feature_count=len(FEATS),
+                           feature_rows=feature_rows, baseline_items=baseline_items,
                            zone_hint=county_zone_hint(county),
                            breakdown=county_year_breakdown(county, year),
                            error=error, source=data_meta["source"])

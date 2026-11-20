@@ -184,9 +184,9 @@
       {% endif %}
 
       <details class="more panel">
-        <summary>给评审：这个数怎么算出来的（技术细节）</summary>
+        <summary>这个数是怎么算出来的</summary>
         <div class="detail-body">
-          <dl class="stat-list">
+          <dl class="stat-list is-stacked">
             <div><dt>融合权重</dt><dd>LightGBM 60% · 随机森林 20% · 线性回归 20%</dd></div>
             <div><dt>本县本年各模型输出</dt><dd>{{ result.pred_rf }} / {{ result.pred_lgbm }} / {{ result.pred_lr }} kg/亩</dd></div>
             {% if metrics %}
@@ -342,23 +342,27 @@
         </div>
       </div>
       <div class="chart-body feature-tall"><canvas role="img" aria-label="气象因子对产量的影响程度"></canvas></div>
-      <p class="chart-note">数值表示各因素对收成的影响大小；年份趋势与生育期积温通常影响最大。</p>
+      <p class="chart-note">本图只排气象因子。品种改良趋势与县域常年单产先验属于长期基线，不含任何气象信息，不参与本图排序——它们回答的是「这个县今年本该产多少」，气象因子回答的是「今年比常年偏高还是偏低」。</p>
       <script type="application/json" class="chart-spec">{{ feature_chart|tojson }}</script>
     </article>
     <details class="more panel">
-      <summary>特征重要性数据表 · {{ feature_chart.payload.labels|length }} 项</summary>
+      <summary>全部 {{ feature_rows|length }} 项特征的贡献占比</summary>
       <div class="detail-body">
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>特征</th><th>重要性占比</th></tr></thead>
+          <table class="feat-table">
+            <thead><tr><th>特征</th><th>类别</th><th>占比</th></tr></thead>
             <tbody>
-              {% for label in feature_chart.payload.labels %}
-              <tr><td>{{ label }}</td><td>{{ feature_chart.payload.values[loop.index0] }}%</td></tr>
+              {% for row in feature_rows %}
+              <tr{% if row.kind == 'baseline' %} class="is-baseline"{% endif %}>
+                <td>{{ row.name }}</td>
+                <td>{% if row.kind == 'baseline' %}<span class="tag tag-base">长期基线</span>{% else %}<span class="tag tag-weather">气象</span>{% endif %}</td>
+                <td class="mono">{{ row.value }}%</td>
+              </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-        <p class="table-hint">表格较宽，移动端可左右滑动查看。</p>
+        <p class="table-hint">气象项按占比降序在前，长期基线置底。气象因子反映灾害与年景波动；基线（年份趋势、县域基准）只提供「本该产多少」的锚点，不作灾害归因。</p>
       </div>
     </details>
   </section>
