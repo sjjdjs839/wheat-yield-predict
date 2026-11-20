@@ -66,7 +66,7 @@ HTML = r"""<!DOCTYPE html>
 <div class="wrap">
   <header>
     <h1>小麦产量<span>情景模拟</span>（离线演示）</h1>
-    <div class="sub">37 个农业县 · 2010-2024 逐日气象 · 随机森林情景预测</div>
+    <div class="sub">110 个主产县 · 2010—2024 逐日气象 · 随机森林单模型情景预测（断网备用页：只走随机森林，与平台页面的三模型融合值有差异，正式口径以平台页面为准）</div>
   </header>
 
   <div class="grid">

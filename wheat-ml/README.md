@@ -184,7 +184,9 @@ wheat-ml/
 ## 离线大屏（附加）
 
 `output/dashboard/predict_dashboard.html` 为内嵌模型树的单文件页面，无需服务器与网络，
-双击即可进行情景模拟演示。
+双击即可进行情景模拟演示。它只走随机森林单模型（浏览器端遍历树），与平台页面的三模型融合值存在差异，
+是断网时的备用演示，正式口径以平台页面与说明书为准；模型更新后需重跑
+`python -m src.visualize.predict_dashboard` 重新生成。
 
 ## 参考案例
 
