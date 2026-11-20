@@ -871,8 +871,29 @@
         function done() {
           btn.textContent = '已复制';
           var tip = document.getElementById('copy-tip');
-          if (tip) { tip.hidden = false; setTimeout(function () { tip.hidden = true; }, 1800); }
+          if (tip) {
+            tip.textContent = '已复制到剪贴板';
+            tip.hidden = false;
+            setTimeout(function () { tip.hidden = true; }, 2200);
+          }
           setTimeout(function () { btn.textContent = label; }, 1800);
+          markSent();
+        }
+        function markSent() {
+          var y = btn.getAttribute('data-send-year');
+          var c = btn.getAttribute('data-send-county');
+          if (!y || !c) return;
+          fetch('/api/send-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ year: y, county: c, action: 'mark' }),
+          }).then(function (r) { return r.json(); }).then(function (res) {
+            if (!res || !res.ok || !res.sent) return;
+            var tip = document.getElementById('copy-tip');
+            if (tip) tip.textContent = '已复制，并记为已通知';
+            var rowTip = document.querySelector('.result-verdict');
+            if (rowTip && rowTip.dataset) rowTip.dataset.notified = '1';
+          }).catch(function () {});
         }
         function fallback() {
           var ta = document.createElement('textarea');

@@ -1687,6 +1687,7 @@ def export_risk():
     year = year_arg if year_arg in years else years[-1]
     snap = risk_snapshot(year)
     _frost_attach(snap["items"], year)
+    send_log = load_send_log()
 
     rows = [{
         "区县": x["county"],
@@ -1704,6 +1705,9 @@ def export_risk():
         "预警线(kg/亩)": x["threshold"],
         "产量预警": "触发" if x["alert"] else "未触发",
         "实测单产(kg/亩)": x["actual"] if x["actual"] is not None else "",
+        "通知状态": (f"已通知 {send_log[send_key(year, x['county'])]['at']}"
+                     if x.get("alert") and send_log.get(send_key(year, x["county"]))
+                     else ("待通知" if x.get("alert") else "")),
     } for x in snap["items"]]
 
     df = pd.DataFrame(rows)

@@ -269,7 +269,7 @@
     <div class="alert-card">
       <pre class="alert-pre" id="alert-body">{{ result.alert_text }}</pre>
       <div class="alert-actions">
-        <button class="btn btn-primary btn-sm" type="button" data-copy-target="alert-body" data-label="复制全文">复制全文</button>
+        <button class="btn btn-primary btn-sm" type="button" data-copy-target="alert-body" data-label="复制全文"{% if result.alert %} data-send-year="{{ result.year }}" data-send-county="{{ result.county }}"{% endif %}>复制全文</button>
         <span class="alert-tip" id="copy-tip" hidden>已复制到剪贴板</span>
       </div>
     </div>
