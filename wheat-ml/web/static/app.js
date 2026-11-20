@@ -713,33 +713,45 @@
     var submit = document.getElementById('upload-submit');
     if (!zone || !input) return;
 
-    var fileLabel = zone.querySelector('[data-file-name]');
+    var fileLabel = zone.querySelector('[data-file-name]') ||
+                    zone.querySelector('#drop-file') ||
+                    zone.querySelector('.drop-file');
     var maxSize = parseFloat(zone.getAttribute('data-max-size')) || 50;
     var allowed = ['.csv', '.xlsx', '.xls'];
 
+    function setLabel(text, ok) {
+      if (!fileLabel) return;
+      fileLabel.textContent = text;
+      if (ok) fileLabel.classList.add('has-file');
+      else fileLabel.classList.remove('has-file');
+    }
+
     function checkFile() {
-      var file = input.files && input.files[0];
-      if (!file) {
-        fileLabel.textContent = '尚未选择文件';
-        fileLabel.classList.remove('has-file');
+      var files = input.files;
+      var count = files ? files.length : 0;
+      if (!count) {
+        setLabel('尚未选择文件', false);
         return false;
       }
-      var dot = file.name.lastIndexOf('.');
-      var extension = dot >= 0 ? file.name.slice(dot).toLowerCase() : '';
-      var sizeMB = file.size / 1024 / 1024;
+      var first = files[0];
+      var dot = first.name.lastIndexOf('.');
+      var extension = dot >= 0 ? first.name.slice(dot).toLowerCase() : '';
+      var sizeMB = first.size / 1024 / 1024;
 
       if (allowed.indexOf(extension) < 0) {
-        fileLabel.textContent = '不支持的文件类型，请选择 CSV / Excel';
-        fileLabel.classList.remove('has-file');
+        setLabel('不支持的文件类型，请选择 CSV / Excel', false);
         return false;
       }
       if (sizeMB > maxSize) {
-        fileLabel.textContent = '文件 ' + sizeMB.toFixed(1) + ' MB，超过 ' + maxSize + ' MB 限制';
-        fileLabel.classList.remove('has-file');
+        setLabel('文件 ' + sizeMB.toFixed(1) + ' MB，超过 ' + maxSize + ' MB 限制', false);
         return false;
       }
-      fileLabel.textContent = file.name + ' · ' + formatSize(file.size);
-      fileLabel.classList.add('has-file');
+      if (count > 1) {
+        setLabel(count + ' 份文件 · ' + first.name + ' 等 · 共 ' + formatSize(
+          Array.prototype.reduce.call(files, function (a, f) { return a + f.size; }, 0)), true);
+      } else {
+        setLabel(first.name + ' · ' + formatSize(first.size), true);
+      }
       return true;
     }
 
@@ -756,10 +768,12 @@
     });
     zone.addEventListener('drop', function (event) {
       event.preventDefault();
+      event.stopPropagation();
       if (event.dataTransfer && event.dataTransfer.files.length) {
         try {
           input.files = event.dataTransfer.files;
         } catch (error) {
+          setLabel('这个浏览器不支持拖放赋值，请点击选择文件', false);
           return;
         }
         checkFile();

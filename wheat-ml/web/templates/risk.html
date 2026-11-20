@@ -67,7 +67,11 @@
 
   <div class="block-head" style="margin-top:26px">
     <h2>年度清单口径</h2>
-    <span class="block-sub">按 {{ year }} 年全量 {{ summary.count }} 个县区的 4—5 月日值统计，和上面那条当期观测不是同一条线</span>
+    <span class="block-sub">
+      按 {{ year }} 年全量 {{ summary.count }} 个县区的 4—5 月日值统计，和上面那条当期观测不是同一条线。
+      当期观测只进上面那条线，不进这里。
+      {% if year_req and year_req not in years %}整年数据只到 {{ years[-1] }} 年，{{ year_req }} 年没有整年记录，这里显示的是 {{ year }} 年。{% endif %}
+    </span>
   </div>
 
   <div class="dh-summary">

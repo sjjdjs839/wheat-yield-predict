@@ -108,7 +108,7 @@
           <span class="drop-title">拖气象数据到这里</span>
           <span class="drop-hint" id="drop-hint">或点击选择文件 · 可一次选多份 · CSV / Excel · 单份不超过 {{ max_size }} MB</span>
           <input id="file-input" type="file" name="file" accept=".csv,.xlsx,.xls" multiple required>
-          <span class="drop-file" id="drop-file">尚未选择文件</span>
+          <span class="drop-file" id="drop-file" data-file-name>尚未选择文件</span>
         </label>
 
         <div class="upload-row">
@@ -158,7 +158,6 @@
   var filter = document.getElementById('county-filter');
   var sel = document.getElementById('county-input');
   var input = document.getElementById('file-input');
-  var fileLabel = document.getElementById('drop-file');
   var TOTAL = sel ? sel.querySelectorAll('option[value]:not([value=""])').length : 0;
 
   function apply() {
@@ -192,7 +191,7 @@
   if (input) {
     input.addEventListener('change', function () {
       var n = input.files ? input.files.length : 0;
-      fileLabel.textContent = n ? ('已选 ' + n + ' 份文件') : '尚未选择文件';
+      // 文件名展示统一交给 app.js 的 initUpload，这里只管多份时清掉单一县区选择
       if (n > 1 && sel && sel.value) {
         sel.value = '';
         if (filter) { filter.value = ''; apply(); }

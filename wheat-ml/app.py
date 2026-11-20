@@ -1660,7 +1660,7 @@ def risk():
     warnings_ = recent_warnings.board(sorted(set(warn_counties_)), window_days=15) if warn_counties_ else None
 
     return render_template("risk.html", title="灾害预警", active="risk",
-                           years=years, year=year, cities=snap["cities"],
+                           years=years, year=year, year_req=year_arg, cities=snap["cities"],
                            city=city_arg, level=level_arg,
                            items=items, summary=snap["summary"], top=snap["top"],
                            total=len(snap["items"]), risk_type=risk_type,
