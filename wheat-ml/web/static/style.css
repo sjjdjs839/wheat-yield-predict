@@ -876,7 +876,8 @@ td .chip{padding:3px 8px;font-size:11px}
   .filter-panel .field{min-width:0}
   .filter-panel .field-wide{grid-column:1/-1}
   .filter-panel .field-wide select,
-  .filter-panel .field-wide .county-filter{max-width:100%}
+  .filter-panel .field-wide .county-filter,
+.filter-panel .field-wide .table-filter{max-width:100%}
   .filter-panel .btn{grid-column:1/-1;width:100%}
   .filter-reset{grid-column:1/-1;justify-self:start;align-self:auto;padding-top:0}
   .insight-panel{padding:24px 22px;margin-top:24px}
@@ -2003,6 +2004,9 @@ td .status-pill{margin-top:0}
 .county-filter{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
   background:var(--paper);font-size:13px;color:var(--ink-900)}
 .county-filter:focus{outline:none;border-color:var(--forest-700)}
+.table-filter{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid var(--line);border-radius:10px;
+  background:#fff;font:inherit;color:inherit}
+.table-filter:focus{outline:none;border-color:var(--forest-700)}
 
 /* ---------- 近期观测预警表（置末尾，特异性压过 .bd-table） ---------- */
 .bd-table.warn-table{min-width:0;width:100%;table-layout:auto}
@@ -2063,5 +2067,6 @@ td .status-pill{margin-top:0}
 
 /* 带关键字筛选的县区字段：独占一整行，避免与旁边字段的高度差把标签错开 */
 .field-wide{flex:1 1 100%!important;max-width:none}
-.field-wide .county-filter{height:34px;font-size:12px;padding:6px 11px;max-width:420px}
+.field-wide .county-filter,
+.field-wide .table-filter{height:34px;font-size:12px;padding:6px 11px;max-width:420px}
 .field-wide select{max-width:420px}

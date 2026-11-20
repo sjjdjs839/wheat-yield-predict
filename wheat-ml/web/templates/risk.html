@@ -151,6 +151,11 @@
         <option value="dry" {{ 'selected' if risk_type == 'dry' }}>出现干热风</option>
       </select>
     </div>
+    <div class="field field-wide">
+      <label for="r-q">在清单里找县区</label>
+      <input type="search" id="r-q" class="table-filter" data-table="rk-main"
+             placeholder="输入县名或地市，如 内黄 / 安阳" autocomplete="off">
+    </div>
     <button class="btn btn-primary" type="submit">应用筛选</button>
     <a class="filter-reset" href="{{ url_for('risk') }}">重置</a>
   </form>
@@ -161,7 +166,7 @@
       <div>
         <h2>{{ year }} 年县级灾害清单</h2>
       </div>
-      <p class="block-note">当前显示 {{ items|length }} 个县区{% if city %} · {{ city }}{% endif %}{% if risk_type == 'frost' %} · 有晚霜冻{% elif risk_type == 'dry' %} · 有干热风{% endif %}</p>
+      <p class="block-note" id="rk-note">当前显示 <span id="rk-count">{{ items|length }}</span> 个县区{% if city %} · {{ city }}{% endif %}{% if risk_type == 'frost' %} · 有晚霜冻{% elif risk_type == 'dry' %} · 有干热风{% endif %}</p>
     </div>
 
     <div class="risk-actions">
@@ -169,7 +174,7 @@
     </div>
 
     <div class="table-wrap">
-      <table class="rk-table">
+      <table class="rk-table" id="rk-main">
         <thead>
           <tr>
             <th>县区</th>
@@ -185,7 +190,8 @@
         </thead>
         <tbody>
           {% for x in items %}
-          <tr class="rk-row is-{{ 'heavy' if x.frost_level >= 3 else ('light' if x.frost_level >= 1 else 'none') }}">
+          <tr class="rk-row is-{{ 'heavy' if x.frost_level >= 3 else ('light' if x.frost_level >= 1 else 'none') }}"
+              data-county="{{ x.county }}" data-city="{{ x.city }}">
             <td><strong>{{ x.county }}</strong></td>
             <td>{{ x.city }}</td>
             <td>
@@ -238,6 +244,7 @@
           {% if not items %}
           <tr><td colspan="9" class="rk-empty">当前筛选条件下没有县区。</td></tr>
           {% endif %}
+          <tr id="rk-no-match" class="rk-empty" style="display:none"><td colspan="9">没有匹配的县区，换个关键字试试。</td></tr>
         </tbody>
       </table>
     </div>

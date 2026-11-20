@@ -851,6 +851,7 @@
 
   initSideRail();
   initCountyPickers();
+  initTableFilters();
 
   /**
    * 县区下拉筛选：模板里在 select 前放一个 .county-filter 输入框即可，
@@ -888,6 +889,43 @@
       box.addEventListener('input', apply);
       box.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); apply(); sel.focus(); }
+      });
+      apply();
+    });
+  }
+
+  /**
+   * 长清单行内检索：表格行带 data-county / data-city，输入框带 class="table-filter"
+   * 与 data-table="目标表 id"，这里按县名或地市过滤，并同步「当前显示」里的计数。
+   */
+  function initTableFilters() {
+    Array.prototype.forEach.call(document.querySelectorAll('.table-filter'), function (box) {
+      if (box.dataset.filterBound) return;
+      var table = document.getElementById(box.dataset.table || '');
+      if (!table) return;
+      var tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      box.dataset.filterBound = '1';
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-county]'));
+      var countEl = document.getElementById('rk-count');
+      var emptyEl = document.getElementById('rk-no-match');
+
+      function apply() {
+        var q = (box.value || '').trim().toLowerCase();
+        var shown = 0;
+        rows.forEach(function (tr) {
+          var hay = ((tr.dataset.county || '') + ' ' + (tr.dataset.city || '')).toLowerCase();
+          var hit = !q || hay.indexOf(q) >= 0;
+          tr.style.display = hit ? '' : 'none';
+          if (hit) shown++;
+        });
+        if (countEl) countEl.textContent = shown;
+        if (emptyEl) emptyEl.style.display = shown > 0 ? 'none' : '';
+      }
+
+      box.addEventListener('input', apply);
+      box.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); apply(); }
       });
       apply();
     });
