@@ -2185,3 +2185,26 @@ td .status-pill{margin-top:0}
 .container.page-content > .upload-layout{margin-top:18px}
 .container.page-content > .ds-empty,
 .container.page-content > section{margin-top:24px}
+
+/* 空态并排：宽屏左空态、右类型说明，避免整页塌在一侧 */
+.ds-empty-layout{display:block}
+@media (min-width:1000px){
+  .ds-empty-layout{
+    display:grid;
+    grid-template-columns:minmax(0,5fr) minmax(0,7fr);
+    gap:32px;
+    align-items:start;
+  }
+  .ds-empty-layout .block-lg{margin-top:24px}
+  .ds-empty-layout>.block-lg:first-child .ds-empty{padding:26px 24px}
+  .ds-empty-layout .data-facts{margin-top:20px}
+}
+/* 宽屏两栏等高：左栏字段卡与右栏上传卡齐平，模板下载贴底 */
+@media (min-width:901px){
+  .upload-layout{align-items:stretch}
+  .up-spec{margin-top:0;height:100%;display:flex;flex-direction:column}
+  .up-spec-list{flex:1 1 auto;gap:14px}
+  .up-spec-list>div:last-child{margin-top:auto}
+  .upload-card{padding:22px}
+  .dropzone{min-height:246px}
+}
