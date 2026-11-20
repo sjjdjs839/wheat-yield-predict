@@ -65,6 +65,10 @@
             <span class="status-pill {{ 'is-alert' if result.alert else 'is-ok' }}">
               {{ '产量预警：低于预警线' if result.alert else '产量正常：不低于预警线' }}
             </span>
+            {% if result.confidence %}
+            <span class="status-pill conf conf--{{ result.confidence.level }}"
+                  title="可信度依据：{{ result.confidence.reasons|join('；') }}">可信度 {{ result.confidence.label }}</span>
+            {% endif %}
           </div>
           {% if zone_hint %}
           <p class="zone-hint">{{ icon('alert') }}该县属{{ zone_hint.zone }}。这类县历史上模型容易算低，平均少算 12.5 公斤/亩，单县单年偏差还可能更大。预测值请当下限看，建议结合实地核查。</p>
@@ -179,6 +183,32 @@
             {% else %}<p class="contrib-empty">无明显拉低因子</p>{% endif %}
           </div>
         </div>
+      {% endif %}
+
+      {% if result.contrib_delta and result.contrib_delta.available %}
+      <details class="more panel">
+        <summary>今年比常年差在哪：贡献合计 {{ '%+.1f'|format(result.contrib_delta.net) }} kg/亩</summary>
+        <div class="detail-body">
+        <div class="delta-panel">
+        <div class="contrib-head">
+          <h3>相对该县常年气象条件，今年哪几项在推、哪几项在拉</h3>
+          <p class="block-note">基准取该县 {{ result.contrib_delta.base_years }} 年各气象特征的中位数（代表常年条件），与今年逐项相减。正值表示今年条件比常年更有利，负值表示更不利；合计只算气象因子，年份趋势与县域先验是「本该产多少」的锚点、不计入；也不等于预测值与常年均值的差。</p>
+        </div>
+        <div class="delta-list">
+          {% for it in result.contrib_delta.rows %}
+          <div class="delta-row {{ 'is-up' if it.delta > 0 else 'is-down' }}">
+            <span class="delta-name">{{ it.name }}</span>
+            <span class="delta-val">{{ '%+.1f'|format(it.delta) }}</span>
+            <small class="delta-sub">常年 {{ it.base }} → 今年 {{ it.cur }}</small>
+          </div>
+          {% endfor %}
+        </div>
+        {% if result.contrib_delta.rest_n %}
+        <div class="delta-rest">
+          <span>其余 {{ result.contrib_delta.rest_n }} 项</span>
+          <span>{{ '%+.1f'|format(result.contrib_delta.rest_sum) }} kg/亩</span>
+        </div>
+        {% endif %}
         </div>
         </div>
       </details>
@@ -189,6 +219,8 @@
         <div class="detail-body">
           <dl class="stat-list is-stacked">
             <div><dt>融合权重</dt><dd>LightGBM 60% · 随机森林 20% · 线性回归 20%</dd></div>
+            <div><dt>可信度怎么分</dt><dd>{{ result.confidence.reasons|join('；') }}。只降不升：任一项不满足就下一档，最终取最低。依据是 500 棵树之间的离散度（树间半宽），与上方「预计区间」按测试集 MAE 估算的口径不同源，两者不可直接比较。</dd></div>
+            <div><dt>比常年差在哪</dt><dd>把今年特征与该县历年特征中位数各跑一次 SHAP，逐项相减。正值表示今年条件比常年更有利，负值表示更不利；合计是模型贡献的移动，不等于预测值与常年均值之差。</dd></div>
             <div><dt>本县本年各模型输出</dt><dd>{{ result.pred_rf }} / {{ result.pred_lgbm }} / {{ result.pred_lr }} kg/亩</dd></div>
             {% if metrics %}
             <div><dt>随机森林 R²</dt><dd>{{ metrics.r2 }}</dd></div>

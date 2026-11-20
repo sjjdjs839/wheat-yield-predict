@@ -544,6 +544,72 @@ def _rf_explainer():
         return None
 
 
+
+
+def _shap_rows(x_vec) -> dict | None:
+    """返回全部 19 项特征的 SHAP 值（yield_norm 尺度）；不可用返回 None。
+
+    与 sample_contributions 的区别：那个只给 top5 推高/拉低，这里给全量，
+    供「今年 vs 常年」逐项相减用。
+    """
+    expl = _rf_explainer()
+    if expl is None:
+        return None
+    try:
+        sv = np.asarray(expl.shap_values(np.asarray(x_vec).reshape(1, -1))).reshape(-1)
+        if sv.shape[0] != len(FEATS):
+            return None
+        return {f: float(v) for f, v in zip(FEATS, sv)}
+    except Exception:
+        return None
+
+
+def predict_confidence(tree_low, tree_high, pred, prob_below,
+                       feature_note, matched, n_years) -> dict:
+    """把集成模型的不确定性翻成「这个数敢不敢信」。
+
+    规则只降不升：任一条件不满足往下一档，最终取最低档。
+    基准档按树间半宽占预测值的比例：≤6% 高、6—12% 中、>12% 低。
+    额外降档：县常年值缺失、跨年特征被填补、该县样本 <8 年、
+    跌破预警线概率落在 40—60% 的贴线区间。
+    """
+    labels = {2: "高", 1: "中", 0: "低"}
+    keys = {2: "high", 1: "mid", 0: "low"}
+    level = 2
+    reasons = []
+    pct = None
+
+    if tree_low is not None and tree_high is not None and pred:
+        half = (float(tree_high) - float(tree_low)) / 2.0
+        pct = round(half / float(pred) * 100, 1)
+        if pct <= 6:
+            reasons.append(f"树间半宽 {half:.1f} kg/亩，占预测值 {pct}%，离散度小")
+        elif pct <= 12:
+            level = min(level, 1)
+            reasons.append(f"树间半宽 {half:.1f} kg/亩，占预测值 {pct}%")
+        else:
+            level = 0
+            reasons.append(f"树间半宽 {half:.1f} kg/亩，占预测值 {pct}%，离散度偏大")
+    else:
+        level = min(level, 1)
+        reasons.append("500 棵树分布未算出，按中等处理")
+
+    if not matched:
+        level = 0
+        reasons.append("该县没有常年单产记录，按全省中位数回退")
+    if feature_note:
+        level = max(0, level - 1)
+        reasons.append("该年存在跨年特征缺失，已按中性值填补")
+    if n_years and n_years < 8:
+        level = max(0, level - 1)
+        reasons.append(f"该县仅 {n_years} 年样本，模型对它学得不够")
+    if prob_below is not None and 40 <= float(prob_below) <= 60:
+        level = max(0, level - 1)
+        reasons.append(f"跌破预警线的概率 {prob_below}% 落在 40—60%，判定贴线")
+
+    return {"level": keys[level], "label": labels[level],
+            "pct": pct, "reasons": reasons}
+
 def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
     """单样本 SHAP：返回把预测推高 / 拉低的 top 因子（yield_norm 尺度）。"""
     expl = _rf_explainer()
@@ -2088,6 +2154,49 @@ def predict():
             "feature_note": feature_note,
             "contrib": sample_contributions(X.iloc[0].values),
         }
+
+        n_years = int(feats['year'].nunique()) if 'year' in feats.columns else 0
+
+        # ① 今年 vs 该县常年气象条件：逐项 SHAP 差值
+        contrib_delta = None
+        try:
+            cur_rows = _shap_rows(X.values)
+            base_vec = feats[FEATS].median(numeric_only=True)
+            base_rows = _shap_rows(base_vec.values)
+            if cur_rows and base_rows:
+                # 只算气象因子：年份趋势与县先验是「本该产多少」的锚点，
+                # 放进「今年比常年差在哪」会和气象因子混淆（与因子排序同口径）
+                weather_feats = [f for f in FEATS if f not in BASELINE_FEATS]
+                items = [
+                    {
+                        "name": FEATURE_NAMES.get(f, f),
+                        "cur": round(cur_rows[f] * mean_yield, 1),
+                        "base": round(base_rows[f] * mean_yield, 1),
+                        "delta": round((cur_rows[f] - base_rows[f]) * mean_yield, 1),
+                    }
+                    for f in weather_feats
+                ]
+                items.sort(key=lambda it: -abs(it["delta"]))
+                net = round(sum(cur_rows[f] - base_rows[f] for f in weather_feats) * mean_yield, 1)
+                contrib_delta = {
+                    "available": True,
+                    "rows": items[:8],
+                    "net": net,
+                    "rest_n": max(0, len(items) - 8),
+                    "rest_sum": round(net - sum(it["delta"] for it in items[:8]), 1),
+                    "base_years": n_years,
+                }
+        except Exception:
+            contrib_delta = None
+        result["contrib_delta"] = contrib_delta
+
+        # ② 可信度分级
+        result["confidence"] = predict_confidence(
+            tree_low=result["tree_low"], tree_high=result["tree_high"],
+            pred=result["pred"], prob_below=result["prob_below"],
+            feature_note=result["feature_note"], matched=result["matched"],
+            n_years=n_years,
+        )
 
         # 历史对比：逐年预测 vs 实测
         api = labels.set_index(["county", "year"])["wheat_yield"].to_dict() if labels is not None else {}
