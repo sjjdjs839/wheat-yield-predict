@@ -2349,6 +2349,13 @@ def predict():
 
     trend_chart = None
     feature_chart = None
+    # 因子表与基线项无论有没有预测结果都要给出：缺年份数据时页面仍要能渲染，
+    # 否则 result 为空会漏掉这些变量，模板直接报错。
+    feature_items = feature_importance_items()
+    weather_items = [x for x in feature_items if x.get("kind") == "weather"]
+    baseline_items = [x for x in feature_items if x.get("kind") == "baseline"]
+    # 表格里气象项在前、基线项置底，避免第一眼看到"品种改良"误以为它是气象因子
+    feature_rows = [dict(x) for x in weather_items] + [dict(x) for x in baseline_items]
     if result:
         base_values = [result["pred"], result["threshold"], result["mean_yield"],
                        result["pred_low"], result["pred_high"]]
@@ -2385,11 +2392,6 @@ def predict():
                 },
             }
 
-        feature_items = feature_importance_items()
-        weather_items = [x for x in feature_items if x.get("kind") == "weather"]
-        baseline_items = [x for x in feature_items if x.get("kind") == "baseline"]
-        # 表格里气象项在前、基线项置底，避免第一眼看到"品种改良"误以为它是气象因子
-        feature_rows = [dict(x) for x in weather_items] + [dict(x) for x in baseline_items]
         if weather_items:
             feature_chart = {
                 "kind": "hBar",

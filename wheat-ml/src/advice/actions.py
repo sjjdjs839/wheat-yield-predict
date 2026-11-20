@@ -21,9 +21,13 @@ _ORDER = {P0: 0, P1: 1, P2: 2}
 
 
 def _card(priority, title, basis, actions, skip, window, evidence=None):
+    # 阶段已经结束的（历史年份或当年已过窗口），不要再喊“立即处理/本周安排”
+    label = PRIORITY_LABEL[priority]
+    if "结束" in window and priority != P2:
+        label = "复盘 · 阶段已结束"
     return {
         "priority": priority,
-        "priority_label": PRIORITY_LABEL[priority],
+        "priority_label": label,
         "title": title,
         "basis": basis,
         "actions": actions,
@@ -182,6 +186,21 @@ def build_cards(key: str, stats: dict, climate: dict, period_end: str,
                 win))
 
     elif key == "heading":
+        # 抽穗扬花期遇低温没有独立回归系数，沿用 4 月低温那条弹性作方向参考
+        if stats.get("霜冻日数", 0) >= 1:
+            basis = [f"本段最低温 ≤0℃ 共 {stats['霜冻日数']} 天",
+                     f"阶段平均最低温 {stats['平均最低温']}℃"]
+            if fz4 is not None:
+                basis.append(f"4 月最低温 ≤0℃ 共 {int(fz4)} 天（与拔节期同一条面板回归口径，每多 1 天约 −1.96%）")
+            cards.append(_card(
+                P0 if stats["霜冻日数"] >= 2 else P1,
+                "抽穗期再遇低温，护住花粉和幼穗",
+                basis,
+                ["寒前 1—2 天小水补墒提温，别等冻了再浇",
+                 "霜后 3—5 天剥穗查看，幼穗变褐的按受害程度分级评估",
+                 "叶面喷施磷酸二氢钾等抗逆调节剂帮助恢复，不追施速效氮肥"],
+                "抽穗扬花期低温会降低花粉活力、增加不孕小穗，这段受损直接落在穗粒数上",
+                win))
         if stats.get("平均相对湿度", 0) >= 80 or precip >= 40:
             cards.append(_card(
                 P0, "花期高湿，优先防赤霉病",
