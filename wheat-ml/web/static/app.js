@@ -850,6 +850,7 @@
   }
 
   initSideRail();
+  initCopyButtons();
   initCountyPickers();
   initTableFilters();
 
@@ -857,6 +858,34 @@
    * 县区下拉筛选：模板里在 select 前放一个 .county-filter 输入框即可，
    * 这里自动接管，不需要各页面另写脚本。选中项始终保留可见，避免筛选把当前县藏掉。
    */
+  function initCopyButtons() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-copy-target]'), function (btn) {
+      if (btn.dataset.copyBound) return;
+      btn.dataset.copyBound = '1';
+      btn.addEventListener('click', function () {
+        var el = document.getElementById(btn.dataset.copyTarget);
+        if (!el) return;
+        var text = el.textContent || '';
+        var label = btn.dataset.label || '复制全文';
+        function done() {
+          btn.textContent = '已复制';
+          var tip = document.getElementById('copy-tip');
+          if (tip) { tip.hidden = false; setTimeout(function () { tip.hidden = true; }, 1800); }
+          setTimeout(function () { btn.textContent = label; }, 1800);
+        }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta); done();
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(fallback);
+        } else { fallback(); }
+      });
+    });
+  }
   function initCountyPickers() {
     Array.prototype.forEach.call(document.querySelectorAll('.county-filter'), function (box) {
       var sel = box.nextElementSibling;

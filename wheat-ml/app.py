@@ -610,6 +610,67 @@ def predict_confidence(tree_low, tree_high, pred, prob_below,
     return {"level": keys[level], "label": labels[level],
             "pct": pct, "reasons": reasons}
 
+
+
+def send_verdict(alert: bool, level: str) -> str:
+    """把可信度翻成一句发给业务方的话：这条预警敢不敢直接发。
+
+    可信度低时不建议直接发——误报一次，下一年的预警就没人信了。
+    """
+    if alert:
+        return {"high": "可直接发预警",
+                "mid": "可发，建议附一句请乡镇实地核实",
+                "low": "先核实再发，避免误报"}.get(level, "先核实再发")
+    return {"high": "无需发预警，可作参考",
+            "mid": "无需发预警，可作参考",
+            "low": "数据偏弱，若要引用请先核实"}.get(level, "可作参考")
+
+
+def build_alert_text(result: dict, breakdown: dict | None) -> str:
+    """生成可直接复制到微信群 / 村广播的预警文字稿。
+
+    只陈述可追溯事实（预测值、较常年、预警线、主要不利因子）；
+    动作只给方向不给用量——施多少肥、灌多少水仍由农技员按地块定。
+    """
+    county = result["county"]
+    year = result["year"]
+    vs = result.get("vs_mean") or 0
+    trend = "偏高" if vs > 0 else "偏低"
+    if result.get("alert"):
+        status = f"当前已跌破预警线 {result['threshold']} 公斤/亩"
+    else:
+        status = f"当前高于预警线 {result['threshold']} 公斤/亩，未触发预警"
+
+    lines = [f"【{county} {year} 年小麦产量预警】"]
+    lines.append(
+        f"预计单产 {result['pred']} 公斤/亩，较常年（{result['mean_yield']} 公斤/亩）"
+        f"{trend} {abs(vs)}%。{status}。")
+
+    rows = ((result.get("contrib_delta") or {}).get("rows") or [])
+    negs = [it for it in rows if it.get("delta", 0) < 0][:2]
+    if negs:
+        lines.append("主要拉低项（相对该县常年中位特征）：" + "、".join(
+            f"{it['name']} {it['delta']}" for it in negs) + "。")
+        lines.append("（以上为模型内部贡献的移动量，与上句“较常年”口径不同，不可直接相减。）")
+
+    bd = breakdown or {}
+    acts = []
+    if (bd.get("fz4") or 0) > 0 or (bd.get("fz3") or 0) > 0:
+        acts.append("拔节期防晚霜冻：低温来临前 3 天适量灌水，提高地温")
+    if (bd.get("hd_may") or 0) > 0:
+        acts.append("灌浆期防干热风：保持土壤墒情，叶面喷施磷酸二氢钾")
+    if not acts:
+        acts.append("按常年农时安排，重点盯拔节与灌浆两个阶段的水肥管理")
+    acts.append("成熟期适期收获，避免连阴雨造成穗发芽")
+    lines.append("建议：" + "；".join(f"({i + 1}) {x}" for i, x in enumerate(acts)))
+
+    conf = result.get("confidence") or {}
+    verdict = result.get("send_verdict") or ""
+    if verdict:
+        lines.append(f"数据可信度 {conf.get('label', '—')}：{verdict}。")
+    lines.append("口径：县级尺度估算，具体到地块请结合实地情况核定。")
+    return "\n".join(lines)
+
 def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
     """单样本 SHAP：返回把预测推高 / 拉低的 top 因子（yield_norm 尺度）。"""
     expl = _rf_explainer()
@@ -1202,7 +1263,8 @@ def risk_snapshot(year: int) -> dict:
         if county not in stats:
             continue
         days = int(r["hot_dry_days"]) if pd.notna(r["hot_dry_days"]) else 0
-        mean = float(stats[county]["mean_yield"])
+        # 与 /predict 保持同一口径：训练期（2010—2021）县均值，否则两页对同一县同一年的预警线会差十几公斤
+        mean = county_prior_of(stats, county, float(stats[county]["mean_yield"]))
         pred = preds[i]
         pred = round(float(pred), 1) if pred is not None else None
         threshold = round(mean * CONFIG["alert"]["default_ratio"], 1)
@@ -2098,6 +2160,8 @@ def predict():
     row = feats[feats["year"] == year] if not feats.empty else feats
     error = None
     result, history = None, []
+    # 灾害折减只算一次：模板与预警文稿共用
+    breakdown_ctx = county_year_breakdown(county, year)
 
     if feats.empty:
         error = f"当前数据集缺少 {county} 的气象记录，无法构造预测特征。"
@@ -2197,6 +2261,11 @@ def predict():
             feature_note=result["feature_note"], matched=result["matched"],
             n_years=n_years,
         )
+        # ③ 发送建议：可信度直接决定这条预警敢不敢发
+        result["send_verdict"] = send_verdict(result["alert"], result["confidence"]["level"])
+
+        # ④ 可转发的预警文稿
+        result["alert_text"] = build_alert_text(result, breakdown_ctx)
 
         # 历史对比：逐年预测 vs 实测
         api = labels.set_index(["county", "year"])["wheat_yield"].to_dict() if labels is not None else {}
@@ -2285,7 +2354,7 @@ def predict():
                            feature_chart=feature_chart, feature_count=len(FEATS),
                            feature_rows=feature_rows, baseline_items=baseline_items,
                            zone_hint=county_zone_hint(county),
-                           breakdown=county_year_breakdown(county, year),
+                           breakdown=breakdown_ctx,
                            error=error, source=data_meta["source"])
 
 

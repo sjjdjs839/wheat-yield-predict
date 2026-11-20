@@ -1292,6 +1292,18 @@ main{overflow-x:clip}
 .status-pill.conf--low{background:rgba(180,71,47,.11);color:var(--alert-600)}
 
 /* 今年 vs 常年的贡献差值 */
+
+
+/* 发送建议与可转发文稿 */
+.result-verdict{margin-top:10px;font-size:13px;color:var(--ink-700)}
+.result-verdict strong{color:var(--forest-700)}
+.alert-card{margin-top:16px;padding:18px 20px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.alert-pre{margin:0;white-space:pre-wrap;word-break:break-word;
+  font:13px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink-700)}
+.alert-actions{margin-top:14px;display:flex;align-items:center;gap:12px}
+.alert-tip{color:var(--forest-700);font-size:12px}
+@media(max-width:640px){.alert-card{padding:14px 16px}.alert-pre{font-size:12px}}
+
 .delta-panel{margin-top:18px;padding:20px 22px;border:1px solid var(--line);border-radius:14px;background:var(--rice-50)}
 .delta-list{margin-top:14px}
 .delta-row{display:flex;align-items:baseline;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}

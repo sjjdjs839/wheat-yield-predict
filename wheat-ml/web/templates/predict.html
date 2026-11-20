@@ -101,6 +101,9 @@
         <div class="metric"><span>可能跌破预警线</span><strong>{{ result.prob_below if result.prob_below is not none else '—' }}{% if result.prob_below is not none %}<small>%</small>{% endif %}</strong></div>
       </div>
       <p class="result-sub">预警线 {{ result.threshold }} kg/亩 · 该县 2010—2021 平均 {{ result.mean_yield }} kg/亩 · 相对常年 {{ '+' if result.vs_mean > 0 }}{{ result.vs_mean }}%{% if result.actual is not none %} · {{ result.year }} 年实测 {{ result.actual }} kg/亩{% endif %}</p>
+      {% if result.send_verdict %}
+      <p class="result-verdict">发送建议：<strong>{{ result.send_verdict }}</strong></p>
+      {% endif %}
       {% if breakdown and result %}
       {# 折算只用距平口径（frost_own），不用「绝对天数 × 弹性」——后者会把常年本身就有的
          几天低温算成灾害。3 月低温分档检验不显著（p>0.05），只报天数不折算。 #}
@@ -253,6 +256,25 @@
     </div>
     {% endif %}
   </div>
+
+
+  {% if result and result.alert_text %}
+  <section class="block-lg" id="alert-text">
+    <div class="block-head">
+      <div>
+        <h2>可以直接发出去的预警</h2>
+      </div>
+      <p class="block-note">县级尺度的文字稿，复制后可用于微信群、村广播或简报；不含施肥与灌溉用量</p>
+    </div>
+    <div class="alert-card">
+      <pre class="alert-pre" id="alert-body">{{ result.alert_text }}</pre>
+      <div class="alert-actions">
+        <button class="btn btn-primary btn-sm" type="button" data-copy-target="alert-body" data-label="复制全文">复制全文</button>
+        <span class="alert-tip" id="copy-tip" hidden>已复制到剪贴板</span>
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   <div class="export-bar">
     <div class="export-bar-title">
