@@ -987,8 +987,10 @@ def upload():
         _UPLOAD_CACHE.clear()
 
     ok_saved = [r for r in results if r.get("ok") and r.get("saved")]
+    # 有自动修正就留在本页把修正清单摆出来：这一步是诊断台的重点，跳走就看不见了
+    fixed = any((r.get("report") or {}).get("fixes") for r in ok_saved)
     # 全部通过且有入库，直接进最新那个县的页面，省掉一层点击
-    if ok_saved and not error:
+    if ok_saved and not error and not fixed:
         latest = upload_index.latest_record()
         if latest:
             county = latest["county"]
