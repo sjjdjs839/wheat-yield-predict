@@ -81,12 +81,14 @@ def judge(df: pd.DataFrame) -> dict:
         frost = d[d["t2m_min"] <= FROST_TMIN]
         if not frost.empty:
             days = len(frost)
+            # 日期和温度必须取同一天，否则读起来像那天就低到该值
+            worst = frost.sort_values("t2m_min").iloc[0]
             hits.append({
                 "key": "frost", "name": "晚霜冻", "days": days,
                 "level": _level_by_days(days),
                 "detail": "%s 最低 %.1f℃" % (
-                    frost["date"].min().strftime("%m-%d"),
-                    float(frost["t2m_min"].min())),
+                    worst["date"].strftime("%m-%d"),
+                    float(worst["t2m_min"])),
                 "rule": "生育期内日最低温 ≤ 0℃",
             })
 
@@ -95,11 +97,13 @@ def judge(df: pd.DataFrame) -> dict:
         hd = d[(d["t2m_max"] >= HOT_DRY_TMAX) & (d["rh"] <= HOT_DRY_RH)]
         if not hd.empty:
             days = len(hd)
+            # 取最热那天，温度和湿度报同一天的，避免「36.7℃ 配 37%」分属两天
+            worst = hd.sort_values("t2m_max", ascending=False).iloc[0]
             hits.append({
                 "key": "hot_dry", "name": "干热风", "days": days,
                 "level": _level_by_days(days),
-                "detail": "最高 %.1f℃ · 湿度低至 %.0f%%" % (
-                    float(hd["t2m_max"].max()), float(hd["rh"].min())),
+                "detail": "最高 %.1f℃ · 湿度 %.0f%%" % (
+                    float(worst["t2m_max"]), float(worst["rh"])),
                 "rule": "日最高温 ≥35℃ 且相对湿度 ≤40%",
             })
 
