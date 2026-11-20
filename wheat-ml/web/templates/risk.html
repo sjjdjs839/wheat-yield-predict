@@ -166,7 +166,7 @@
       <div>
         <h2>{{ year }} 年县级灾害清单</h2>
       </div>
-      <p class="block-note" id="rk-note">当前显示 <span id="rk-count">{{ items|length }}</span> 个县区{% if city %} · {{ city }}{% endif %}{% if risk_type == 'frost' %} · 有晚霜冻{% elif risk_type == 'dry' %} · 有干热风{% endif %}</p>
+      <p class="block-note" id="rk-note">当前显示 <span id="rk-count">{{ items|length }}</span> 个县区{% if city %} · {{ city }}{% endif %}{% if risk_type == 'frost' %} · 有晚霜冻{% elif risk_type == 'dry' %} · 有干热风{% endif %} · 触发预警 {{ alert_n }} 个 · <span id="rk-sent-n">已通知 {{ sent_n }} 个</span></p>
     </div>
 
     <div class="risk-actions">
@@ -186,6 +186,7 @@
             <th>干热风</th>
             <th>单产对照</th>
             <th>历史同强度年</th>
+            <th>通知</th>
           </tr>
         </thead>
         <tbody>
@@ -238,13 +239,26 @@
               {% else %}
               <span class="rk-same-main is-weak">无同类年份</span>
               {% endif %}
+            <td class="rk-send">
+              {% if x.alert %}
+              {% if x.sent %}
+              <span class="rk-sent">已通知<small>{{ x.sent.at }} · {{ x.sent.to }}</small></span>
+              <button class="rk-send-btn" type="button" data-action="unmark"
+                      data-year="{{ year }}" data-county="{{ x.county }}">撤销</button>
+              {% else %}
+              <button class="rk-send-btn is-mark" type="button" data-action="mark"
+                      data-year="{{ year }}" data-county="{{ x.county }}">标记已通知</button>
+              {% endif %}
+              {% else %}
+              <span class="rk-send-na">—</span>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="9" class="rk-empty">当前筛选条件下没有县区。</td></tr>
+          <tr><td colspan="10" class="rk-empty">当前筛选条件下没有县区。</td></tr>
           {% endif %}
-          <tr id="rk-no-match" class="rk-empty" style="display:none"><td colspan="9">没有匹配的县区，换个关键字试试。</td></tr>
+          <tr id="rk-no-match" class="rk-empty" style="display:none"><td colspan="10">没有匹配的县区，换个关键字试试。</td></tr>
         </tbody>
       </table>
     </div>

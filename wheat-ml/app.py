@@ -18,7 +18,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-from flask import (Flask, render_template, request, redirect, url_for, Response)
+from flask import (Flask, render_template, request, redirect, url_for, Response, jsonify)
 
 from src.data import upload_index
 from src.analysis import recent_warnings
@@ -39,6 +39,8 @@ FEATS = CONFIG["feature_cols"]
 NASA_TO_CANON = {v: k for k, v in CANONICAL_TO_NASA.items()}
 UPLOAD_DIR = PROJECT_ROOT / CONFIG["paths"]["uploads"]
 LATEST = UPLOAD_DIR / "latest.json"
+# 预警通知记录：哪个县的预警在什么时候发出去了
+SEND_LOG = UPLOAD_DIR / "send_log.json"
 PROCESSED = PROJECT_ROOT / CONFIG["paths"]["processed"] / "weather_clean.csv"
 FEATURE_CSV = PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv"
 MODELS_DIR = PROJECT_ROOT / CONFIG["paths"]["models"]
@@ -670,6 +672,25 @@ def build_alert_text(result: dict, breakdown: dict | None) -> str:
         lines.append(f"数据可信度 {conf.get('label', '—')}：{verdict}。")
     lines.append("口径：县级尺度估算，具体到地块请结合实地情况核定。")
     return "\n".join(lines)
+
+def send_key(year: int, county: str) -> str:
+    """通知记录键：年份 + 县区。"""
+    return f"{int(year)}|{county}"
+
+
+def load_send_log() -> dict:
+    """读取已通知记录，只回答一个问题：这条预警到底发出去没有。"""
+    try:
+        return json.loads(SEND_LOG.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_send_log(data: dict) -> None:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SEND_LOG.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 def sample_contributions(x_vec: np.ndarray, top_n: int = 5) -> dict:
     """单样本 SHAP：返回把预测推高 / 拉低的 top 因子（yield_norm 尺度）。"""
@@ -1575,6 +1596,29 @@ def _last_frost(year: int):
             "worst": cur.loc[cur["frost_loss"].idxmin(), "county"]}
 
 
+@app.route("/api/send-log", methods=["POST"])
+def api_send_log():
+    """标记 / 撤销某县某年的预警已通知。只写本地记录，不对外发送任何内容。"""
+    payload = request.get_json(silent=True) or {}
+    try:
+        year = int(payload.get("year"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "年份不合法"}), 400
+    county = (payload.get("county") or "").strip()
+    if not county:
+        return jsonify({"ok": False, "error": "缺少县区"}), 400
+    action = payload.get("action")
+    log = load_send_log()
+    key = send_key(year, county)
+    if action == "mark":
+        log[key] = {"at": datetime.now().strftime("%Y-%m-%d %H:%M"), "to": "县农技站"}
+    elif action == "unmark":
+        log.pop(key, None)
+    else:
+        return jsonify({"ok": False, "error": "未知动作"}), 400
+    save_send_log(log)
+    return jsonify({"ok": True, "sent": log.get(key)})
+
 @app.route("/risk")
 def risk():
 
@@ -1586,6 +1630,14 @@ def risk():
 
     snap = risk_snapshot(year)
     items = _frost_attach(list(snap["items"]), year)
+
+    # 通知记录：只有触发预警的县才需要'已通知 / 未通知'
+    send_log = load_send_log()
+    for x in items:
+        x["sent"] = send_log.get(send_key(year, x["county"]))
+    alert_n = sum(1 for x in snap["items"] if x.get("alert"))
+    sent_n = sum(1 for x in snap["items"]
+                 if x.get("alert") and send_log.get(send_key(year, x["county"])))
     items.sort(key=lambda x: (-(x["frost_level"] or 0),
                               x["frost_loss"] if x["frost_loss"] is not None else 0,
                               -x["days"], x["county"]))
@@ -1620,7 +1672,8 @@ def risk():
                            last_frost=_last_frost(year), warnings=warnings_,
                            dose=_dose_payload(),
                            mh=_multihazard_payload(),
-                           ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100)
+                           ratio=round(CONFIG["alert"]["default_ratio"] * 100, 0) / 100,
+                           alert_n=alert_n, sent_n=sent_n)
 
 
 @app.route("/export_risk")

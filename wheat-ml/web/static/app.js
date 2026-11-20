@@ -851,6 +851,7 @@
 
   initSideRail();
   initCopyButtons();
+  initSendLog();
   initCountyPickers();
   initTableFilters();
 
@@ -885,6 +886,50 @@
         } else { fallback(); }
       });
     });
+  }
+
+  function initSendLog() {
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      var btn = t && t.closest ? t.closest('[data-action=mark],[data-action=unmark]') : null;
+      if (!btn || btn.disabled) return;
+      var year = btn.getAttribute('data-year');
+      var county = btn.getAttribute('data-county');
+      var action = btn.getAttribute('data-action');
+      var td = btn.closest('td');
+      btn.disabled = true;
+      fetch('/api/send-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: year, county: county, action: action }),
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (!res.ok) throw new Error(res.error || 'failed');
+        function markBtn(a) {
+          return '<button class="rk-send-btn is-mark" type="button" data-action="' + a +
+            '" data-year="' + year + '" data-county="' + county + '">标记已通知</button>';
+        }
+        if (action === 'mark' && res.sent) {
+          td.innerHTML = '<span class="rk-sent">已通知<small>' + res.sent.at + ' · ' +
+            res.sent.to + '</small></span>' +
+            '<button class="rk-send-btn" type="button" data-action="unmark" data-year="' +
+            year + '" data-county="' + county + '">撤销</button>';
+          bumpSent(1);
+        } else {
+          td.innerHTML = markBtn('mark');
+          bumpSent(-1);
+        }
+      }).catch(function () {
+        btn.disabled = false;
+        btn.textContent = '记录失败，重试';
+      });
+    });
+  }
+
+  function bumpSent(delta) {
+    var el = document.getElementById('rk-sent-n');
+    if (!el) return;
+    var n = parseInt((el.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
+    el.textContent = '已通知 ' + Math.max(0, n + delta) + ' 个';
   }
   function initCountyPickers() {
     Array.prototype.forEach.call(document.querySelectorAll('.county-filter'), function (box) {
