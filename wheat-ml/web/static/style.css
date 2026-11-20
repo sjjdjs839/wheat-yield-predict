@@ -1243,10 +1243,9 @@ main{overflow-x:clip}
   .dh-panel{padding:20px}
   .upload-feedback{display:block}
   .upload-feedback-actions{margin-top:12px}
-  .dh-table{min-width:0}
-  .dh-table th:nth-child(4),.dh-table td:nth-child(4){display:none}
-  .dh-table th:nth-child(1),.dh-table td:nth-child(1){width:42%}
-  .dh-table th:nth-child(3),.dh-table td:nth-child(3){width:30%}
+  /* 七列在窄屏放不下：隐藏「地市」（可由县名推出），其余横向滑动查看 */
+  .dh-table{min-width:560px}
+  .dh-table th:nth-child(2),.dh-table td:nth-child(2){display:none}
   .dh-table th,.dh-table td{padding:10px 8px;font-size:12px}
   .dh-county-name{padding-left:20px !important}
   .dh-city-toggle{min-height:40px;padding:8px 0}
@@ -2214,4 +2213,23 @@ td .status-pill{margin-top:0}
   .up-spec-list>div:last-child{margin-top:auto}
   .upload-card{padding:22px}
   .dropzone{min-height:246px}
+}
+
+/* ---- 干热风页：县级暴露排行 ---- */
+.dh-of{font-size:12px;font-weight:500;color:var(--ink-500);margin-left:4px}
+.dh-verdict{
+  margin:0 0 20px;padding:13px 16px;
+  background:var(--rice-50);border:1px solid var(--line);
+  border-left:3px solid var(--forest-700);border-radius:10px;
+  font-size:13.5px;line-height:1.65;color:var(--ink-700);
+}
+.dh-note-cell{font-size:12.5px;line-height:1.6;color:var(--ink-600)}
+.dh-row-heavy td:first-child{box-shadow:inset 3px 0 0 var(--alert-600)}
+.dh-row-light td:first-child{box-shadow:inset 3px 0 0 var(--wheat-500)}
+.dh-method{margin-top:22px}
+.dh-method-list{margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:var(--ink-700)}
+.dh-method-list li{margin-bottom:10px}
+.dh-method-list b{color:var(--forest-700)}
+@media(max-width:900px){
+  .dh-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 }

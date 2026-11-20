@@ -1,30 +1,32 @@
 ﻿{% extends "base.html" %}
 {% from "_macros.html" import icon, page_head %}
 {% block content %}
-{{ page_head('干热风预警', '按城市展开查看各区县灌浆期干热风天数与等级，并给出应对方向；天数是风险提示，不等于一定减产。', [year ~ ' 年', '县级天数']) }}
+{{ page_head('干热风预警', '只看该县今年相对自己常年是否偏多；不跨县比绝对天数，也不折算减产。', [year ~ ' 年', '县级排行']) }}
 <div class="container page-content dh-page">
   <div class="dh-summary">
     <div class="dh-card" data-reveal>
-      <span class="dh-label">近 15 年干热风总天数</span>
-      <strong>{{ stats.total_days }}</strong>
-      <small>天 · 全部区县累计</small>
-    </div>
-    <div class="dh-card" data-reveal>
-      <span class="dh-label">最严重年份</span>
-      <strong class="is-text">{{ stats.max_year }}</strong>
-      <small>按当年总天数</small>
-    </div>
-    <div class="dh-card" data-reveal>
-      <span class="dh-label">干热风最多区县</span>
+      <span class="dh-label">{{ year }} 年最重县</span>
       <strong class="is-text">{{ stats.max_county }}</strong>
-      <small>15 年累计</small>
+      <small>{{ stats.max_days }} 天 · 单县天数，非全市累加</small>
     </div>
-    <div class="dh-card is-alert" data-reveal>
-      <span class="dh-label">预警区县数</span>
-      <strong>{{ stats.alert_count }}</strong>
-      <small>{{ year }} 年天数 &gt; 0</small>
+    <div class="dh-card{% if stats.heavy %} is-alert{% endif %}" data-reveal>
+      <span class="dh-label">偏重县数</span>
+      <strong>{{ stats.heavy }}</strong>
+      <small>达到本县近 15 年前 20%</small>
+    </div>
+    <div class="dh-card" data-reveal>
+      <span class="dh-label">出现暴露的县</span>
+      <strong>{{ stats.exposed }}<span class="dh-of">/ {{ stats.counties }}</span></strong>
+      <small>{{ year }} 年天数 &gt; 0 的主产县</small>
+    </div>
+    <div class="dh-card" data-reveal>
+      <span class="dh-label">县级中位天数</span>
+      <strong>{{ stats.med_cur }}<span class="dh-of">天</span></strong>
+      <small>全期县级中位 {{ stats.med_all }} 天</small>
     </div>
   </div>
+
+  <p class="dh-verdict">{{ verdict }}</p>
 
   <form class="filter-panel dh-filter" method="get" aria-label="干热风年份筛选">
     <div class="field">
@@ -35,142 +37,86 @@
         {% endfor %}
       </select>
     </div>
-    <button class="btn btn-primary" type="submit">查看该年</button>
-    <p class="filter-hint" id="yearNote" aria-live="polite">正在统计…</p>
+    <div class="field">
+      <label for="showAll">范围</label>
+      <select id="showAll" name="all" onchange="this.form.submit()">
+        <option value="0" {{ 'selected' if not show_all }}>只看有暴露的县</option>
+        <option value="1" {{ 'selected' if show_all }}>全部 {{ stats.counties }} 个主产县</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">应用</button>
+    <p class="filter-hint">判定基准是该县自己的 15 年序列，不是全省均值。</p>
   </form>
 
   <section class="panel dh-panel" data-reveal>
     <div class="block-head">
       <div>
-        <h2>{{ year }} 年干热风分布</h2>
+        <h2>{{ year }} 年县级干热风暴露</h2>
       </div>
-      <p class="block-note">点击城市行展开 / 收起区县明细；城市行等级取该市最高县。</p>
+      <p class="block-note">按判定排序，同档按天数降序；「历史排位」是今年在该县 15 年里的名次。</p>
     </div>
+    {% if rows %}
     <div class="table-wrap">
       <table class="dh-table">
         <thead>
           <tr>
-            <th style="width:30%">区域</th>
-            <th>干热风天数</th>
-            <th>等级</th>
-            <th>应对方向</th>
+            <th style="width:16%">县区</th>
+            <th style="width:10%">地市</th>
+            <th style="width:9%">当年天数</th>
+            <th style="width:11%">该县常年中位</th>
+            <th style="width:11%">历史排位</th>
+            <th style="width:10%">判定</th>
+            <th style="width:31%">处置提示</th>
           </tr>
         </thead>
-        <tbody id="dhTableBody">
+        <tbody>
+          {% for r in rows %}
+          <tr class="dh-row-{{ r.tone }}">
+            <td><b>{{ r.county }}</b></td>
+            <td>{{ r.city }}</td>
+            <td>{{ r.days }} 天</td>
+            <td>{{ r.median }} 天</td>
+            <td class="mono">第 {{ r.rank }} / {{ r.years }} 高</td>
+            <td>
+              <span class="chip chip--{% if r.tone == 'heavy' %}alert{% elif r.tone == 'light' %}gold{% else %}ok{% endif %}">
+                <i class="dot"></i>{{ r.level }}
+              </span>
+            </td>
+            <td class="dh-note-cell">{{ r.note }}</td>
+          </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>
-    <p class="chart-note">干热风天数按县区逐日气象统计（日最高温 ≥35℃ 且相对湿度 ≤40%）；等级按天数划分暴露强度，不等同于减产幅度——县域尺度上气象与单产的统计关联较弱，实际损失需结合实地灾情评估。</p>
+    {% else %}
+    <div class="dh-empty">
+      <p>{{ year }} 年 110 个主产县均未出现干热风日。</p>
+      <p class="chart-note">判据为日最高温 ≥35℃ 且相对湿度 ≤40%；若要查看全年份逐县天数，把上方「范围」切到「全部主产县」。</p>
+    </div>
+    {% endif %}
   </section>
 
-  <section class="dh-legend" aria-label="等级说明">
-    <span><span class="chip chip--ok"><i class="dot"></i>无</span> 0 天 · 正常关注灌浆期水分</span>
-    <span><span class="chip chip--gold"><i class="dot"></i>轻度</span> 1—2 天 · 查墒情、叶面补肥</span>
-    <span><span class="chip chip--alert"><i class="dot"></i>重度</span> ≥3 天 · 优先安排降温补水</span>
+  <section class="dh-legend" aria-label="判定说明">
+    <span><span class="chip chip--ok"><i class="dot"></i>无</span> 0 天，当年未出现</span>
+    <span><span class="chip chip--ok"><i class="dot"></i>常年</span> 高于 0 但未超本县中位</span>
+    <span><span class="chip chip--gold"><i class="dot"></i>略多</span> 超过本县中位，未进前 20%</span>
+    <span><span class="chip chip--alert"><i class="dot"></i>偏重</span> 达到本县近 15 年前 20%</span>
+  </section>
+
+  <section class="panel dh-panel dh-method" data-reveal>
+    <div class="block-head">
+      <div>
+        <h2>这一页的口径边界</h2>
+      </div>
+      <p class="block-note">三句话说明它为什么只排暴露、不给减产数字</p>
+    </div>
+    <ul class="dh-method-list">
+      <li><b>只收主产县。</b>全省 150 个行政区里有 40 个中心城区，与所属县共用同一气象站、天数完全相同，且没有小麦产量基准，混进来只会重复计数。本页只统计 110 个有产量基准的县。</li>
+      <li><b>相邻县共用一个气象站。</b>安阳、殷都、汤阴等地处同一气候区，同一年的天数完全相同是正常的——本页按县列出、不做市域累加，就是因为一旦累加，同一个气象站会被算成好几倍。</li>
+      <li><b>不跨县比天数。</b>各县常年底数本来就不同（豫北多于豫南），「5 天」在常年 5 天的县属于正常，在常年 0 天的县才算偏重。所以判定一律对标本县自己的 15 年序列。</li>
+      <li><b>不折算减产。</b>四灾种同时进面板回归后，干热风的系数 p=0.53、95% 区间跨 0，只报暴露强度。能否减产取决于灌溉条件——2017、2019、2020 三年 5 月干热风分别 1.92、2.38、2.32 天，当年全省单产仍高于常年。</li>
+    </ul>
+    <p class="chart-note">另需说明：本区干热风是稀疏事件，110 个县里多数县 15 年的中位天数为 0，这也是它在面板回归里不显著的原因之一——零值太多，年际差异撑不起统计功效。</p>
   </section>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-(function () {
-  'use strict';
-  var DATA = {{ data|tojson }};
-  var COUNTY_TO_CITY = {{ city_map|tojson }};
-  var selectedYear = String({{ year|tojson }});
-  var yearSelect = document.getElementById('yearSelect');
-  var tbody = document.getElementById('dhTableBody');
-  var yearNote = document.getElementById('yearNote');
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, function (char) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
-    });
-  }
-
-  function getLevel(days) {
-    if (days === 0) return { level: 0, text: '无', chip: 'chip--ok', effect: '无暴露 · 正常关注灌浆期水分供应' };
-    if (days <= 2) return { level: 1, text: '轻度', chip: 'chip--gold', effect: '叶片可能提前衰老 · 建议查墒情、叶面补肥' };
-    return { level: 2, text: '重度', chip: 'chip--alert', effect: '灌浆期缩短风险 · 优先安排降温补水，跟踪成熟期' };
-  }
-
-  function toggleCity(city) {
-    var rows = tbody.querySelectorAll('.dh-county-row[data-city="' + CSS.escape(city) + '"]');
-    var cityRow = tbody.querySelector('.dh-city-row[data-city="' + CSS.escape(city) + '"]');
-    var button = cityRow ? cityRow.querySelector('.dh-city-toggle') : null;
-    var expanded = button ? button.getAttribute('aria-expanded') === 'true' : false;
-    rows.forEach(function (row) {
-      row.classList.toggle('show', !expanded);
-    });
-    if (button) {
-      button.setAttribute('aria-expanded', String(!expanded));
-      var hint = button.querySelector('.dh-toggle');
-      if (hint) hint.textContent = expanded ? '展开 ▼' : '收起 ▲';
-    }
-  }
-
-  function renderTable() {
-    selectedYear = yearSelect.value;
-    var yearData = DATA.filter(function (item) { return String(item.year) === selectedYear; });
-    var groups = {};
-
-    yearData.forEach(function (item) {
-      var city = COUNTY_TO_CITY[item.county] || '其他';
-      if (!groups[city]) groups[city] = [];
-      groups[city].push(item);
-    });
-
-    var cities = Object.keys(groups).sort(function (a, b) {
-      var sumA = groups[a].reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
-      var sumB = groups[b].reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
-      return sumB - sumA;
-    });
-
-    if (!cities.length) {
-      tbody.innerHTML = '<tr><td colspan="4" class="dh-empty">该年没有干热风统计数据。</td></tr>';
-      yearNote.textContent = '该年没有可用数据。';
-      return;
-    }
-
-    var html = '';
-    cities.forEach(function (city) {
-      var counties = groups[city].slice().sort(function (a, b) { return b.hot_dry_days - a.hot_dry_days; });
-      var totalDays = counties.reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
-      var alertCount = counties.filter(function (item) { return item.hot_dry_days > 0; }).length;
-      var maxDays = counties.length ? counties[0].hot_dry_days : 0;
-      var level = getLevel(maxDays);
-
-      html += '<tr class="dh-city-row" data-city="' + escapeHtml(city) + '">' +
-        '<td><button class="dh-city-toggle" type="button" aria-expanded="false">' +
-        '<span>' + escapeHtml(city) + '</span> <span class="dh-toggle">展开 ▼</span></button></td>' +
-        '<td><b>' + totalDays + '</b> 天（' + alertCount + ' 个区县）</td>' +
-        '<td><span class="chip ' + level.chip + '"><i class="dot"></i>' + level.text + '</span>' +
-        '<span class="dh-impact-mobile">影响：' + level.effect + '</span></td>' +
-        '<td>' + level.effect + '</td></tr>';
-
-      counties.forEach(function (item) {
-        var countyLevel = getLevel(item.hot_dry_days);
-        html += '<tr class="dh-county-row" data-city="' + escapeHtml(city) + '">' +
-          '<td class="dh-county-name">└ ' + escapeHtml(item.county) + '</td>' +
-          '<td>' + item.hot_dry_days + ' 天</td>' +
-          '<td><span class="chip ' + countyLevel.chip + '"><i class="dot"></i>' + countyLevel.text + '</span>' +
-          '<span class="dh-impact-mobile">影响：' + countyLevel.effect + '</span></td>' +
-          '<td>' + countyLevel.effect + '</td></tr>';
-      });
-    });
-
-    tbody.innerHTML = html;
-    var maxTotal = groups[cities[0]].reduce(function (sum, item) { return sum + item.hot_dry_days; }, 0);
-    yearNote.textContent = maxTotal > 20
-      ? selectedYear + ' 年干热风偏重，注意防范灌浆期青枯逼熟。'
-      : selectedYear + ' 年干热风总体正常。';
-  }
-
-  tbody.addEventListener('click', function (event) {
-    var row = event.target.closest('.dh-city-row');
-    if (row) toggleCity(row.getAttribute('data-city'));
-  });
-  renderTable();
-})();
-</script>
 {% endblock %}

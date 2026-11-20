@@ -1198,55 +1198,113 @@ def api_map_data():
 
 @app.route("/dry_hot")
 def dry_hot():
+    """干热风暴露：只判「该县今年相对自己常年是否异常」，不做跨县、跨市比较。
+
+    为什么不跨县比绝对天数：各县常年底数不同（豫北本就多于豫南），
+    且城区与其属县共用同一气象站、天数完全相同，把行政区当独立样本会重复计数。
+    为什么不折算减产：四灾种面板检验里干热风 p=0.53、置信区间跨 0（见灾害预警页），
+    本页只排暴露强度，不给减产数字。
+    """
     years = list(BASE_YEARS)
-    year_arg = request.args.get("year", type=int)
-    year = year_arg if year_arg in years else years[-1]
+    year = request.args.get("year", type=int)
+    year = year if year in years else years[-1]
+    show_all = request.args.get("all") == "1"
 
     feat = pd.read_csv(PROJECT_ROOT / CONFIG["paths"]["processed"] / "feature_table.csv")
-    data = []
-    for _, r in feat.iterrows():
-        data.append({
-            "county": r["county"],
-            "year": int(r["year"]),
-            "hot_dry_days": int(r["hot_dry_days"]) if pd.notna(r["hot_dry_days"]) else 0,
+    stats = _county_stats_baseline()
+    feat = feat[feat["county"].isin(stats)].copy()       # 只留 110 个有产量基准的主产县
+    feat["hot_dry_days"] = feat["hot_dry_days"].fillna(0).astype(int)
+
+    # 每县自己的常年基准：中位数（稳健，抗极端年）与 80 分位（偏重线）
+    hist = {}
+    for c, g in feat.groupby("county"):
+        vals = g["hot_dry_days"].values
+        hist[c] = {
+            "median": float(np.median(vals)),
+            "p80": float(np.percentile(vals, 80)),
+            "max": int(vals.max()),
+            "years": int(len(vals)),
+        }
+
+    def _tidy(v):
+        """中位数常是整数，避免页面上出现 0.0 天。"""
+        v = float(v)
+        return int(v) if v.is_integer() else round(v, 1)
+
+    city_map = _county_city_map()
+    y = feat[feat["year"] == year]
+    rows = []
+    for c, d in zip(y["county"], y["hot_dry_days"]):
+        h = hist[c]
+        seq = feat[feat["county"] == c]["hot_dry_days"]
+        rank = int((seq > d).sum()) + 1               # 今年在该县历年中排第几高
+
+        if d >= h["p80"] and d > 0:
+            level, tone = "偏重", "heavy"
+            note = "进入本县近 15 年前 20%：灌浆期注意补水，能否减产看灌溉条件，本平台不折算"
+        elif d > h["median"]:
+            level, tone = "略多", "light"
+            note = "高于本县常年水平，留意墒情即可"
+        elif d > 0:
+            level, tone = "常年", "ok"
+            note = "在本县常年波动范围内，无需额外处置"
+        else:
+            level, tone = "无", "none"
+            note = "当年未出现干热风日"
+
+        rows.append({
+            "county": c,
+            "city": city_map.get(c, "其他"),
+            "days": int(d),
+            "median": _tidy(h["median"]),
+            "p80": _tidy(h["p80"]),
+            "rank": rank,
+            "years": h["years"],
+            "level": level,
+            "tone": tone,
+            "note": note,
+            "exposed": d > 0,
         })
 
-    # 统计汇总
-    all_days = [d["hot_dry_days"] for d in data]
-    total_days = sum(all_days)
+    order = {"heavy": 0, "light": 1, "ok": 2, "none": 3}
+    rows.sort(key=lambda r: (order[r["tone"]], -r["days"], r["county"]))
 
-    # 最严重年份
-    year_totals = {}
-    for d in data:
-        year_totals[d["year"]] = year_totals.get(d["year"], 0) + d["hot_dry_days"]
-    max_year = max(year_totals, key=year_totals.get)
+    exposed = [r for r in rows if r["exposed"]]
+    heavy = [r for r in exposed if r["tone"] == "heavy"]
+    light = [r for r in exposed if r["tone"] == "light"]
 
-    # 干热风最多区县
-    county_totals = {}
-    for d in data:
-        county_totals[d["county"]] = county_totals.get(d["county"], 0) + d["hot_dry_days"]
-    max_county = max(county_totals, key=county_totals.get)
+    # 当年县级中位 vs 全期县级中位：判断这年整体是正常年还是偏重年
+    med_cur = float(np.median([r["days"] for r in rows])) if rows else 0.0
+    med_all = float(np.median([h["median"] for h in hist.values()]))
+    max_county = max(rows, key=lambda r: r["days"]) if rows else None
 
-    # 预警区县数（当年天数>0的）
-    year_data = [d for d in data if d["year"] == year]
-    alert_count = sum(1 for d in year_data if d["hot_dry_days"] > 0)
-
-    stats = {
-        "total_days": total_days,
-        "max_year": f"{max_year}年({year_totals[max_year]}天)",
-        "max_county": f"{max_county}({county_totals[max_county]}天)",
-        "alert_count": alert_count,
+    stats_view = {
+        "max_county": max_county["county"] if max_county else "—",
+        "max_days": max_county["days"] if max_county else 0,
+        "exposed": len(exposed),
+        "heavy": len(heavy),
+        "light": len(light),
+        "none": len(rows) - len(exposed),
+        "med_cur": _tidy(med_cur),
+        "med_all": _tidy(med_all),
+        "counties": len(rows),
     }
 
-    # 构建区县->城市映射
-    city_map = {}
-    for city, counties_dict in CONFIG["counties"].items():
-        for c in counties_dict.values():
-            city_map[c] = city
+    if not exposed:
+        verdict = (f"{year} 年 {len(rows)} 个主产县均未出现干热风日"
+                   f"（判据：日最高温 ≥35℃ 且相对湿度 ≤40%），本年度无暴露。")
+    elif heavy:
+        verdict = (f"{year} 年 {len(exposed)} 个县出现干热风，其中 {len(heavy)} 个县达到各自近 15 年前 20%，"
+                   f"属偏重年份；最重为 {max_county['county']} {max_county['days']} 天。")
+    else:
+        verdict = (f"{year} 年 {len(exposed)} 个县出现干热风，均在本县常年波动范围内，"
+                   f"无县进入各自历史前 20%；最重为 {max_county['county']} {max_county['days']} 天。")
+
+    shown = rows if show_all else exposed
 
     return render_template("dry_hot.html", title="干热风预警", active="dry_hot",
-                           years=years, year=year, data=data, stats=stats, city_map=city_map)
-
+                           years=years, year=year, stats=stats_view, rows=shown,
+                           show_all=show_all, verdict=verdict)
 
 # ---- 风险总览 ----
 def _risk_feature_table() -> pd.DataFrame:
