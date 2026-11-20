@@ -103,6 +103,7 @@ python run.py                        # 加 --no-browser 则不弹浏览器
 - 原始包共 150 个县文件，配置中的 `洛阳市/龙管会.csv` 原始文件缺失；清洗后的 `wheat-ml/data/processed/weather_clean.csv` 已包含该县，页面与模型不受影响。
 - 重新运行 `wheat-ml/scripts/run_pipeline.py` 前请先备份 `wheat-ml/data/processed/`，否则新结果会因缺少上述原始文件而少一个县。
 - 市级产量 CSV 与《河南省小麦产量标签_总表.csv》已迁入 `wheat-ml/data/raw/source_yield/`，用于追溯；运行项目实际读取的是 `wheat-ml/data/raw/county_yield.csv`。
+- `wheat-ml/data/raw/gee_ndvi_henan.js` 是为后续接入 NDVI 预留的 GEE 取数脚本，本版建模未使用，也不参与流水线；对应的取数说明见同目录 `NDVI数据获取手册.md`。
 - `wheat-ml/data/processed/` 与 `wheat-ml/output/models/` 是运行必需的大文件，不要随代码清理误删。
 
 ## Git 仓库说明

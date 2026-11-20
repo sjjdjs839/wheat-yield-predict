@@ -71,6 +71,9 @@ def available() -> bool:
     """数据库是否可用（结果缓存 5 秒，避免每次请求都探测）"""
     if not DB.get("enabled"):
         return False
+    if not str(DB.get("password") or "").strip():
+        # 没配密码就不去撞连接：本机没库时会白等一个超时，页面跟着变慢
+        return False
     now = time.time()
     with _lock:
         if now - _cache["ts"] < _TTL:

@@ -467,7 +467,8 @@ model:
 
   random_forest:
 
-    n_estimators: 300
+    # 训练脚本里是硬编码的 500 棵，这一项没人读；留在这里只为和实际模型对得上
+    n_estimators: 500
 
   linear_regression: {}
 
@@ -505,7 +506,7 @@ database:
   host: "127.0.0.1"
   port: 3306          # 用 scripts/mysql_server.ps1 启的项目内实例时改为 3307
   user: "root"
-  password: "Root@123456"   # 换机器请改成你自己的密码，或设 WHEAT_DB_PASSWORD 环境变量
+  password: ""              # 留空即不连库、全程走 CSV；要用库就设 WHEAT_DB_PASSWORD 环境变量
   name: "wheat_ml"
   charset: "utf8mb4"
   connect_timeout: 3
